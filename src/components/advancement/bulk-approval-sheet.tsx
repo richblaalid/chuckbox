@@ -193,7 +193,7 @@ export function BulkApprovalSheet({
             requirementIds: Array.from(selectedIds),
             unitId,
             completedAt: `${completedDate}T12:00:00.000Z`,
-            notes: notes || undefined,
+            noteText: notes || undefined,
           })
         } else {
           const progressIds = incompleteRequirements
@@ -218,7 +218,7 @@ export function BulkApprovalSheet({
             requirementIds: Array.from(selectedIds),
             unitId,
             completedAt: `${completedDate}T12:00:00.000Z`,
-            notes: notes || undefined,
+            noteText: notes || undefined,
           })
         } else {
           // Fallback: only approve requirements that have progress records
