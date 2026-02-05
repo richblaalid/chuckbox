@@ -143,8 +143,6 @@ export async function syncFromScoutbook(
     let previousMemberCount = 0;
     let stuckPageCount = 0;
 
-    console.log(`[Sync] Starting extraction: ${totalMembers} members across ~${totalPages} pages`);
-
     while (currentPage <= maxPages) {
       snapshot = await client.snapshot();
 
@@ -153,8 +151,6 @@ export async function syncFromScoutbook(
       if (pageMembers.length === 0) {
         pageMembers = parseRosterFromRefs(snapshot);
       }
-
-      console.log(`[Sync] Page ${currentPage}: found ${pageMembers.length} members on this page`);
 
       rosterMembers.push(...pageMembers);
 
@@ -169,9 +165,7 @@ export async function syncFromScoutbook(
       // Safety check: if we're not making progress, break
       if (rosterMembers.length === previousMemberCount) {
         stuckPageCount++;
-        console.log(`[Sync] Warning: No new members on page ${currentPage} (stuck count: ${stuckPageCount})`);
         if (stuckPageCount >= 3) {
-          console.log(`[Sync] Breaking: stuck for 3 pages`);
           break;
         }
       } else {
@@ -181,24 +175,19 @@ export async function syncFromScoutbook(
 
       // Check for next page
       const hasNext = hasNextPage(snapshot);
-      console.log(`[Sync] hasNextPage: ${hasNext}`);
 
       if (!hasNext) {
-        console.log(`[Sync] No next page found, extraction complete`);
         break;
       }
 
       const nextPageRef = findNextPageRef(snapshot);
-      console.log(`[Sync] nextPageRef: ${nextPageRef}`);
 
       if (!nextPageRef) {
-        console.log(`[Sync] No next page ref found, extraction complete`);
         break;
       }
 
       // Check if we've already extracted all expected members
       if (totalMembers > 0 && rosterMembers.length >= totalMembers) {
-        console.log(`[Sync] Extracted all ${totalMembers} members, stopping`);
         break;
       }
 
@@ -207,8 +196,6 @@ export async function syncFromScoutbook(
       session.pagesVisited++;
       currentPage++;
     }
-
-    console.log(`[Sync] Extraction complete: ${rosterMembers.length} members from ${currentPage} pages`);
 
     // Deduplicate by BSA member ID (handles pagination edge cases)
     const uniqueMembers = new Map<string, RosterMember>();
@@ -219,10 +206,6 @@ export async function syncFromScoutbook(
       }
     }
     const deduplicatedMembers = Array.from(uniqueMembers.values());
-
-    if (deduplicatedMembers.length < rosterMembers.length) {
-      console.log(`[Sync] Deduplicated: ${rosterMembers.length} -> ${deduplicatedMembers.length} members`);
-    }
 
     // Clear and replace with deduplicated list
     rosterMembers.length = 0;

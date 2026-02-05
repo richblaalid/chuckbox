@@ -23,13 +23,10 @@ async function runSyncInBackground(
   const supabase = getServiceClient()
 
   try {
-    console.log(`[Sync ${sessionId}] Starting browser automation...`)
-
     const result = await syncFromScoutbook({
       rosterOnly,
       onProgress: async (progress) => {
         // Update session with progress
-        console.log(`[Sync ${sessionId}] ${progress.phase}: ${progress.message}`)
         await supabase
           .from('sync_sessions')
           .update({
@@ -43,12 +40,8 @@ async function runSyncInBackground(
     // Stage roster members for preview (instead of direct import)
     let stagingResult = null
     if (result.success && result.rosterMembers.length > 0) {
-      console.log(`[Sync ${sessionId}] Staging ${result.rosterMembers.length} members for review...`)
       try {
         stagingResult = await stageRosterMembers(supabase, sessionId, unitId, result.rosterMembers)
-        console.log(
-          `[Sync ${sessionId}] Staging complete: ${stagingResult.toCreate} to create, ${stagingResult.toUpdate} to update, ${stagingResult.toSkip} to skip`
-        )
       } catch (stagingError) {
         console.error(`[Sync ${sessionId}] Staging error:`, stagingError)
         result.errors.push({
@@ -62,9 +55,8 @@ async function runSyncInBackground(
 
     // Update session with results - status is 'staged' pending user confirmation
     const newStatus = result.success && stagingResult ? 'staged' : (result.success ? 'completed' : 'failed')
-    console.log(`[Sync ${sessionId}] Updating session status to: ${newStatus}`)
 
-    const { error: updateError, data: updateData } = await supabase
+    const { error: updateError } = await supabase
       .from('sync_sessions')
       .update({
         status: newStatus,
@@ -79,13 +71,7 @@ async function runSyncInBackground(
 
     if (updateError) {
       console.error(`[Sync ${sessionId}] Failed to update session status:`, updateError)
-    } else {
-      console.log(`[Sync ${sessionId}] Session updated successfully:`, updateData)
     }
-
-    console.log(
-      `[Sync ${sessionId}] Extraction complete: ${result.rosterMembers.length} members extracted, awaiting user confirmation`
-    )
   } catch (error) {
     console.error(`[Sync ${sessionId}] Error:`, error)
 

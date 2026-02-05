@@ -140,8 +140,6 @@ export async function POST(request: Request) {
       )
     }
 
-    console.log(`[Extension Sync] Processing ${html.length} bytes of HTML for unit ${unitId}`)
-
     // Create sync session
     const serviceClient = getServiceClient()
     const { data: session, error: sessionError } = await serviceClient
@@ -192,10 +190,6 @@ export async function POST(request: Request) {
       )
     }
 
-    console.log(
-      `[Extension Sync] Parsed ${parseResult.members.length} members (AI: ${parseResult.usedAI})`
-    )
-
     // Stage members for review
     const stagingResult = await stageRosterMembers(
       serviceClient,
@@ -213,8 +207,6 @@ export async function POST(request: Request) {
         records_extracted: parseResult.members.length,
       })
       .eq('id', session.id)
-
-    console.log(`[Extension Sync] Staging complete for session ${session.id}`)
 
     return NextResponse.json({
       success: true,

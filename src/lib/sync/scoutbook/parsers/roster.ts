@@ -16,26 +16,9 @@ export function parseRosterPage(snapshot: AgentBrowserSnapshot): RosterMember[] 
   const refs = snapshot.data?.refs || {};
   const snapshotText = snapshot.data?.snapshot || '';
 
-  const DEBUG_POSITIONS = process.env.DEBUG_SCOUTBOOK_SYNC === 'true';
-
-  // Debug: Log snapshot summary
-  if (DEBUG_POSITIONS) {
-    console.log('[ROSTER PARSER] Snapshot length:', snapshotText.length);
-    console.log('[ROSTER PARSER] Refs count:', Object.keys(refs).length);
-    // Look for "Position" column hints in the snapshot
-    const positionMatches = snapshotText.match(/[Pp]osition[^"]{0,100}/g);
-    console.log('[ROSTER PARSER] Position-related text samples:', positionMatches?.slice(0, 5));
-  }
-
   // Parse the snapshot text to find table rows
   // Each row contains: Name, Member ID, Type, Age, Last Rank, Patrol, Position, Renewal Status, Expiration Date
   const rows = extractTableRows(snapshotText);
-
-  if (DEBUG_POSITIONS) {
-    console.log('[ROSTER PARSER] Extracted rows count:', rows.length);
-    // Log first few rows for debugging
-    console.log('[ROSTER PARSER] Sample rows:', rows.slice(0, 3));
-  }
 
   for (const row of rows) {
     const member = parseRosterRow(row, refs);
@@ -84,7 +67,7 @@ function extractTableRows(snapshotText: string): string[] {
  */
 function parseRosterRow(
   rowContent: string,
-  refs: Record<string, SnapshotRef>
+  _refs: Record<string, SnapshotRef>
 ): RosterMember | null {
   // Row format example:
   // "George Anderson 133456904 YOUTH 15 Life Scout Flaring Phoenix 1Senior Patrol Leader Current 8/31/2026"
@@ -96,15 +79,6 @@ function parseRosterRow(
   }
 
   const bsaMemberId = bsaIdMatch[1];
-
-  // Debug: Log the raw row content for position debugging
-  const DEBUG_POSITIONS = process.env.DEBUG_SCOUTBOOK_SYNC === 'true';
-
-  // Always log for specific scouts to debug dual positions issue
-  const isDebugTarget = rowContent.toLowerCase().includes('blaalid');
-  if (DEBUG_POSITIONS || isDebugTarget) {
-    console.log(`[ROSTER PARSER] BSA ID ${bsaMemberId}: Raw row content:`, rowContent);
-  }
 
   // Split the row content to extract fields
   // Name is everything before the BSA ID
@@ -208,8 +182,7 @@ function parseRosterRow(
   // We extract the visible position and note the count for reference.
 
   let position: string | null = null;
-  let position2: string | null = null;
-  let positionCount = 0;
+  const position2: string | null = null;
 
   for (const pos of knownPositions) {
     const escapedPos = pos.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -219,26 +192,12 @@ function parseRosterRow(
 
     if (match) {
       position = pos;
-      positionCount = match[1] ? parseInt(match[1], 10) : 1;
       break; // Only one position is visible in roster view
     }
   }
 
   // Note: position2 will always be null from roster view since Scoutbook
-  // only displays one position. The positionCount tells us if there are more.
-  // To get all positions, need to navigate to individual profile pages.
-
-  const foundPositions = position ? [`${positionCount}:${position}`] : [];
-
-  // Debug: Log extracted positions
-  if (DEBUG_POSITIONS || isDebugTarget) {
-    console.log(`[ROSTER PARSER] BSA ID ${bsaMemberId}: Extracted positions:`, {
-      position,
-      position2,
-      foundPositions,
-      restText: rest,
-    });
-  }
+  // only displays one position. To get all positions, need to navigate to individual profile pages.
 
   return {
     name,

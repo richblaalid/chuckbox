@@ -155,13 +155,7 @@ export async function importScoutbookHistory(
   // Import rank progress
   for (const rankProgress of selections.rankProgress) {
     const rank = rankMap.get(rankProgress.rankCode) || rankNameMap.get(rankProgress.rankName.toLowerCase())
-    if (!rank) {
-      console.log(`Rank not found: ${rankProgress.rankCode} / ${rankProgress.rankName}`)
-      continue
-    }
-
-    if (!rank.requirement_version_year) {
-      console.log(`Rank ${rank.name} does not have a version year set`)
+    if (!rank || !rank.requirement_version_year) {
       continue
     }
 
@@ -281,7 +275,6 @@ export async function importScoutbookHistory(
   for (const badgeEntry of selections.completedMeritBadges) {
     const meritBadge = badgeNameMap.get(badgeEntry.normalizedName)
     if (!meritBadge) {
-      console.log(`Badge not found: ${badgeEntry.name} (${badgeEntry.normalizedName})`)
       continue
     }
 
@@ -323,13 +316,7 @@ export async function importScoutbookHistory(
   // Import partial merit badges with requirement completions
   for (const badgeEntry of selections.partialMeritBadges) {
     const meritBadge = badgeNameMap.get(badgeEntry.normalizedName)
-    if (!meritBadge) {
-      console.log(`Badge not found: ${badgeEntry.name} (${badgeEntry.normalizedName})`)
-      continue
-    }
-
-    if (!meritBadge.requirement_version_year) {
-      console.log(`Badge ${meritBadge.name} does not have a version year set`)
+    if (!meritBadge || !meritBadge.requirement_version_year) {
       continue
     }
 
@@ -365,7 +352,6 @@ export async function importScoutbookHistory(
         .single()
 
       if (!newProgress) {
-        console.log(`Failed to create progress for badge: ${badgeEntry.name}`)
         continue
       }
       progressId = newProgress.id
@@ -540,14 +526,8 @@ export async function importScoutbookHistory(
   // Import leadership history
   for (const position of selections.leadershipHistory) {
     const positionId = positionMap.get(position.name.toLowerCase())
-    if (!positionId) {
-      console.log(`Position not found: ${position.name}`)
-      continue
-    }
-
-    // Skip if no start date
-    if (!position.startDate) {
-      console.log(`Skipping position without start date: ${position.name}`)
+    // Skip if position not found or no start date
+    if (!positionId || !position.startDate) {
       continue
     }
 

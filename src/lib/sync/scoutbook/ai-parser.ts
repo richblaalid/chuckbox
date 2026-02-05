@@ -77,8 +77,6 @@ async function parsePageWithAI(
   const tableHtml = extractRosterTable(sanitized)
   const truncated = tableHtml.length > 150000 ? tableHtml.slice(0, 150000) : tableHtml
 
-  console.log(`[AI Parser] Processing page ${pageNumber} (${truncated.length} chars)`)
-
   const message = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
     max_tokens: 8192,
@@ -122,7 +120,6 @@ export async function parseRosterHtmlWithAI(html: string): Promise<AIParserResul
 
   // AI parsing temporarily disabled - use HTML parser directly
   // TODO: Re-enable AI parsing when ready for production
-  console.log('[Parser] Using HTML parser')
   return parseRosterHtmlWithRegex(html)
 
   /* AI parsing commented out for now
@@ -568,13 +565,11 @@ function parseRosterHtmlWithRegex(html: string): AIParserResult {
     if (rowMatches.length > 0) {
       const headerCells = extractCells(rowMatches[0][1])
       columnMap = identifyColumnsFromHeaders(headerCells)
-      console.log('[Regex Parser] Columns from headers:', columnMap)
 
       // If header detection failed, try to infer from first data row
       if (Object.keys(columnMap).length === 0 && rowMatches.length > 1) {
         const dataCells = extractCells(rowMatches[1][1])
         columnMap = identifyColumnsFromData(dataCells)
-        console.log('[Regex Parser] Columns from data patterns:', columnMap)
       }
     }
 
@@ -738,8 +733,6 @@ function parseRosterHtmlWithRegex(html: string): AIParserResult {
         expirationDate,
       })
     }
-
-    console.log(`[Regex Parser] Extracted ${members.length} members`)
   } catch (error) {
     console.error('[Regex Parser] Error:', error)
   }

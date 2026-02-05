@@ -101,7 +101,6 @@ export async function POST(request: NextRequest) {
 
     // Parse the event
     const event: SquareWebhookEvent = JSON.parse(rawBody)
-    console.log(`Received Square webhook: ${event.type}`, { eventId: event.event_id })
 
     // Get the unit associated with this merchant
     const supabase = getAdminSupabase()
@@ -137,7 +136,8 @@ export async function POST(request: NextRequest) {
         break
 
       default:
-        console.log(`Unhandled webhook event type: ${event.type}`)
+        // Unhandled event type - ignore
+        break
     }
 
     return NextResponse.json({ received: true })
@@ -203,8 +203,6 @@ async function handlePaymentEvent(
         updated_at: new Date().toISOString(),
       })
       .eq('id', existingTransaction.id)
-
-    console.log(`Updated Square transaction ${payment.id}`)
   } else {
     // Insert new transaction (may have been created via external Square payment)
     await supabase.from('square_transactions').insert({
@@ -212,8 +210,6 @@ async function handlePaymentEvent(
       is_reconciled: false,
       synced_at: new Date().toISOString(),
     })
-
-    console.log(`Created Square transaction ${payment.id}`)
   }
 }
 
@@ -274,12 +270,8 @@ async function handleRefundEvent(
     if (journalError) {
       console.error(`Failed to create refund journal entry for ${refund.id}:`, journalError)
       // Don't throw - the refund itself is processed, just log the accounting error
-    } else {
-      console.log(`Created refund journal entry for ${refund.id}`)
     }
   }
-
-  console.log(`Processed refund ${refund.id} for payment ${refund.payment_id}`)
 }
 
 async function handleOAuthRevoked(
@@ -295,6 +287,4 @@ async function handleOAuthRevoked(
       updated_at: new Date().toISOString(),
     })
     .eq('unit_id', unitId)
-
-  console.log(`OAuth revoked for unit ${unitId}, merchant ${event.merchant_id}`)
 }

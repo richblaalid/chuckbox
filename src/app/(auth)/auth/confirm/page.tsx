@@ -74,8 +74,6 @@ function AuthConfirmContent() {
 
     // Listen for auth state changes (handles hash fragment automatically)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state change:', event, !!session)
-
       if (event === 'SIGNED_IN' && session) {
         // Track successful login
         trackLoginCompleted({ userId: session.user.id })
@@ -117,10 +115,6 @@ function AuthConfirmContent() {
       const hashParams = parseHashParams()
       const accessToken = hashParams.access_token
       const refreshToken = hashParams.refresh_token
-
-      console.log('Auth confirm - URL hash:', window.location.hash)
-      console.log('Auth confirm - hashParams:', hashParams)
-      console.log('Auth confirm - code:', code, 'tokenHash:', tokenHash, 'accessToken:', !!accessToken)
 
       // First check if we already have a session
       const { data: { session: existingSession } } = await supabase.auth.getSession()
@@ -334,7 +328,6 @@ function AuthConfirmContent() {
 
       // If we have hash params, wait a bit for onAuthStateChange to process them
       if (accessToken) {
-        console.log('Hash tokens found, waiting for auth state change...')
         // Give the auth state listener time to process
         await new Promise(resolve => setTimeout(resolve, 2000))
         // If we're still here, auth state change didn't fire

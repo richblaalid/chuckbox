@@ -35,7 +35,6 @@ export class AgentBrowserClient {
     // Try to close any existing browser session first
     try {
       await this.runCommand('close');
-      console.log('[Browser] Closed existing browser session');
     } catch {
       // No existing session, that's fine
     }
@@ -193,8 +192,6 @@ export class AgentBrowserClient {
     const maxAttempts = 3;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      console.log(`[Browser] Checking for tour modal (attempt ${attempt}/${maxAttempts})...`);
-
       // Wait a bit for modal to appear (longer on first attempt)
       await this.sleep(attempt === 1 ? 1000 : 500);
 
@@ -209,7 +206,6 @@ export class AgentBrowserClient {
         const skipMatch = snapshotText.match(/button "[^"]*" \[ref=(e\d+)\][^\n]*: Skip\b/i);
         if (skipMatch) {
           const skipRef = skipMatch[1];
-          console.log(`[Browser] Found Skip button via snapshot text: @${skipRef}`);
           await this.click(`@${skipRef}`);
           await this.sleep(500);
           return true;
@@ -219,7 +215,6 @@ export class AgentBrowserClient {
         for (const [key, ref] of Object.entries(refs)) {
           const name = ref.name?.trim();
           if (name && name.toLowerCase() === 'skip') {
-            console.log(`[Browser] Found Skip button via refs: @${key}`);
             await this.click(`@${key}`);
             await this.sleep(500);
             return true;
@@ -228,14 +223,9 @@ export class AgentBrowserClient {
 
         // Check if tour modal text is present but Skip button wasn't found
         if (snapshotText.includes('Welcome to Scoutbook Plus') || snapshotText.includes('begin the tour')) {
-          console.log('[Browser] Tour modal detected but Skip button not found in expected format');
-          // Debug: show last 500 chars of snapshot where modal buttons should be
-          console.log('[Browser] Snapshot tail:', snapshotText.slice(-500));
-
           // Look for [object Object] buttons which are the modal buttons
           const objectButtonMatch = snapshotText.match(/button "\[object Object\]" \[ref=(e\d+)\][^\n]*: Skip/i);
           if (objectButtonMatch) {
-            console.log(`[Browser] Found Skip via [object Object] pattern: @${objectButtonMatch[1]}`);
             await this.click(`@${objectButtonMatch[1]}`);
             await this.sleep(500);
             return true;
@@ -248,7 +238,6 @@ export class AgentBrowserClient {
     }
 
     // Last resort: try pressing Escape to close any modal
-    console.log('[Browser] No Skip button found after retries, trying Escape key');
     await this.press('Escape');
     await this.sleep(300);
     return false;
