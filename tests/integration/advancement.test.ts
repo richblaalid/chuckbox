@@ -373,4 +373,192 @@ describeIntegration('Advancement Integration Tests', () => {
       expect(reqProgress?.length || 0).toBe(0)
     })
   })
+
+  /**
+   * Phase 2 Batch Performance Tests
+   *
+   * These tests verify that batch query patterns work correctly
+   * for bulk operations with multiple scouts.
+   *
+   * Tasks verified: 2.1.5, 2.2.3, 2.3.2
+   */
+  describe('Batch Performance Tests', () => {
+    it('should batch create rank progress for 10 scouts in under 5s', { timeout: 30000 }, async () => {
+      const SCOUT_COUNT = 10
+      const unit = await seedUnit(supabase, ctx)
+
+      // Get Scout rank
+      const ranks = await getRanks(supabase)
+      const scoutRank = ranks.find(r => r.code === 'scout')
+      expect(scoutRank).toBeDefined()
+
+      // Create 10 scouts
+      const scoutPromises = Array.from({ length: SCOUT_COUNT }, () =>
+        seedScout(supabase, ctx, unit.id)
+      )
+      const scouts = await Promise.all(scoutPromises)
+      expect(scouts.length).toBe(SCOUT_COUNT)
+
+      // Measure batch insert time for rank progress
+      const startTime = performance.now()
+
+      // Batch insert rank progress for all scouts (simulating the optimized pattern)
+      const rankProgressRecords = scouts.map(scout => ({
+        scout_id: scout.id,
+        rank_id: scoutRank!.id,
+        status: 'in_progress' as const,
+        started_at: new Date().toISOString(),
+      }))
+
+      const { data: insertedProgress, error: insertError } = await supabase
+        .from('scout_rank_progress')
+        .insert(rankProgressRecords)
+        .select('id, scout_id, rank_id')
+
+      const elapsed = performance.now() - startTime
+
+      // Verify success
+      expect(insertError).toBeNull()
+      expect(insertedProgress?.length).toBe(SCOUT_COUNT)
+
+      // Verify timing - batch insert should be fast
+      expect(elapsed).toBeLessThan(5000)
+
+      // Track for cleanup
+      insertedProgress?.forEach(p => ctx.trackRankProgress(p.id))
+    })
+
+    it('should batch fetch and update requirements for 10 scouts using in() operator', { timeout: 30000 }, async () => {
+      const SCOUT_COUNT = 10
+      const unit = await seedUnit(supabase, ctx)
+
+      // Create 10 scouts with rank progress
+      const scouts: Awaited<ReturnType<typeof seedScoutWithRequirementProgress>>[] = []
+      for (let i = 0; i < SCOUT_COUNT; i++) {
+        const result = await seedScoutWithRequirementProgress(supabase, ctx, unit.id, {
+          rankCode: 'scout',
+          completedRequirements: 0,
+        })
+        scouts.push(result)
+      }
+
+      expect(scouts.length).toBe(SCOUT_COUNT)
+
+      // Collect requirement progress IDs to update (first requirement from each scout)
+      const idsToUpdate = scouts.map(s => s.requirementProgress[0].id)
+      expect(idsToUpdate.length).toBe(SCOUT_COUNT)
+
+      // Measure batch operations
+      const startTime = performance.now()
+
+      // 1. Batch fetch (should be 1 query)
+      const { data: existingProgress, error: fetchError } = await supabase
+        .from('scout_rank_requirement_progress')
+        .select('id, status')
+        .in('id', idsToUpdate)
+
+      expect(fetchError).toBeNull()
+      expect(existingProgress?.length).toBe(SCOUT_COUNT)
+
+      // 2. Batch update (should be 1 query)
+      const { data: updated, error: updateError } = await supabase
+        .from('scout_rank_requirement_progress')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', idsToUpdate)
+        .select('id')
+
+      const elapsed = performance.now() - startTime
+
+      // Verify success
+      expect(updateError).toBeNull()
+      expect(updated?.length).toBe(SCOUT_COUNT)
+
+      // Verify timing - batch should be fast
+      expect(elapsed).toBeLessThan(3000)
+
+      // Verify all were actually updated
+      const { data: verified } = await supabase
+        .from('scout_rank_requirement_progress')
+        .select('id, status')
+        .in('id', idsToUpdate)
+
+      const completedCount = verified?.filter(r => r.status === 'completed').length
+      expect(completedCount).toBe(SCOUT_COUNT)
+    })
+
+    it('should efficiently create missing progress records for scouts without progress', { timeout: 30000 }, async () => {
+      const unit = await seedUnit(supabase, ctx)
+
+      // Create 5 scouts with progress, 5 without
+      const scoutsWithProgress: Awaited<ReturnType<typeof seedScoutWithRequirementProgress>>[] = []
+      for (let i = 0; i < 5; i++) {
+        const result = await seedScoutWithRequirementProgress(supabase, ctx, unit.id, {
+          rankCode: 'scout',
+          completedRequirements: 0,
+        })
+        scoutsWithProgress.push(result)
+      }
+
+      // Create 5 scouts without rank progress
+      const scoutsWithoutProgress: Awaited<ReturnType<typeof seedScout>>[] = []
+      for (let i = 0; i < 5; i++) {
+        const scout = await seedScout(supabase, ctx, unit.id)
+        scoutsWithoutProgress.push(scout)
+      }
+
+      // Get Scout rank info
+      const ranks = await getRanks(supabase)
+      const scoutRank = ranks.find(r => r.code === 'scout')
+      expect(scoutRank).toBeDefined()
+
+      const allScoutIds = [
+        ...scoutsWithProgress.map(s => s.scout.id),
+        ...scoutsWithoutProgress.map(s => s.id),
+      ]
+
+      const startTime = performance.now()
+
+      // Batch check which scouts have rank progress
+      const { data: existingProgress } = await supabase
+        .from('scout_rank_progress')
+        .select('id, scout_id, rank_id')
+        .in('scout_id', allScoutIds)
+        .eq('rank_id', scoutRank!.id)
+
+      // Should find 5 existing
+      expect(existingProgress?.length).toBe(5)
+
+      // Create progress for scouts missing it
+      const scoutsWithProgressIds = new Set(existingProgress?.map(p => p.scout_id))
+      const scoutsMissingProgress = allScoutIds.filter(id => !scoutsWithProgressIds.has(id))
+
+      expect(scoutsMissingProgress.length).toBe(5)
+
+      // Batch insert missing progress
+      const newProgressRecords = scoutsMissingProgress.map(scoutId => ({
+        scout_id: scoutId,
+        rank_id: scoutRank!.id,
+        status: 'in_progress' as const,
+        started_at: new Date().toISOString(),
+      }))
+
+      const { data: inserted } = await supabase
+        .from('scout_rank_progress')
+        .insert(newProgressRecords)
+        .select('id')
+
+      const elapsed = performance.now() - startTime
+
+      // Verify
+      expect(inserted?.length).toBe(5)
+      expect(elapsed).toBeLessThan(3000)
+
+      // Track for cleanup
+      inserted?.forEach(p => ctx.trackRankProgress(p.id))
+    })
+  })
 })

@@ -479,12 +479,16 @@ export async function bulkApproveMeritBadgeRequirementsWithInit(params: {
 }
 
 // ==========================================
-// BULK ENTRY ACTIONS
+// BULK ENTRY ACTIONS (Optimized for batch operations)
 // ==========================================
 
 /**
  * Bulk record requirement progress from the bulk entry interface
  * Handles both rank and merit badge requirements
+ *
+ * OPTIMIZED: Uses batch queries instead of per-entry loops
+ * Previous: O(n) queries where n = entries
+ * Now: O(1) queries regardless of entry count
  */
 export async function bulkRecordProgress(params: {
   entries: Array<{
@@ -505,54 +509,40 @@ export async function bulkRecordProgress(params: {
 
   const adminSupabase = createAdminClient()
 
+  // Separate entries by type
+  const rankEntries = params.entries.filter(e => e.type === 'rank')
+  const mbEntries = params.entries.filter(e => e.type === 'merit_badge')
+
   let successCount = 0
   let failedCount = 0
   const errors: string[] = []
 
-  for (const entry of params.entries) {
-    try {
-      if (entry.type === 'rank') {
-        // Handle rank requirement
-        const result = await processRankRequirementEntry(
-          adminSupabase,
-          entry.scoutId,
-          entry.requirementId,
-          entry.parentId,
-          params.completedAt,
-          auth.profileId,
-          params.notes
-        )
+  // Process rank entries using batched operations
+  if (rankEntries.length > 0) {
+    const result = await batchProcessRankRequirements(
+      adminSupabase,
+      rankEntries,
+      params.completedAt,
+      auth.profileId,
+      params.notes
+    )
+    successCount += result.successCount
+    failedCount += result.failedCount
+    errors.push(...result.errors)
+  }
 
-        if (result.success) {
-          successCount++
-        } else {
-          errors.push(result.error || `Failed for scout ${entry.scoutId}`)
-          failedCount++
-        }
-      } else {
-        // Handle merit badge requirement
-        const result = await processMeritBadgeRequirementEntry(
-          adminSupabase,
-          entry.scoutId,
-          entry.requirementId,
-          entry.parentId,
-          params.completedAt,
-          auth.profileId,
-          params.notes
-        )
-
-        if (result.success) {
-          successCount++
-        } else {
-          errors.push(result.error || `Failed for scout ${entry.scoutId}`)
-          failedCount++
-        }
-      }
-    } catch (err) {
-      console.error('Unexpected error in bulk entry:', err)
-      errors.push(`Unexpected error for scout ${entry.scoutId}`)
-      failedCount++
-    }
+  // Process merit badge entries using batched operations
+  if (mbEntries.length > 0) {
+    const result = await batchProcessMeritBadgeRequirements(
+      adminSupabase,
+      mbEntries,
+      params.completedAt,
+      auth.profileId,
+      params.notes
+    )
+    successCount += result.successCount
+    failedCount += result.failedCount
+    errors.push(...result.errors)
   }
 
   revalidatePath('/advancement')
@@ -562,6 +552,470 @@ export async function bulkRecordProgress(params: {
     success: failedCount === 0,
     data: { successCount, failedCount, errors },
     error: failedCount > 0 ? `Failed to record ${failedCount} entry/entries` : undefined,
+  }
+}
+
+/**
+ * Batch process rank requirements using O(1) queries
+ * Instead of querying per-entry, we batch all operations
+ */
+async function batchProcessRankRequirements(
+  adminSupabase: ReturnType<typeof createAdminClient>,
+  entries: Array<{ scoutId: string; requirementId: string; parentId: string }>,
+  completedAt: string,
+  profileId: string,
+  notes?: string
+): Promise<{ successCount: number; failedCount: number; errors: string[] }> {
+  const errors: string[] = []
+
+  // Extract unique IDs for batch queries
+  const uniqueRankIds = [...new Set(entries.map(e => e.parentId))]
+  const uniqueScoutIds = [...new Set(entries.map(e => e.scoutId))]
+
+  // 1. Batch fetch all rank info (for version years)
+  const { data: ranks } = await adminSupabase
+    .from('bsa_ranks')
+    .select('id, requirement_version_year')
+    .in('id', uniqueRankIds)
+
+  if (!ranks || ranks.length === 0) {
+    return { successCount: 0, failedCount: entries.length, errors: ['Ranks not found'] }
+  }
+
+  const rankMap = new Map(ranks.map(r => [r.id, r]))
+
+  // Validate all ranks have version years
+  for (const rankId of uniqueRankIds) {
+    const rank = rankMap.get(rankId)
+    if (!rank?.requirement_version_year) {
+      return {
+        successCount: 0,
+        failedCount: entries.length,
+        errors: [`Rank ${rankId} does not have a version year set`],
+      }
+    }
+  }
+
+  // 2. Batch fetch all existing rank progress records
+  const { data: existingRankProgress } = await adminSupabase
+    .from('scout_rank_progress')
+    .select('id, scout_id, rank_id')
+    .in('scout_id', uniqueScoutIds)
+    .in('rank_id', uniqueRankIds)
+
+  // Map: "scoutId:rankId" -> progressId
+  const rankProgressMap = new Map(
+    (existingRankProgress || []).map(p => [`${p.scout_id}:${p.rank_id}`, p.id])
+  )
+
+  // 3. Find which scout×rank combinations need new progress records
+  const scoutRankPairs = [...new Set(entries.map(e => `${e.scoutId}:${e.parentId}`))]
+  const missingRankProgress = scoutRankPairs.filter(key => !rankProgressMap.has(key))
+
+  // 4. Batch insert missing rank progress records
+  if (missingRankProgress.length > 0) {
+    const newRankProgressRecords = missingRankProgress.map(key => {
+      const [scoutId, rankId] = key.split(':')
+      return {
+        scout_id: scoutId,
+        rank_id: rankId,
+        status: 'in_progress' as const,
+        started_at: new Date().toISOString(),
+      }
+    })
+
+    const { data: insertedProgress, error: insertError } = await adminSupabase
+      .from('scout_rank_progress')
+      .insert(newRankProgressRecords)
+      .select('id, scout_id, rank_id')
+
+    if (insertError) {
+      console.error('Error batch inserting rank progress:', insertError)
+      return {
+        successCount: 0,
+        failedCount: entries.length,
+        errors: ['Failed to create rank progress records'],
+      }
+    }
+
+    // Add new progress to map
+    for (const p of insertedProgress || []) {
+      rankProgressMap.set(`${p.scout_id}:${p.rank_id}`, p.id)
+    }
+
+    // 5. For each newly created rank progress, batch insert all requirement progress records
+    if (insertedProgress && insertedProgress.length > 0) {
+      // Get all requirements for all ranks (one query)
+      const { data: allRequirements } = await adminSupabase
+        .from('bsa_rank_requirements')
+        .select('id, rank_id, version_year')
+        .in('rank_id', uniqueRankIds)
+
+      // Filter to only requirements matching each rank's version year
+      const reqProgressRecords: Array<{
+        scout_rank_progress_id: string
+        requirement_id: string
+        status: 'not_started'
+      }> = []
+
+      for (const progress of insertedProgress) {
+        const rank = rankMap.get(progress.rank_id)
+        if (!rank) continue
+
+        const rankReqs = (allRequirements || []).filter(
+          r => r.rank_id === progress.rank_id && r.version_year === rank.requirement_version_year
+        )
+
+        for (const req of rankReqs) {
+          reqProgressRecords.push({
+            scout_rank_progress_id: progress.id,
+            requirement_id: req.id,
+            status: 'not_started',
+          })
+        }
+      }
+
+      if (reqProgressRecords.length > 0) {
+        await adminSupabase.from('scout_rank_requirement_progress').insert(reqProgressRecords)
+      }
+    }
+  }
+
+  // 6. Now get all requirement progress IDs we need to update
+  // Build list of (rank_progress_id, requirement_id) pairs
+  const progressReqPairs = entries.map(e => ({
+    rankProgressId: rankProgressMap.get(`${e.scoutId}:${e.parentId}`)!,
+    requirementId: e.requirementId,
+    scoutId: e.scoutId,
+  }))
+
+  // Get all rank progress IDs
+  const allRankProgressIds = [...new Set(progressReqPairs.map(p => p.rankProgressId))]
+
+  // 7. Batch fetch existing requirement progress
+  const { data: existingReqProgress } = await adminSupabase
+    .from('scout_rank_requirement_progress')
+    .select('id, scout_rank_progress_id, requirement_id, status')
+    .in('scout_rank_progress_id', allRankProgressIds)
+
+  // Map: "progressId:reqId" -> { id, status }
+  const reqProgressMap = new Map(
+    (existingReqProgress || []).map(p => [
+      `${p.scout_rank_progress_id}:${p.requirement_id}`,
+      { id: p.id, status: p.status },
+    ])
+  )
+
+  // 8. Find which requirements need progress records created
+  const missingReqProgress = progressReqPairs.filter(
+    p => !reqProgressMap.has(`${p.rankProgressId}:${p.requirementId}`)
+  )
+
+  // 9. Batch insert missing requirement progress
+  if (missingReqProgress.length > 0) {
+    const newReqProgressRecords = missingReqProgress.map(p => ({
+      scout_rank_progress_id: p.rankProgressId,
+      requirement_id: p.requirementId,
+      status: 'not_started' as const,
+    }))
+
+    const { data: insertedReqProgress } = await adminSupabase
+      .from('scout_rank_requirement_progress')
+      .insert(newReqProgressRecords)
+      .select('id, scout_rank_progress_id, requirement_id, status')
+
+    // Add to map
+    for (const p of insertedReqProgress || []) {
+      reqProgressMap.set(`${p.scout_rank_progress_id}:${p.requirement_id}`, {
+        id: p.id,
+        status: p.status,
+      })
+    }
+  }
+
+  // 10. Batch update: mark all requirements complete (skip already completed ones)
+  const idsToUpdate: string[] = []
+  let skippedCount = 0
+
+  for (const pair of progressReqPairs) {
+    const reqProgress = reqProgressMap.get(`${pair.rankProgressId}:${pair.requirementId}`)
+    if (!reqProgress) {
+      errors.push(`Requirement progress not found for scout ${pair.scoutId}`)
+      continue
+    }
+
+    // Skip already completed
+    if (['completed', 'approved', 'awarded'].includes(reqProgress.status)) {
+      skippedCount++
+      continue
+    }
+
+    idsToUpdate.push(reqProgress.id)
+  }
+
+  // Batch update all at once
+  let updatedCount = 0
+  if (idsToUpdate.length > 0) {
+    const { data: updated, error: updateError } = await adminSupabase
+      .from('scout_rank_requirement_progress')
+      .update({
+        status: 'completed',
+        completed_at: completedAt,
+        completed_by: profileId,
+        notes,
+        updated_at: new Date().toISOString(),
+      })
+      .in('id', idsToUpdate)
+      .select('id')
+
+    if (updateError) {
+      console.error('Error batch updating requirements:', updateError)
+      return {
+        successCount: skippedCount,
+        failedCount: idsToUpdate.length + errors.length,
+        errors: [...errors, 'Failed to mark requirements complete'],
+      }
+    }
+
+    updatedCount = updated?.length || 0
+  }
+
+  return {
+    successCount: updatedCount + skippedCount,
+    failedCount: errors.length,
+    errors,
+  }
+}
+
+/**
+ * Batch process merit badge requirements using O(1) queries
+ * Parallel implementation to batchProcessRankRequirements
+ */
+async function batchProcessMeritBadgeRequirements(
+  adminSupabase: ReturnType<typeof createAdminClient>,
+  entries: Array<{ scoutId: string; requirementId: string; parentId: string }>,
+  completedAt: string,
+  profileId: string,
+  notes?: string
+): Promise<{ successCount: number; failedCount: number; errors: string[] }> {
+  const errors: string[] = []
+
+  // Extract unique IDs
+  const uniqueBadgeIds = [...new Set(entries.map(e => e.parentId))]
+  const uniqueScoutIds = [...new Set(entries.map(e => e.scoutId))]
+
+  // 1. Batch fetch badge version info
+  const { data: versions } = await adminSupabase
+    .from('bsa_merit_badge_versions')
+    .select('merit_badge_id, version_year')
+    .in('merit_badge_id', uniqueBadgeIds)
+    .eq('is_current', true)
+
+  // Also get fallback from badges table
+  const { data: badges } = await adminSupabase
+    .from('bsa_merit_badges')
+    .select('id, requirement_version_year')
+    .in('id', uniqueBadgeIds)
+
+  // Build version map (prefer versions table, fall back to badges)
+  const versionMap = new Map<string, number>()
+  for (const badge of badges || []) {
+    if (badge.requirement_version_year) {
+      versionMap.set(badge.id, badge.requirement_version_year)
+    }
+  }
+  for (const v of versions || []) {
+    versionMap.set(v.merit_badge_id, v.version_year)
+  }
+
+  // Validate all badges have versions
+  for (const badgeId of uniqueBadgeIds) {
+    if (!versionMap.has(badgeId)) {
+      return {
+        successCount: 0,
+        failedCount: entries.length,
+        errors: [`Merit badge ${badgeId} does not have a version year set`],
+      }
+    }
+  }
+
+  // 2. Batch fetch existing badge progress
+  const { data: existingBadgeProgress } = await adminSupabase
+    .from('scout_merit_badge_progress')
+    .select('id, scout_id, merit_badge_id')
+    .in('scout_id', uniqueScoutIds)
+    .in('merit_badge_id', uniqueBadgeIds)
+
+  const badgeProgressMap = new Map(
+    (existingBadgeProgress || []).map(p => [`${p.scout_id}:${p.merit_badge_id}`, p.id])
+  )
+
+  // 3. Find missing badge progress
+  const scoutBadgePairs = [...new Set(entries.map(e => `${e.scoutId}:${e.parentId}`))]
+  const missingBadgeProgress = scoutBadgePairs.filter(key => !badgeProgressMap.has(key))
+
+  // 4. Batch insert missing badge progress
+  if (missingBadgeProgress.length > 0) {
+    const newBadgeProgressRecords = missingBadgeProgress.map(key => {
+      const [scoutId, badgeId] = key.split(':')
+      return {
+        scout_id: scoutId,
+        merit_badge_id: badgeId,
+        status: 'in_progress' as const,
+        started_at: new Date().toISOString(),
+        requirement_version_year: versionMap.get(badgeId)!,
+      }
+    })
+
+    const { data: insertedProgress, error: insertError } = await adminSupabase
+      .from('scout_merit_badge_progress')
+      .insert(newBadgeProgressRecords)
+      .select('id, scout_id, merit_badge_id')
+
+    if (insertError) {
+      console.error('Error batch inserting badge progress:', insertError)
+      return {
+        successCount: 0,
+        failedCount: entries.length,
+        errors: ['Failed to create badge progress records'],
+      }
+    }
+
+    for (const p of insertedProgress || []) {
+      badgeProgressMap.set(`${p.scout_id}:${p.merit_badge_id}`, p.id)
+    }
+
+    // 5. Create requirement progress for new badges
+    if (insertedProgress && insertedProgress.length > 0) {
+      const { data: allRequirements } = await adminSupabase
+        .from('bsa_merit_badge_requirements')
+        .select('id, merit_badge_id, version_year')
+        .in('merit_badge_id', uniqueBadgeIds)
+
+      const reqProgressRecords: Array<{
+        scout_merit_badge_progress_id: string
+        requirement_id: string
+        status: 'not_started'
+      }> = []
+
+      for (const progress of insertedProgress) {
+        const versionYear = versionMap.get(progress.merit_badge_id)
+        const badgeReqs = (allRequirements || []).filter(
+          r => r.merit_badge_id === progress.merit_badge_id && r.version_year === versionYear
+        )
+
+        for (const req of badgeReqs) {
+          reqProgressRecords.push({
+            scout_merit_badge_progress_id: progress.id,
+            requirement_id: req.id,
+            status: 'not_started',
+          })
+        }
+      }
+
+      if (reqProgressRecords.length > 0) {
+        await adminSupabase.from('scout_merit_badge_requirement_progress').insert(reqProgressRecords)
+      }
+    }
+  }
+
+  // 6. Build list of requirement progress to update
+  const progressReqPairs = entries.map(e => ({
+    badgeProgressId: badgeProgressMap.get(`${e.scoutId}:${e.parentId}`)!,
+    requirementId: e.requirementId,
+    scoutId: e.scoutId,
+  }))
+
+  const allBadgeProgressIds = [...new Set(progressReqPairs.map(p => p.badgeProgressId))]
+
+  // 7. Batch fetch existing requirement progress
+  const { data: existingReqProgress } = await adminSupabase
+    .from('scout_merit_badge_requirement_progress')
+    .select('id, scout_merit_badge_progress_id, requirement_id, status')
+    .in('scout_merit_badge_progress_id', allBadgeProgressIds)
+
+  const reqProgressMap = new Map(
+    (existingReqProgress || []).map(p => [
+      `${p.scout_merit_badge_progress_id}:${p.requirement_id}`,
+      { id: p.id, status: p.status },
+    ])
+  )
+
+  // 8. Find missing requirement progress
+  const missingReqProgress = progressReqPairs.filter(
+    p => !reqProgressMap.has(`${p.badgeProgressId}:${p.requirementId}`)
+  )
+
+  // 9. Batch insert missing requirement progress
+  if (missingReqProgress.length > 0) {
+    const newReqProgressRecords = missingReqProgress.map(p => ({
+      scout_merit_badge_progress_id: p.badgeProgressId,
+      requirement_id: p.requirementId,
+      status: 'not_started' as const,
+    }))
+
+    const { data: insertedReqProgress } = await adminSupabase
+      .from('scout_merit_badge_requirement_progress')
+      .insert(newReqProgressRecords)
+      .select('id, scout_merit_badge_progress_id, requirement_id, status')
+
+    for (const p of insertedReqProgress || []) {
+      reqProgressMap.set(`${p.scout_merit_badge_progress_id}:${p.requirement_id}`, {
+        id: p.id,
+        status: p.status,
+      })
+    }
+  }
+
+  // 10. Batch update requirements
+  const idsToUpdate: string[] = []
+  let skippedCount = 0
+
+  for (const pair of progressReqPairs) {
+    const reqProgress = reqProgressMap.get(`${pair.badgeProgressId}:${pair.requirementId}`)
+    if (!reqProgress) {
+      errors.push(`Requirement progress not found for scout ${pair.scoutId}`)
+      continue
+    }
+
+    if (['completed', 'approved'].includes(reqProgress.status)) {
+      skippedCount++
+      continue
+    }
+
+    idsToUpdate.push(reqProgress.id)
+  }
+
+  let updatedCount = 0
+  if (idsToUpdate.length > 0) {
+    const { data: updated, error: updateError } = await adminSupabase
+      .from('scout_merit_badge_requirement_progress')
+      .update({
+        status: 'completed',
+        completed_at: completedAt,
+        completed_by: profileId,
+        notes,
+        updated_at: new Date().toISOString(),
+      })
+      .in('id', idsToUpdate)
+      .select('id')
+
+    if (updateError) {
+      console.error('Error batch updating MB requirements:', updateError)
+      return {
+        successCount: skippedCount,
+        failedCount: idsToUpdate.length + errors.length,
+        errors: [...errors, 'Failed to mark requirements complete'],
+      }
+    }
+
+    updatedCount = updated?.length || 0
+  }
+
+  return {
+    successCount: updatedCount + skippedCount,
+    failedCount: errors.length,
+    errors,
   }
 }
 
