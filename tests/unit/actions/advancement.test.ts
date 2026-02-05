@@ -35,10 +35,15 @@ vi.mock('@/lib/supabase/admin', () => ({
 
 // Import actions after mocking
 import {
+  initializeRankProgress,
   markRequirementComplete,
   undoRequirementCompletion,
   markMeritBadgeRequirement,
   bulkSignOffForScouts,
+  bulkMarkRequirementsComplete,
+  bulkApproveMeritBadgeRequirements,
+  startMeritBadge,
+  switchMeritBadgeVersion,
   getUnitAdvancementSummary,
   getRankRequirementsForUnit,
   getMeritBadgeCategories,
@@ -57,6 +62,335 @@ const mockMembership = { role: 'leader' }
 describe('Advancement Actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  // ==========================================
+  // initializeRankProgress
+  // ==========================================
+  describe('initializeRankProgress', () => {
+    it('should return error when feature flag is disabled', async () => {
+      vi.mocked(isFeatureEnabled).mockReturnValue(false)
+
+      const result = await initializeRankProgress('scout-123', 'rank-123', 'unit-123')
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Advancement tracking feature is not enabled')
+
+      vi.mocked(isFeatureEnabled).mockReturnValue(true)
+    })
+
+    it('should return error when not authenticated', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+
+      const result = await initializeRankProgress('scout-123', 'rank-123', 'unit-123')
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Not authenticated')
+    })
+
+    it('should return error when user is not a leader', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: { role: 'scout' }, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      const result = await initializeRankProgress('scout-123', 'rank-123', 'unit-123')
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Only leaders can modify advancement records')
+    })
+
+    it('should return error when rank not found', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      // Admin client returns no rank
+      mockAdminSupabase.from.mockImplementation(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: null, error: null }),
+      }))
+
+      const result = await initializeRankProgress('scout-123', 'rank-123', 'unit-123')
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Rank not found')
+    })
+
+    it('should return error when rank has no version year', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      // Admin client returns rank without version year
+      mockAdminSupabase.from.mockImplementation(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({
+          data: { id: 'rank-123', requirement_version_year: null },
+          error: null,
+        }),
+      }))
+
+      const result = await initializeRankProgress('scout-123', 'rank-123', 'unit-123')
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Rank does not have a version year set')
+    })
+
+    it('should return error when progress insert fails', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      let callCount = 0
+      mockAdminSupabase.from.mockImplementation((table: string) => {
+        callCount++
+        if (callCount === 1) {
+          // First call: fetch rank
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({
+              data: { id: 'rank-123', requirement_version_year: 2024 },
+              error: null,
+            }),
+          }
+        }
+        // Second call: insert progress (fails)
+        return {
+          insert: vi.fn().mockReturnThis(),
+          select: vi.fn().mockReturnThis(),
+          single: vi.fn().mockResolvedValue({
+            data: null,
+            error: { message: 'Duplicate key' },
+          }),
+        }
+      })
+
+      const result = await initializeRankProgress('scout-123', 'rank-123', 'unit-123')
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Failed to initialize rank progress')
+    })
+
+    it('should successfully create progress record', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      let callCount = 0
+      mockAdminSupabase.from.mockImplementation((table: string) => {
+        callCount++
+        if (callCount === 1) {
+          // First call: fetch rank
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({
+              data: { id: 'rank-123', requirement_version_year: 2024 },
+              error: null,
+            }),
+          }
+        }
+        if (callCount === 2) {
+          // Second call: insert progress
+          return {
+            insert: vi.fn().mockReturnThis(),
+            select: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({
+              data: { id: 'progress-123' },
+              error: null,
+            }),
+          }
+        }
+        if (callCount === 3) {
+          // Third call: fetch requirements
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            is: vi.fn().mockResolvedValue({
+              data: [{ id: 'req-1' }, { id: 'req-2' }],
+              error: null,
+            }),
+          }
+        }
+        // Fourth call: insert requirement progress
+        return {
+          insert: vi.fn().mockResolvedValue({ error: null }),
+        }
+      })
+
+      const result = await initializeRankProgress('scout-123', 'rank-123', 'unit-123')
+
+      expect(result.success).toBe(true)
+      expect(result.data?.progressId).toBe('progress-123')
+    })
+
+    it('should handle rank with no requirements', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      let callCount = 0
+      mockAdminSupabase.from.mockImplementation((table: string) => {
+        callCount++
+        if (callCount === 1) {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({
+              data: { id: 'rank-123', requirement_version_year: 2024 },
+              error: null,
+            }),
+          }
+        }
+        if (callCount === 2) {
+          return {
+            insert: vi.fn().mockReturnThis(),
+            select: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({
+              data: { id: 'progress-123' },
+              error: null,
+            }),
+          }
+        }
+        // Third call: fetch requirements returns empty
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          is: vi.fn().mockResolvedValue({
+            data: [],
+            error: null,
+          }),
+        }
+      })
+
+      const result = await initializeRankProgress('scout-123', 'rank-123', 'unit-123')
+
+      expect(result.success).toBe(true)
+      expect(result.data?.progressId).toBe('progress-123')
+    })
   })
 
   // ==========================================
@@ -615,6 +949,838 @@ describe('Advancement Actions', () => {
   })
 
   // ==========================================
+  // startMeritBadge
+  // ==========================================
+  describe('startMeritBadge', () => {
+    it('should return error when feature flag is disabled', async () => {
+      vi.mocked(isFeatureEnabled).mockReturnValue(false)
+
+      const result = await startMeritBadge('scout-123', 'badge-123', 'unit-123')
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Advancement tracking feature is not enabled')
+
+      vi.mocked(isFeatureEnabled).mockReturnValue(true)
+    })
+
+    it('should return error when not authenticated', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+
+      const result = await startMeritBadge('scout-123', 'badge-123', 'unit-123')
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Not authenticated')
+    })
+
+    it('should return error when user is not a leader', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: { role: 'scout' }, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      const result = await startMeritBadge('scout-123', 'badge-123', 'unit-123')
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Only leaders can modify advancement records')
+    })
+
+    it('should return error when badge has no version year', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      let callCount = 0
+      mockAdminSupabase.from.mockImplementation((table: string) => {
+        callCount++
+        if (callCount === 1) {
+          // First call: bsa_merit_badge_versions - no current version found
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }
+        }
+        // Second call: bsa_merit_badges - no version year
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          single: vi.fn().mockResolvedValue({
+            data: { requirement_version_year: null },
+            error: null,
+          }),
+        }
+      })
+
+      const result = await startMeritBadge('scout-123', 'badge-123', 'unit-123')
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Merit badge does not have a version year set')
+    })
+
+    it('should successfully start merit badge with current version', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      let callCount = 0
+      mockAdminSupabase.from.mockImplementation((table: string) => {
+        callCount++
+        if (callCount === 1) {
+          // First call: bsa_merit_badge_versions - current version found
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { version_year: 2024 },
+              error: null,
+            }),
+          }
+        }
+        if (callCount === 2) {
+          // Second call: insert progress
+          return {
+            insert: vi.fn().mockReturnThis(),
+            select: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({
+              data: { id: 'progress-123' },
+              error: null,
+            }),
+          }
+        }
+        if (callCount === 3) {
+          // Third call: fetch requirements
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            neq: vi.fn().mockResolvedValue({
+              data: [{ id: 'req-1' }, { id: 'req-2' }],
+              error: null,
+            }),
+          }
+        }
+        // Fourth call: insert requirement progress
+        return {
+          insert: vi.fn().mockResolvedValue({ error: null }),
+        }
+      })
+
+      const result = await startMeritBadge('scout-123', 'badge-123', 'unit-123')
+
+      expect(result.success).toBe(true)
+      expect(result.data?.progressId).toBe('progress-123')
+    })
+
+    it('should successfully start merit badge with fallback to badge version year', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      let callCount = 0
+      mockAdminSupabase.from.mockImplementation((table: string) => {
+        callCount++
+        if (callCount === 1) {
+          // First call: bsa_merit_badge_versions - no current version
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }
+        }
+        if (callCount === 2) {
+          // Second call: bsa_merit_badges - fallback version year
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({
+              data: { requirement_version_year: 2023 },
+              error: null,
+            }),
+          }
+        }
+        if (callCount === 3) {
+          // Third call: insert progress
+          return {
+            insert: vi.fn().mockReturnThis(),
+            select: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({
+              data: { id: 'progress-456' },
+              error: null,
+            }),
+          }
+        }
+        if (callCount === 4) {
+          // Fourth call: fetch requirements
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            neq: vi.fn().mockResolvedValue({
+              data: [],
+              error: null,
+            }),
+          }
+        }
+        return { insert: vi.fn().mockResolvedValue({ error: null }) }
+      })
+
+      const result = await startMeritBadge('scout-123', 'badge-123', 'unit-123')
+
+      expect(result.success).toBe(true)
+      expect(result.data?.progressId).toBe('progress-456')
+    })
+
+    it('should return error when progress insert fails', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      let callCount = 0
+      mockAdminSupabase.from.mockImplementation((table: string) => {
+        callCount++
+        if (callCount === 1) {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { version_year: 2024 },
+              error: null,
+            }),
+          }
+        }
+        // Second call: insert fails (e.g., already started)
+        return {
+          insert: vi.fn().mockReturnThis(),
+          select: vi.fn().mockReturnThis(),
+          single: vi.fn().mockResolvedValue({
+            data: null,
+            error: { message: 'Duplicate key' },
+          }),
+        }
+      })
+
+      const result = await startMeritBadge('scout-123', 'badge-123', 'unit-123')
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Failed to start merit badge tracking')
+    })
+
+    it('should accept optional counselor parameters', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      let callCount = 0
+      mockAdminSupabase.from.mockImplementation((table: string) => {
+        callCount++
+        if (callCount === 1) {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { version_year: 2024 },
+              error: null,
+            }),
+          }
+        }
+        if (callCount === 2) {
+          return {
+            insert: vi.fn().mockReturnThis(),
+            select: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({
+              data: { id: 'progress-789' },
+              error: null,
+            }),
+          }
+        }
+        if (callCount === 3) {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            neq: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }
+        }
+        return { insert: vi.fn().mockResolvedValue({ error: null }) }
+      })
+
+      const result = await startMeritBadge(
+        'scout-123',
+        'badge-123',
+        'unit-123',
+        'John Smith',
+        'counselor-profile-id'
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.data?.progressId).toBe('progress-789')
+    })
+  })
+
+  // ==========================================
+  // bulkApproveMeritBadgeRequirements
+  // ==========================================
+  describe('bulkApproveMeritBadgeRequirements', () => {
+    it('should return error when feature flag is disabled', async () => {
+      vi.mocked(isFeatureEnabled).mockReturnValue(false)
+
+      const result = await bulkApproveMeritBadgeRequirements(['req-1', 'req-2'], 'unit-123')
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Advancement tracking feature is not enabled')
+
+      vi.mocked(isFeatureEnabled).mockReturnValue(true)
+    })
+
+    it('should return early with empty array', async () => {
+      const result = await bulkApproveMeritBadgeRequirements([], 'unit-123')
+
+      expect(result.success).toBe(true)
+      expect(result.data?.successCount).toBe(0)
+      expect(result.data?.failedCount).toBe(0)
+    })
+
+    it('should return error when not authenticated', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+
+      const result = await bulkApproveMeritBadgeRequirements(['req-1'], 'unit-123')
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Not authenticated')
+    })
+
+    it('should return error when user is not a leader', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: { role: 'scout' }, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      const result = await bulkApproveMeritBadgeRequirements(['req-1'], 'unit-123')
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Only leaders can modify advancement records')
+    })
+
+    it('should successfully approve all requirements', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      mockAdminSupabase.from.mockImplementation(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({
+          data: { notes: null, status: 'in_progress' },
+          error: null,
+        }),
+        update: vi.fn().mockReturnThis(),
+      }))
+
+      const result = await bulkApproveMeritBadgeRequirements(
+        ['req-1', 'req-2'],
+        'unit-123',
+        '2024-01-15T00:00:00Z',
+        'Completed at camp'
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.data?.successCount).toBe(2)
+      expect(result.data?.failedCount).toBe(0)
+    })
+
+    it('should skip already approved requirements', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      // Return already-approved status
+      mockAdminSupabase.from.mockImplementation(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({
+          data: { notes: null, status: 'approved' },
+          error: null,
+        }),
+        update: vi.fn().mockReturnThis(),
+      }))
+
+      const result = await bulkApproveMeritBadgeRequirements(['req-1'], 'unit-123')
+
+      expect(result.success).toBe(true)
+      // Should skip already approved, so counts stay at 0
+      expect(result.data?.successCount).toBe(0)
+      expect(result.data?.failedCount).toBe(0)
+    })
+
+    it('should handle partial failures', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      let updateCallCount = 0
+      mockAdminSupabase.from.mockImplementation(() => {
+        const singleMock = {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          single: vi.fn().mockResolvedValue({
+            data: { notes: null, status: 'in_progress' },
+            error: null,
+          }),
+          update: vi.fn().mockReturnValue({
+            eq: vi.fn().mockImplementation(() => {
+              updateCallCount++
+              // First update succeeds, second fails
+              return { error: updateCallCount === 2 ? { message: 'DB error' } : null }
+            }),
+          }),
+        }
+        return singleMock
+      })
+
+      const result = await bulkApproveMeritBadgeRequirements(
+        ['req-1', 'req-2'],
+        'unit-123'
+      )
+
+      expect(result.success).toBe(true)
+      expect(result.data?.successCount).toBe(1)
+      expect(result.data?.failedCount).toBe(1)
+    })
+  })
+
+  // ==========================================
+  // switchMeritBadgeVersion
+  // ==========================================
+  describe('switchMeritBadgeVersion', () => {
+    const switchParams = {
+      unitId: 'unit-123',
+      scoutId: 'scout-123',
+      meritBadgeId: 'badge-123',
+      progressId: 'progress-123',
+      currentVersionYear: 2023,
+      targetVersionYear: 2024,
+      mappings: [
+        { sourceReqNumber: '1', targetReqId: 'new-req-1', confidence: 'high' as const },
+        { sourceReqNumber: '2', targetReqId: 'new-req-2', confidence: 'medium' as const },
+      ],
+    }
+
+    it('should return error when feature flag is disabled', async () => {
+      vi.mocked(isFeatureEnabled).mockReturnValue(false)
+
+      const result = await switchMeritBadgeVersion(switchParams)
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Advancement tracking feature is not enabled')
+
+      vi.mocked(isFeatureEnabled).mockReturnValue(true)
+    })
+
+    it('should return error when not authenticated', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+
+      const result = await switchMeritBadgeVersion(switchParams)
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Not authenticated')
+    })
+
+    it('should return error when user is not a leader', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: { role: 'scout' }, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      const result = await switchMeritBadgeVersion(switchParams)
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Only leaders can modify advancement records')
+    })
+
+    it('should successfully switch version with mapped requirements', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      let callCount = 0
+      mockAdminSupabase.from.mockImplementation(() => {
+        callCount++
+        if (callCount === 1) {
+          // First call: get existing progress
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            then: vi.fn((resolve) =>
+              resolve({
+                data: [
+                  { id: 'prog-1', requirement_id: 'old-1', status: 'completed', bsa_merit_badge_requirements: { requirement_number: '1' } },
+                  { id: 'prog-2', requirement_id: 'old-2', status: 'completed', bsa_merit_badge_requirements: { requirement_number: '2' } },
+                ],
+                error: null,
+              })
+            ),
+          }
+        }
+        if (callCount === 2) {
+          // Second call: update main progress
+          return {
+            update: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockResolvedValue({ error: null }),
+          }
+        }
+        if (callCount === 3) {
+          // Third call: delete old progress
+          return {
+            delete: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockResolvedValue({ error: null }),
+          }
+        }
+        // Remaining calls: insert new mapped requirements
+        return {
+          insert: vi.fn().mockResolvedValue({ error: null }),
+        }
+      })
+
+      const result = await switchMeritBadgeVersion(switchParams)
+
+      expect(result.success).toBe(true)
+      expect(result.data?.mappedCount).toBe(2)
+      expect(result.data?.unmappedCount).toBe(0)
+    })
+
+    it('should return error when update fails', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      let callCount = 0
+      mockAdminSupabase.from.mockImplementation(() => {
+        callCount++
+        if (callCount === 1) {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            then: vi.fn((resolve) => resolve({ data: [], error: null })),
+          }
+        }
+        // Second call: update fails
+        return {
+          update: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockResolvedValue({ error: { message: 'Update failed' } }),
+        }
+      })
+
+      const result = await switchMeritBadgeVersion(switchParams)
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Failed to update version')
+    })
+
+    it('should handle unmapped requirements', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      mockAdminSupabase.from.mockImplementation(() => ({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        update: vi.fn().mockReturnThis(),
+        delete: vi.fn().mockReturnThis(),
+        insert: vi.fn().mockResolvedValue({ error: null }),
+        then: vi.fn((resolve) => resolve({ data: [], error: null })),
+      }))
+
+      // Params with a mapping that has no target
+      const paramsWithUnmapped = {
+        ...switchParams,
+        mappings: [
+          { sourceReqNumber: '1', targetReqId: null, confidence: 'none' as const },
+        ],
+      }
+
+      const result = await switchMeritBadgeVersion(paramsWithUnmapped)
+
+      expect(result.success).toBe(true)
+      expect(result.data?.mappedCount).toBe(0)
+      expect(result.data?.unmappedCount).toBe(1)
+    })
+  })
+
+  // ==========================================
   // markMeritBadgeRequirement
   // ==========================================
   describe('markMeritBadgeRequirement', () => {
@@ -793,6 +1959,180 @@ describe('Advancement Actions', () => {
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('Failed to mark requirement complete')
+    })
+  })
+
+  // ==========================================
+  // bulkMarkRequirementsComplete
+  // ==========================================
+  describe('bulkMarkRequirementsComplete', () => {
+    const bulkEntries = [
+      { scoutId: 'scout-1', requirementProgressId: 'req-prog-1' },
+      { scoutId: 'scout-2', requirementProgressId: 'req-prog-2' },
+    ]
+
+    it('should return error when feature flag is disabled', async () => {
+      vi.mocked(isFeatureEnabled).mockReturnValue(false)
+
+      const result = await bulkMarkRequirementsComplete(bulkEntries, 'unit-123', '2024-01-15T00:00:00Z')
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Advancement tracking feature is not enabled')
+
+      vi.mocked(isFeatureEnabled).mockReturnValue(true)
+    })
+
+    it('should return error when not authenticated', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+
+      const result = await bulkMarkRequirementsComplete(bulkEntries, 'unit-123', '2024-01-15T00:00:00Z')
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Not authenticated')
+    })
+
+    it('should return error when user is not a leader', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: { role: 'scout' }, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      const result = await bulkMarkRequirementsComplete(bulkEntries, 'unit-123', '2024-01-15T00:00:00Z')
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Only leaders can modify advancement records')
+    })
+
+    it('should successfully mark all requirements complete', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      mockAdminSupabase.from.mockImplementation(() => ({
+        update: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockResolvedValue({ error: null }),
+      }))
+
+      const result = await bulkMarkRequirementsComplete(bulkEntries, 'unit-123', '2024-01-15T00:00:00Z')
+
+      expect(result.success).toBe(true)
+      expect(result.data?.successCount).toBe(2)
+      expect(result.data?.failedCount).toBe(0)
+    })
+
+    it('should handle partial failures', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      let callCount = 0
+      mockAdminSupabase.from.mockImplementation(() => {
+        callCount++
+        // First call succeeds, second fails
+        return {
+          update: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockResolvedValue({
+            error: callCount === 2 ? { message: 'DB error' } : null,
+          }),
+        }
+      })
+
+      const result = await bulkMarkRequirementsComplete(bulkEntries, 'unit-123', '2024-01-15T00:00:00Z')
+
+      expect(result.success).toBe(true)
+      expect(result.data?.successCount).toBe(1)
+      expect(result.data?.failedCount).toBe(1)
+    })
+
+    it('should work with empty entries array', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: mockUser } })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: mockMembership, error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      const result = await bulkMarkRequirementsComplete([], 'unit-123', '2024-01-15T00:00:00Z')
+
+      expect(result.success).toBe(true)
+      expect(result.data?.successCount).toBe(0)
+      expect(result.data?.failedCount).toBe(0)
     })
   })
 
