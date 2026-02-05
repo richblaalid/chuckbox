@@ -11,7 +11,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { appendNote } from '@/lib/notes-utils'
 import type { ActionResult } from './types'
-import { checkFeatureEnabled, verifyLeaderRole } from './utils'
+import { checkFeatureEnabled, verifyLeaderRole, verifyParentAccess } from './utils'
 
 /**
  * Initialize rank progress for a scout
@@ -521,4 +521,225 @@ export async function addRankRequirementNoteWithInit(params: {
   revalidatePath('/advancement')
   revalidatePath(`/scouts/${params.scoutId}`)
   return { success: true, data: { progressId: reqProgress.id } }
+}
+
+// ==========================================
+// APPROVAL WORKFLOW FUNCTIONS
+// ==========================================
+
+/**
+ * Submit requirement completion for leader approval (parent action)
+ */
+export async function submitRequirementForApproval(
+  requirementProgressId: string,
+  scoutId: string,
+  completedAt: string,
+  notes: string
+): Promise<ActionResult> {
+  const featureCheck = await checkFeatureEnabled<void>()
+  if (featureCheck) return featureCheck
+
+  const auth = await verifyParentAccess(scoutId)
+  if ('error' in auth) return { success: false, error: auth.error }
+
+  const adminSupabase = createAdminClient()
+
+  const { error } = await adminSupabase
+    .from('scout_rank_requirement_progress')
+    .update({
+      submitted_by: auth.profileId,
+      submitted_at: new Date().toISOString(),
+      submission_notes: notes,
+      approval_status: 'pending_approval',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', requirementProgressId)
+
+  if (error) {
+    console.error('Error submitting requirement:', error)
+    return { success: false, error: 'Failed to submit requirement for approval' }
+  }
+
+  revalidatePath('/my-progress')
+  revalidatePath('/advancement')
+  return { success: true }
+}
+
+/**
+ * Approve parent submission
+ */
+export async function approveRequirementSubmission(
+  requirementProgressId: string,
+  unitId: string
+): Promise<ActionResult> {
+  const featureCheck = await checkFeatureEnabled<void>()
+  if (featureCheck) return featureCheck
+
+  const auth = await verifyLeaderRole(unitId)
+  if ('error' in auth) return { success: false, error: auth.error }
+
+  const adminSupabase = createAdminClient()
+
+  // Get the submission to preserve the completion date from the parent
+  const { data: submission } = await adminSupabase
+    .from('scout_rank_requirement_progress')
+    .select('submitted_at')
+    .eq('id', requirementProgressId)
+    .single()
+
+  const { error } = await adminSupabase
+    .from('scout_rank_requirement_progress')
+    .update({
+      status: 'completed',
+      completed_at: submission?.submitted_at || new Date().toISOString(),
+      completed_by: auth.profileId,
+      approval_status: 'approved',
+      reviewed_by: auth.profileId,
+      reviewed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', requirementProgressId)
+
+  if (error) {
+    console.error('Error approving submission:', error)
+    return { success: false, error: 'Failed to approve submission' }
+  }
+
+  revalidatePath('/advancement')
+  return { success: true }
+}
+
+/**
+ * Deny parent submission with reason
+ */
+export async function denyRequirementSubmission(
+  requirementProgressId: string,
+  unitId: string,
+  denialReason: string
+): Promise<ActionResult> {
+  const featureCheck = await checkFeatureEnabled<void>()
+  if (featureCheck) return featureCheck
+
+  const auth = await verifyLeaderRole(unitId)
+  if ('error' in auth) return { success: false, error: auth.error }
+
+  const adminSupabase = createAdminClient()
+
+  const { error } = await adminSupabase
+    .from('scout_rank_requirement_progress')
+    .update({
+      approval_status: 'denied',
+      denial_reason: denialReason,
+      reviewed_by: auth.profileId,
+      reviewed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', requirementProgressId)
+
+  if (error) {
+    console.error('Error denying submission:', error)
+    return { success: false, error: 'Failed to deny submission' }
+  }
+
+  revalidatePath('/advancement')
+  return { success: true }
+}
+
+// ==========================================
+// RANK APPROVAL & AWARD FUNCTIONS
+// ==========================================
+
+/**
+ * Approve a rank (after all requirements completed)
+ */
+export async function approveRank(
+  rankProgressId: string,
+  unitId: string,
+  approvedAt?: string
+): Promise<ActionResult> {
+  const featureCheck = await checkFeatureEnabled<void>()
+  if (featureCheck) return featureCheck
+
+  const auth = await verifyLeaderRole(unitId)
+  if ('error' in auth) return { success: false, error: auth.error }
+
+  const adminSupabase = createAdminClient()
+
+  const { error } = await adminSupabase
+    .from('scout_rank_progress')
+    .update({
+      status: 'approved',
+      approved_at: approvedAt || new Date().toISOString(),
+      approved_by: auth.profileId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', rankProgressId)
+
+  if (error) {
+    console.error('Error approving rank:', error)
+    return { success: false, error: 'Failed to approve rank' }
+  }
+
+  revalidatePath('/advancement')
+  return { success: true }
+}
+
+/**
+ * Award a rank (final step, updates scout's current rank)
+ */
+export async function awardRank(
+  rankProgressId: string,
+  scoutId: string,
+  unitId: string,
+  awardedAt?: string
+): Promise<ActionResult> {
+  const featureCheck = await checkFeatureEnabled<void>()
+  if (featureCheck) return featureCheck
+
+  const auth = await verifyLeaderRole(unitId)
+  if ('error' in auth) return { success: false, error: auth.error }
+
+  const adminSupabase = createAdminClient()
+
+  // Get the rank name
+  const { data: progress } = await adminSupabase
+    .from('scout_rank_progress')
+    .select('rank_id, bsa_ranks(name)')
+    .eq('id', rankProgressId)
+    .single()
+
+  if (!progress) {
+    return { success: false, error: 'Rank progress not found' }
+  }
+
+  const timestamp = awardedAt || new Date().toISOString()
+
+  // Update rank progress
+  const { error: progressError } = await adminSupabase
+    .from('scout_rank_progress')
+    .update({
+      status: 'awarded',
+      awarded_at: timestamp,
+      awarded_by: auth.profileId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', rankProgressId)
+
+  if (progressError) {
+    console.error('Error awarding rank:', progressError)
+    return { success: false, error: 'Failed to award rank' }
+  }
+
+  // Update scout's current rank
+  const rankName = (progress.bsa_ranks as { name: string })?.name
+  if (rankName) {
+    await adminSupabase
+      .from('scouts')
+      .update({ rank: rankName, updated_at: new Date().toISOString() })
+      .eq('id', scoutId)
+  }
+
+  revalidatePath('/advancement')
+  revalidatePath(`/scouts/${scoutId}`)
+  return { success: true }
 }

@@ -563,3 +563,44 @@ export async function switchMeritBadgeVersion(params: {
     return { success: false, error: 'Failed to switch version' }
   }
 }
+
+// ==========================================
+// MERIT BADGE COMPLETION
+// ==========================================
+
+/**
+ * Complete and award a merit badge
+ */
+export async function completeMeritBadge(
+  meritBadgeProgressId: string,
+  unitId: string,
+  counselorSignedAt?: string
+): Promise<ActionResult> {
+  const featureCheck = await checkFeatureEnabled<void>()
+  if (featureCheck) return featureCheck
+
+  const auth = await verifyLeaderRole(unitId)
+  if ('error' in auth) return { success: false, error: auth.error }
+
+  const adminSupabase = createAdminClient()
+
+  const { error } = await adminSupabase
+    .from('scout_merit_badge_progress')
+    .update({
+      status: 'awarded',
+      completed_at: new Date().toISOString(),
+      awarded_at: new Date().toISOString(),
+      counselor_signed_at: counselorSignedAt,
+      approved_by: auth.profileId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', meritBadgeProgressId)
+
+  if (error) {
+    console.error('Error completing merit badge:', error)
+    return { success: false, error: 'Failed to complete merit badge' }
+  }
+
+  revalidatePath('/advancement')
+  return { success: true }
+}

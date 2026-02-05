@@ -29,6 +29,8 @@ export * from './merit-badges'
 // Export bulk operations functions
 export * from './bulk-operations'
 
-// Re-export everything from the legacy file
-// This maintains backwards compatibility during refactoring
-export * from './_legacy'
+// Export leadership and activity functions
+export * from './leadership'
+
+// Export query functions
+export * from './queries'

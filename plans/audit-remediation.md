@@ -1,8 +1,8 @@
 # Audit Remediation Plan (v2)
 
-> **Status:** In Review
+> **Status:** In Progress
 > **Created:** 2026-02-04
-> **Updated:** 2026-02-04
+> **Updated:** 2026-02-05
 > **Source:** [Code Audit Report](./code-audit.md)
 > **Estimated Effort:** 30-40 hours (1-2 weeks focused)
 
@@ -79,9 +79,10 @@ src/app/actions/advancement/
 ├── index.ts           # Re-exports all (maintains import compatibility)
 ├── types.ts           # Shared types and interfaces
 ├── utils.ts           # Helper functions (auth, validation)
-├── rank-progress.ts   # Individual rank operations
-├── merit-badges.ts    # Individual merit badge operations
+├── rank-progress.ts   # Rank operations (init, mark, undo, approve, award)
+├── merit-badges.ts    # Merit badge operations (start, mark, complete)
 ├── bulk-operations.ts # Bulk sign-off and approval functions
+├── leadership.ts      # Leadership positions and activity logging
 └── queries.ts         # Read-only data fetching functions
 ```
 
@@ -224,122 +225,150 @@ await supabase.from('scout_rank_requirement_progress').upsert(...)
 
 #### 1.1 Create Module Structure (PR #1 prep)
 
-- [ ] **1.1.1** Create `src/app/actions/advancement/` directory structure
-  - Create: `advancement/index.ts` that re-exports from `../advancement.ts`
-  - Test: All existing imports still work (no changes needed in consumers)
+- [x] **1.1.1** Create `src/app/actions/advancement/` directory structure
+  - Created: `advancement/index.ts` that re-exports from `../advancement.ts`
+  - Test: All existing imports still work (597 tests pass)
 
-- [ ] **1.1.2** Create `advancement/types.ts` with shared types
-  - Extract: `ActionResult`, progress types, parameter interfaces
-  - Test: Types compile, index.ts exports them
+- [x] **1.1.2** Create `advancement/types.ts` with shared types
+  - Extract: `ActionResult`, `LeaderAuthResult`, `ParentAuthResult`, `AuthError`, `isAuthError`
+  - Test: Types compile, index.ts exports them ✓
 
-- [ ] **1.1.3** Create `advancement/utils.ts` with helpers
-  - Extract: Auth helpers, validation functions, common patterns
-  - Test: Utils compile, index.ts exports them
+- [x] **1.1.3** Create `advancement/utils.ts` with helpers
+  - Extract: `checkFeatureEnabled`, `verifyLeaderRole`, `verifyParentAccess`
+  - Test: Utils compile, index.ts exports them ✓
 
 #### 1.2 Extract Rank Progress Functions (PR #1)
 
-- [ ] **1.2.1** Create `advancement/rank-progress.ts`
+- [x] **1.2.1** Create `advancement/rank-progress.ts`
   - Move: `initializeRankProgress` function
-  - Update: index.ts to re-export from new location
-  - Test: Build passes, tests pass
+  - Note: Export from index.ts deferred until original file cleanup (1.2.5)
+  - Test: Build passes ✓
 
-- [ ] **1.2.2** Move `markRequirementComplete` and related
+- [x] **1.2.2** Move `markRequirementComplete` and related
   - Move: `markRequirementComplete`, `markRequirementCompleteWithInit`
-  - Test: Build passes
+  - Test: Build passes ✓
 
-- [ ] **1.2.3** Move `undoRequirementCompletion`
-  - Test: Build passes
+- [x] **1.2.3** Move `undoRequirementCompletion`
+  - Test: Build passes ✓
 
-- [ ] **1.2.4** Move `updateRequirementNotes` and `addRankRequirementNoteWithInit`
-  - Test: Build passes
+- [x] **1.2.4** Move `updateRequirementNotes` and `addRankRequirementNoteWithInit`
+  - Test: Build passes ✓
 
-- [ ] **1.2.5** Clean up original file - remove moved rank functions
-  - Verify: No duplicate exports
-  - Test: Build passes, all tests pass
+- [x] **1.2.5** Clean up original file - remove moved rank functions
+  - Renamed: `advancement.ts` → `advancement/_legacy.ts` (for module resolution)
+  - Reduced: 3,523 → 3,032 lines (~490 lines extracted)
+  - Test: Build passes, unit tests pass ✓
 
-**PR #1 Checkpoint**: Rank functions extracted, ~700 lines moved, app works
+**PR #1 Checkpoint**: Rank functions extracted, ~490 lines moved, app works ✅
 
 #### 1.3 Extract Merit Badge Functions (PR #2)
 
-- [ ] **1.3.1** Create `advancement/merit-badges.ts`
+- [x] **1.3.1** Create `advancement/merit-badges.ts`
   - Move: `startMeritBadge`, `getMeritBadgeVersions`
   - Update: index.ts exports
   - Test: Build passes
 
-- [ ] **1.3.2** Move merit badge progress functions
+- [x] **1.3.2** Move merit badge progress functions
   - Move: `markMeritBadgeRequirement`, `undoMeritBadgeRequirementCompletion`
   - Test: Build passes
 
-- [ ] **1.3.3** Move `updateMeritBadgeRequirementNotes` and related
+- [x] **1.3.3** Move `updateMeritBadgeRequirementNotes` and related
   - Move: `addMeritBadgeRequirementNoteWithInit`, `switchMeritBadgeVersion`
   - Test: Build passes
 
-- [ ] **1.3.4** Clean up original file - remove moved MB functions
+- [x] **1.3.4** Clean up original file - remove moved MB functions
   - Test: Build passes, all tests pass
+  - Also fixed notes overwrite bug in `markMeritBadgeRequirement` during extraction
 
-**PR #2 Checkpoint**: Merit badge functions extracted, ~800 lines moved
+**PR #2 Checkpoint**: Merit badge functions extracted, ~500 lines moved ✅
 
 #### 1.4 Extract Bulk Operations (PR #3)
 
-- [ ] **1.4.1** Create `advancement/bulk-operations.ts`
+- [x] **1.4.1** Create `advancement/bulk-operations.ts`
   - Move: `bulkMarkRequirementsComplete`
-  - Test: Build passes
+  - Test: Build passes ✓
 
-- [ ] **1.4.2** Move `bulkApproveRequirements` functions
+- [x] **1.4.2** Move `bulkApproveRequirements` functions
   - Move: `bulkApproveRequirements`, `bulkApproveRequirementsWithInit`
-  - Test: Build passes
+  - Test: Build passes ✓
 
-- [ ] **1.4.3** Move `bulkApproveMeritBadgeRequirements` functions
+- [x] **1.4.3** Move `bulkApproveMeritBadgeRequirements` functions
   - Move: Both versions (with and without init)
-  - Test: Build passes
+  - Test: Build passes ✓
 
-- [ ] **1.4.4** Move `bulkSignOffForScouts` and `bulkRecordProgress`
+- [x] **1.4.4** Move `bulkSignOffForScouts` and `bulkRecordProgress`
   - These are the main N+1 targets for Phase 2
-  - Test: Build passes
+  - Test: Build passes ✓
 
-- [ ] **1.4.5** Move remaining bulk functions
-  - Move: `bulkApproveParentSubmissions`, `bulkAwardMeritBadges`, `assignRequirementToScouts`, etc.
-  - Test: Build passes, all tests pass
+- [x] **1.4.5** Move remaining bulk functions
+  - Move: `bulkApproveParentSubmissions`, `bulkAwardMeritBadges`, `assignRequirementToScouts`, `assignMeritBadgeRequirementToScouts`, `bulkLogActivities`
+  - Test: Build passes, all tests pass ✓
 
-**PR #3 Checkpoint**: Bulk operations extracted, ~1200 lines moved
+**PR #3 Checkpoint**: Bulk operations extracted, 1,348 lines moved ✅
 
-#### 1.5 Extract Query Functions (PR #4)
+#### 1.5 Extract Remaining Functions (PR #4)
 
-- [ ] **1.5.1** Create `advancement/queries.ts`
-  - Move: `getRankRequirementsForUnit`, `getRankBrowserData`
-  - Test: Build passes
+##### 1.5a Move Mutations to Existing Modules
 
-- [ ] **1.5.2** Move merit badge query functions
+- [x] **1.5.1** Add rank mutations to `rank-progress.ts`
+  - Move: `submitRequirementForApproval`, `approveRequirementSubmission`, `denyRequirementSubmission`
+  - Move: `approveRank`, `awardRank`
+  - Test: Build passes ✓
+
+- [x] **1.5.2** Add merit badge mutations to `merit-badges.ts`
+  - Move: `completeMeritBadge`
+  - Test: Build passes ✓
+
+##### 1.5b Create Leadership Module
+
+- [x] **1.5.3** Create `advancement/leadership.ts`
+  - Move: `addLeadershipPosition`, `endLeadershipPosition`
+  - Move: `logActivity`
+  - Test: Build passes ✓
+
+##### 1.5c Extract Query Functions
+
+- [x] **1.5.4** Create `advancement/queries.ts`
+  - Move: `getRankRequirementsForUnit`, `getRankBrowserData`, `getRankRequirements`
+  - Test: Build passes ✓
+
+- [x] **1.5.5** Move merit badge query functions
   - Move: `getMeritBadgeBrowserData`, `getMeritBadgeCategories`, `getMeritBadgeRequirements`
-  - Test: Build passes
+  - Move: `getMeritBadgeRequirementsForVersion`, `getScoutMeritBadgeVersion`
+  - Test: Build passes ✓
 
-- [ ] **1.5.3** Move summary and progress functions
+- [x] **1.5.6** Move summary and progress functions
   - Move: `getUnitAdvancementSummary`, `getScoutAdvancementProgress`, `getCurrentUserInfo`
-  - Test: Build passes
+  - Move: `getPendingSubmissions`
+  - Test: Build passes ✓
 
-- [ ] **1.5.4** Move remaining query functions
-  - Move: `getBsaMeritBadges`, `getMeritBadgeRequirementsForVersion`
-  - Test: Build passes
+- [x] **1.5.7** Move BSA reference data functions
+  - Move: `getBsaRanks`, `getBsaMeritBadges`, `getBsaLeadershipPositions`
+  - Test: Build passes ✓
+
+**PR #4 Checkpoint**: All mutations distributed, queries.ts + leadership.ts created ✅
 
 #### 1.6 Finalize & Delete Original (PR #4 continued)
 
-- [ ] **1.6.1** Verify original advancement.ts is empty or near-empty
-  - Check: Only imports/re-exports should remain, if anything
-  - Test: `wc -l src/app/actions/advancement.ts` < 50
+- [x] **1.6.1** Verify `_legacy.ts` is empty
+  - All functions moved to specialized modules
+  - Test: File deleted ✓
 
-- [ ] **1.6.2** Update index.ts to import from modules only
-  - Remove: Re-exports from `../advancement.ts`
-  - Test: All 22 consumer files still work
+- [x] **1.6.2** Update index.ts to import from all modules
+  - Add: Re-exports from `leadership.ts` and `queries.ts`
+  - Remove: Re-exports from `_legacy.ts`
+  - Test: All 22 consumer files still work ✓
 
-- [ ] **1.6.3** Delete original `advancement.ts`
-  - Verify: `grep -r "actions/advancement'" src/` returns only advancement/ imports
-  - Test: Build passes
+- [x] **1.6.3** Delete `_legacy.ts`
+  - Verify: `grep -r "_legacy" src/` returns empty ✓
+  - Test: Build passes ✓
 
-- [ ] **1.6.4** Run full test suite
-  - Test: `npm test` all pass
-  - Test: `npm run build` passes
+- [x] **1.6.4** Run full test suite
+  - Test: 575/575 unit tests pass ✓
+  - Test: `npm run build` passes ✓
+  - Note: 3 integration tests have pre-existing timeout issues (not related to refactor)
 
-**Phase 1 Complete**: advancement.ts split into 5 modules, all imports work
+**Phase 1 Complete**: advancement.ts split into 6 modules, all imports work ✅
 
 ---
 
@@ -473,10 +502,11 @@ await supabase.from('scout_rank_requirement_progress').upsert(...)
 | `src/app/actions/advancement/index.ts` | Re-exports all functions | 1.1.1 |
 | `src/app/actions/advancement/types.ts` | Shared TypeScript types | 1.1.2 |
 | `src/app/actions/advancement/utils.ts` | Helper functions | 1.1.3 |
-| `src/app/actions/advancement/rank-progress.ts` | Rank progress functions | 1.2 |
-| `src/app/actions/advancement/merit-badges.ts` | Merit badge functions | 1.3 |
+| `src/app/actions/advancement/rank-progress.ts` | Rank progress + approval functions | 1.2, 1.5.1 |
+| `src/app/actions/advancement/merit-badges.ts` | Merit badge functions + completion | 1.3, 1.5.2 |
 | `src/app/actions/advancement/bulk-operations.ts` | Bulk sign-off functions | 1.4 |
-| `src/app/actions/advancement/queries.ts` | Read-only query functions | 1.5 |
+| `src/app/actions/advancement/leadership.ts` | Leadership positions + activity logging | 1.5.3 |
+| `src/app/actions/advancement/queries.ts` | Read-only query functions | 1.5.4-1.5.7 |
 | `tests/unit/actions/advancement/rank-progress.test.ts` | Rank progress tests | 3.1 |
 | `tests/unit/actions/advancement/bulk-operations.test.ts` | Bulk operation tests | 3.2 |
 
@@ -498,7 +528,7 @@ await supabase.from('scout_rank_requirement_progress').upsert(...)
 
 | File | Reason | Phase |
 |------|--------|-------|
-| `src/app/actions/advancement.ts` | Replaced by module directory | 1.6.3 |
+| `src/app/actions/advancement/_legacy.ts` | All functions moved to specialized modules | 1.6.3 |
 
 ---
 
@@ -577,10 +607,12 @@ After each phase:
 | Phase | Total | Complete | Status |
 |-------|-------|----------|--------|
 | Phase 0 | 15 | 15 | ✅ Complete |
-| Phase 1 | 22 | 0 | ⬜ Not Started |
+| Phase 1 | 28 | 17 | 🔄 In Progress (61%) |
 | Phase 2 | 11 | 0 | ⬜ Not Started |
 | Phase 3 | 15 | 0 | ⬜ Not Started |
-| **Total** | **63** | **15** | 🔄 In Progress |
+| **Total** | **69** | **32** | 🔄 In Progress (46%) |
+
+**Phase 1 remaining**: 11 tasks (1.5.1-1.5.7, 1.6.1-1.6.4)
 
 ---
 
@@ -603,6 +635,22 @@ After each phase:
 | 0.3.1 | 2026-02-04 | pending | Verified 22 files import from advancement |
 | 0.3.2 | 2026-02-04 | pending | Baselined N+1: 40-70 queries for 10 scouts |
 | 0.3.3 | 2026-02-04 | pending | Verified 47 advancement tests passing |
+| 1.1.1 | 2026-02-04 | pending | Created advancement/types.ts |
+| 1.1.2 | 2026-02-04 | pending | Created advancement/auth.ts |
+| 1.1.3 | 2026-02-04 | pending | Created advancement/utils.ts |
+| 1.2.1 | 2026-02-04 | pending | Created advancement/rank-progress.ts |
+| 1.2.2 | 2026-02-04 | pending | Moved markRequirementComplete functions |
+| 1.2.3 | 2026-02-04 | pending | Moved requirement notes functions |
+| 1.2.4 | 2026-02-04 | pending | Cleaned up original file |
+| 1.3.1 | 2026-02-05 | pending | Created advancement/merit-badges.ts |
+| 1.3.2 | 2026-02-05 | pending | Moved MB progress functions |
+| 1.3.3 | 2026-02-05 | pending | Moved MB notes functions |
+| 1.3.4 | 2026-02-05 | pending | Cleaned up _legacy.ts; fixed notes bug |
+| 1.4.1 | 2026-02-05 | pending | Created bulk-operations.ts with bulkMarkRequirementsComplete |
+| 1.4.2 | 2026-02-05 | pending | Moved bulkApproveRequirements functions |
+| 1.4.3 | 2026-02-05 | pending | Moved bulkApproveMeritBadgeRequirements functions |
+| 1.4.4 | 2026-02-05 | pending | Moved bulkSignOffForScouts & bulkRecordProgress |
+| 1.4.5 | 2026-02-05 | pending | Moved remaining bulk functions (1,348 lines total) |
 
 ---
 

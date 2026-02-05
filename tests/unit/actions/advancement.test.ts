@@ -694,9 +694,12 @@ describe('Advancement Actions', () => {
         }
       })
 
+      // Mock adminSupabase for both select (fetch existing notes) and update
       mockAdminSupabase.from.mockImplementation(() => ({
+        select: vi.fn().mockReturnThis(),
         update: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockResolvedValue({ error: null }),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: { notes: null }, error: null }),
       }))
 
       const result = await markMeritBadgeRequirement('req-123', 'unit-123')
@@ -729,9 +732,12 @@ describe('Advancement Actions', () => {
         }
       })
 
+      // Mock adminSupabase for both select (fetch existing notes) and update
       mockAdminSupabase.from.mockImplementation(() => ({
+        select: vi.fn().mockReturnThis(),
         update: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockResolvedValue({ error: null }),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: { notes: null }, error: null }),
       }))
 
       const customDate = '2024-01-15T00:00:00Z'
@@ -765,10 +771,23 @@ describe('Advancement Actions', () => {
         }
       })
 
-      mockAdminSupabase.from.mockImplementation(() => ({
-        update: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockResolvedValue({ error: { message: 'Database error' } }),
-      }))
+      // Mock adminSupabase for both select and update - update fails
+      let callCount = 0
+      mockAdminSupabase.from.mockImplementation(() => {
+        callCount++
+        // First call is select for existing notes, second is update
+        if (callCount === 1) {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({ data: { notes: null }, error: null }),
+          }
+        }
+        return {
+          update: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockResolvedValue({ error: { message: 'Database error' } }),
+        }
+      })
 
       const result = await markMeritBadgeRequirement('req-123', 'unit-123')
 

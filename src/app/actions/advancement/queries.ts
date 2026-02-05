@@ -1,475 +1,23 @@
 'use server'
 
+/**
+ * Read-only query functions for advancement data
+ *
+ * These functions fetch data for display in the UI. They use admin client
+ * to bypass RLS - authorization is handled by the calling pages/components.
+ *
+ * Sub-categories:
+ * - User info queries
+ * - BSA reference data (ranks, badges, positions)
+ * - Scout progress queries
+ * - Unit advancement queries
+ * - Browser data (lazy-loaded tabs)
+ */
+
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { revalidatePath } from 'next/cache'
-import { isFeatureEnabled, FeatureFlag } from '@/lib/feature-flags'
-import { appendNote, serializeNotes, createCompletionNote, createUndoNote } from '@/lib/notes-utils'
-
-interface ActionResult<T = void> {
-  success: boolean
-  error?: string
-  data?: T
-}
-
-// Helper to check if feature is enabled
-function checkFeatureEnabled<T>(): ActionResult<T> | null {
-  if (!isFeatureEnabled(FeatureFlag.ADVANCEMENT_TRACKING)) {
-    return { success: false, error: 'Advancement tracking feature is not enabled' }
-  }
-  return null
-}
-
-// Helper to get current user's profile and verify leader role
-async function verifyLeaderRole(unitId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: 'Not authenticated' }
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, first_name, last_name')
-    .eq('user_id', user.id)
-    .maybeSingle()
-
-  if (!profile) {
-    return { error: 'Profile not found' }
-  }
-
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select('role')
-    .eq('unit_id', unitId)
-    .eq('profile_id', profile.id)
-    .eq('status', 'active')
-    .maybeSingle()
-
-  if (!membership || !['admin', 'treasurer', 'leader'].includes(membership.role)) {
-    return { error: 'Only leaders can modify advancement records' }
-  }
-
-  const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'Unknown'
-  return { profileId: profile.id, role: membership.role, fullName }
-}
-
-// Helper to verify parent access to a scout
-async function verifyParentAccess(scoutId: string) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    return { error: 'Not authenticated' }
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .maybeSingle()
-
-  if (!profile) {
-    return { error: 'Profile not found' }
-  }
-
-  // Check if user is a guardian of the scout
-  const { data: guardian } = await supabase
-    .from('scout_guardians')
-    .select('id')
-    .eq('scout_id', scoutId)
-    .eq('profile_id', profile.id)
-    .maybeSingle()
-
-  if (!guardian) {
-    return { error: 'You are not a guardian of this scout' }
-  }
-
-  return { profileId: profile.id }
-}
-
-/**
- * Submit requirement completion for leader approval (parent action)
- */
-export async function submitRequirementForApproval(
-  requirementProgressId: string,
-  scoutId: string,
-  completedAt: string,
-  notes: string
-): Promise<ActionResult> {
-  const featureCheck = checkFeatureEnabled<void>()
-  if (featureCheck) return featureCheck
-
-  const auth = await verifyParentAccess(scoutId)
-  if ('error' in auth) return { success: false, error: auth.error }
-
-  const adminSupabase = createAdminClient()
-
-  const { error } = await adminSupabase
-    .from('scout_rank_requirement_progress')
-    .update({
-      submitted_by: auth.profileId,
-      submitted_at: new Date().toISOString(),
-      submission_notes: notes,
-      approval_status: 'pending_approval',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', requirementProgressId)
-
-  if (error) {
-    console.error('Error submitting requirement:', error)
-    return { success: false, error: 'Failed to submit requirement for approval' }
-  }
-
-  revalidatePath('/my-progress')
-  revalidatePath('/advancement')
-  return { success: true }
-}
-
-/**
- * Approve parent submission
- */
-export async function approveRequirementSubmission(
-  requirementProgressId: string,
-  unitId: string
-): Promise<ActionResult> {
-  const featureCheck = checkFeatureEnabled<void>()
-  if (featureCheck) return featureCheck
-
-  const auth = await verifyLeaderRole(unitId)
-  if ('error' in auth) return { success: false, error: auth.error }
-
-  const adminSupabase = createAdminClient()
-
-  // Get the submission to preserve the completion date from the parent
-  const { data: submission } = await adminSupabase
-    .from('scout_rank_requirement_progress')
-    .select('submitted_at')
-    .eq('id', requirementProgressId)
-    .single()
-
-  const { error } = await adminSupabase
-    .from('scout_rank_requirement_progress')
-    .update({
-      status: 'completed',
-      completed_at: submission?.submitted_at || new Date().toISOString(),
-      completed_by: auth.profileId,
-      approval_status: 'approved',
-      reviewed_by: auth.profileId,
-      reviewed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', requirementProgressId)
-
-  if (error) {
-    console.error('Error approving submission:', error)
-    return { success: false, error: 'Failed to approve submission' }
-  }
-
-  revalidatePath('/advancement')
-  return { success: true }
-}
-
-/**
- * Deny parent submission with reason
- */
-export async function denyRequirementSubmission(
-  requirementProgressId: string,
-  unitId: string,
-  denialReason: string
-): Promise<ActionResult> {
-  const featureCheck = checkFeatureEnabled<void>()
-  if (featureCheck) return featureCheck
-
-  const auth = await verifyLeaderRole(unitId)
-  if ('error' in auth) return { success: false, error: auth.error }
-
-  const adminSupabase = createAdminClient()
-
-  const { error } = await adminSupabase
-    .from('scout_rank_requirement_progress')
-    .update({
-      approval_status: 'denied',
-      denial_reason: denialReason,
-      reviewed_by: auth.profileId,
-      reviewed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', requirementProgressId)
-
-  if (error) {
-    console.error('Error denying submission:', error)
-    return { success: false, error: 'Failed to deny submission' }
-  }
-
-  revalidatePath('/advancement')
-  return { success: true }
-}
-
-/**
- * Approve a rank (after all requirements completed)
- */
-export async function approveRank(
-  rankProgressId: string,
-  unitId: string,
-  approvedAt?: string
-): Promise<ActionResult> {
-  const featureCheck = checkFeatureEnabled<void>()
-  if (featureCheck) return featureCheck
-
-  const auth = await verifyLeaderRole(unitId)
-  if ('error' in auth) return { success: false, error: auth.error }
-
-  const adminSupabase = createAdminClient()
-
-  const { error } = await adminSupabase
-    .from('scout_rank_progress')
-    .update({
-      status: 'approved',
-      approved_at: approvedAt || new Date().toISOString(),
-      approved_by: auth.profileId,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', rankProgressId)
-
-  if (error) {
-    console.error('Error approving rank:', error)
-    return { success: false, error: 'Failed to approve rank' }
-  }
-
-  revalidatePath('/advancement')
-  return { success: true }
-}
-
-/**
- * Award a rank (final step, updates scout's current rank)
- */
-export async function awardRank(
-  rankProgressId: string,
-  scoutId: string,
-  unitId: string,
-  awardedAt?: string
-): Promise<ActionResult> {
-  const featureCheck = checkFeatureEnabled<void>()
-  if (featureCheck) return featureCheck
-
-  const auth = await verifyLeaderRole(unitId)
-  if ('error' in auth) return { success: false, error: auth.error }
-
-  const adminSupabase = createAdminClient()
-
-  // Get the rank name
-  const { data: progress } = await adminSupabase
-    .from('scout_rank_progress')
-    .select('rank_id, bsa_ranks(name)')
-    .eq('id', rankProgressId)
-    .single()
-
-  if (!progress) {
-    return { success: false, error: 'Rank progress not found' }
-  }
-
-  const timestamp = awardedAt || new Date().toISOString()
-
-  // Update rank progress
-  const { error: progressError } = await adminSupabase
-    .from('scout_rank_progress')
-    .update({
-      status: 'awarded',
-      awarded_at: timestamp,
-      awarded_by: auth.profileId,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', rankProgressId)
-
-  if (progressError) {
-    console.error('Error awarding rank:', progressError)
-    return { success: false, error: 'Failed to award rank' }
-  }
-
-  // Update scout's current rank
-  const rankName = (progress.bsa_ranks as { name: string })?.name
-  if (rankName) {
-    await adminSupabase
-      .from('scouts')
-      .update({ rank: rankName, updated_at: new Date().toISOString() })
-      .eq('id', scoutId)
-  }
-
-  revalidatePath('/advancement')
-  revalidatePath(`/scouts/${scoutId}`)
-  return { success: true }
-}
-
-// ==========================================
-// MERIT BADGE ACTIONS
-// ==========================================
-
-/**
- * Complete and award a merit badge
- */
-export async function completeMeritBadge(
-  meritBadgeProgressId: string,
-  unitId: string,
-  counselorSignedAt?: string
-): Promise<ActionResult> {
-  const featureCheck = checkFeatureEnabled<void>()
-  if (featureCheck) return featureCheck
-
-  const auth = await verifyLeaderRole(unitId)
-  if ('error' in auth) return { success: false, error: auth.error }
-
-  const adminSupabase = createAdminClient()
-
-  const { error } = await adminSupabase
-    .from('scout_merit_badge_progress')
-    .update({
-      status: 'awarded',
-      completed_at: new Date().toISOString(),
-      awarded_at: new Date().toISOString(),
-      counselor_signed_at: counselorSignedAt,
-      approved_by: auth.profileId,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', meritBadgeProgressId)
-
-  if (error) {
-    console.error('Error completing merit badge:', error)
-    return { success: false, error: 'Failed to complete merit badge' }
-  }
-
-  revalidatePath('/advancement')
-  return { success: true }
-}
-
-// ==========================================
-// LEADERSHIP ACTIONS
-// ==========================================
-
-/**
- * Add a leadership position for a scout
- */
-export async function addLeadershipPosition(
-  scoutId: string,
-  positionId: string,
-  unitId: string,
-  startDate: string,
-  notes?: string
-): Promise<ActionResult<{ historyId: string }>> {
-  const featureCheck = checkFeatureEnabled<{ historyId: string }>()
-  if (featureCheck) return featureCheck
-
-  const auth = await verifyLeaderRole(unitId)
-  if ('error' in auth) return { success: false, error: auth.error }
-
-  const adminSupabase = createAdminClient()
-
-  const { data: history, error } = await adminSupabase
-    .from('scout_leadership_history')
-    .insert({
-      scout_id: scoutId,
-      position_id: positionId,
-      unit_id: unitId,
-      start_date: startDate,
-      notes,
-    })
-    .select('id')
-    .single()
-
-  if (error) {
-    console.error('Error adding leadership position:', error)
-    return { success: false, error: 'Failed to add leadership position' }
-  }
-
-  revalidatePath(`/scouts/${scoutId}`)
-  revalidatePath('/advancement')
-  return { success: true, data: { historyId: history.id } }
-}
-
-/**
- * End a leadership position
- */
-export async function endLeadershipPosition(
-  historyId: string,
-  unitId: string,
-  endDate: string
-): Promise<ActionResult> {
-  const featureCheck = checkFeatureEnabled<void>()
-  if (featureCheck) return featureCheck
-
-  const auth = await verifyLeaderRole(unitId)
-  if ('error' in auth) return { success: false, error: auth.error }
-
-  const adminSupabase = createAdminClient()
-
-  const { error } = await adminSupabase
-    .from('scout_leadership_history')
-    .update({
-      end_date: endDate,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', historyId)
-
-  if (error) {
-    console.error('Error ending leadership position:', error)
-    return { success: false, error: 'Failed to end leadership position' }
-  }
-
-  revalidatePath('/advancement')
-  return { success: true }
-}
-
-// ==========================================
-// ACTIVITY LOG ACTIONS
-// ==========================================
-
-/**
- * Log an activity entry (camping, hiking, service)
- */
-export async function logActivity(
-  scoutId: string,
-  unitId: string,
-  activityType: 'camping' | 'hiking' | 'service' | 'conservation',
-  activityDate: string,
-  value: number,
-  description?: string,
-  location?: string,
-  eventId?: string
-): Promise<ActionResult<{ entryId: string }>> {
-  const featureCheck = checkFeatureEnabled<{ entryId: string }>()
-  if (featureCheck) return featureCheck
-
-  const auth = await verifyLeaderRole(unitId)
-  if ('error' in auth) return { success: false, error: auth.error }
-
-  const adminSupabase = createAdminClient()
-
-  const { data: entry, error } = await adminSupabase
-    .from('scout_activity_entries')
-    .insert({
-      scout_id: scoutId,
-      activity_type: activityType,
-      activity_date: activityDate,
-      value,
-      description,
-      location,
-      event_id: eventId,
-      verified_by: auth.profileId,
-      verified_at: new Date().toISOString(),
-    })
-    .select('id')
-    .single()
-
-  if (error) {
-    console.error('Error logging activity:', error)
-    return { success: false, error: 'Failed to log activity' }
-  }
-
-  revalidatePath(`/scouts/${scoutId}`)
-  revalidatePath('/advancement')
-  return { success: true, data: { entryId: entry.id } }
-}
+import type { ActionResult } from './types'
+import { verifyLeaderRole } from './utils'
 
 // ==========================================
 // USER INFO
@@ -497,14 +45,13 @@ export async function getCurrentUserInfo(unitId: string): Promise<ActionResult<{
 }
 
 // ==========================================
-// READ-ONLY DATA FETCHING
+// BSA REFERENCE DATA
 // ==========================================
 
 /**
  * Get BSA ranks reference data
  */
 export async function getBsaRanks() {
-  // Use admin client to bypass RLS for this read-only BSA reference query
   const supabase = createAdminClient()
 
   const { data, error } = await supabase
@@ -524,7 +71,6 @@ export async function getBsaRanks() {
  * Get BSA merit badges reference data
  */
 export async function getBsaMeritBadges(filters?: { category?: string; isEagleRequired?: boolean }) {
-  // Use admin client to bypass RLS for this read-only BSA reference query
   const supabase = createAdminClient()
 
   let query = supabase
@@ -554,7 +100,6 @@ export async function getBsaMeritBadges(filters?: { category?: string; isEagleRe
  * Get leadership positions reference data
  */
 export async function getBsaLeadershipPositions() {
-  // Use admin client to bypass RLS for this read-only BSA reference query
   const supabase = createAdminClient()
 
   const { data, error } = await supabase
@@ -570,12 +115,14 @@ export async function getBsaLeadershipPositions() {
   return data
 }
 
+// ==========================================
+// SCOUT PROGRESS QUERIES
+// ==========================================
+
 /**
  * Get scout's advancement progress
  */
 export async function getScoutAdvancementProgress(scoutId: string) {
-  // Use admin client to bypass RLS for this read-only query
-  // Authorization is handled by the calling page which checks user role
   const supabase = createAdminClient()
 
   // Run all 4 queries in parallel - they are completely independent
@@ -650,140 +197,6 @@ export async function getScoutAdvancementProgress(scoutId: string) {
 }
 
 /**
- * Get requirements for a specific merit badge
- * @param meritBadgeId - The merit badge ID
- * @param versionYear - Optional version year (e.g., from scout's progress). If not provided, uses the current active version.
- */
-export async function getMeritBadgeRequirements(meritBadgeId: string, versionYear?: number) {
-  // Use admin client to bypass RLS for this read-only BSA reference query
-  const supabase = createAdminClient()
-
-  let effectiveVersionYear = versionYear
-
-  // If no version year provided, get the current active version
-  if (!effectiveVersionYear) {
-    const { data: currentVersion } = await supabase
-      .from('bsa_merit_badge_versions')
-      .select('version_year')
-      .eq('merit_badge_id', meritBadgeId)
-      .eq('is_current', true)
-      .maybeSingle()
-
-    if (currentVersion) {
-      effectiveVersionYear = currentVersion.version_year
-    } else {
-      // Fallback: get the badge's requirement_version_year
-      const { data: badge } = await supabase
-        .from('bsa_merit_badges')
-        .select('requirement_version_year')
-        .eq('id', meritBadgeId)
-        .single()
-
-      if (!badge?.requirement_version_year) {
-        console.error('Merit badge does not have a version year set')
-        return []
-      }
-      effectiveVersionYear = badge.requirement_version_year
-    }
-  }
-
-  const { data, error } = await supabase
-    .from('bsa_merit_badge_requirements')
-    .select(`
-      id,
-      version_year,
-      merit_badge_id,
-      requirement_number,
-      parent_requirement_id,
-      sub_requirement_letter,
-      description,
-      display_order,
-      is_alternative,
-      alternatives_group,
-      nesting_depth,
-      required_count,
-      is_header
-    `)
-    .eq('merit_badge_id', meritBadgeId)
-    .eq('version_year', effectiveVersionYear)
-    .order('display_order')
-
-  if (error) {
-    console.error('Error fetching merit badge requirements:', error)
-    return []
-  }
-
-  // Return with explicit type to ensure all fields are available
-  return data as Array<{
-    id: string
-    version_year: number | null
-    merit_badge_id: string
-    requirement_number: string
-    parent_requirement_id: string | null
-    sub_requirement_letter: string | null
-    description: string
-    display_order: number
-    is_alternative: boolean | null
-    alternatives_group: string | null
-    nesting_depth: number | null
-    required_count: number | null
-    is_header: boolean | null
-  }>
-}
-
-/**
- * Get rank requirements by rank code
- * Returns requirements for display even when scout has no progress record
- */
-export async function getRankRequirements(rankCode: string) {
-  const supabase = await createClient()
-
-  // Get the rank with its requirement_version_year
-  const { data: rankData, error: rankError } = await supabase
-    .from('bsa_ranks')
-    .select('id, code, name, display_order, requirement_version_year')
-    .eq('code', rankCode)
-    .single()
-
-  if (rankError || !rankData) {
-    console.error('Error fetching rank:', rankError)
-    return null
-  }
-
-  if (!rankData.requirement_version_year) {
-    console.error('Rank does not have a version year set')
-    return null
-  }
-
-  // Capture version year as non-null after the check
-  const versionYear = rankData.requirement_version_year
-
-  // Add image_url (images are stored in filesystem, not database)
-  const rank = {
-    ...rankData,
-    image_url: null as string | null,
-  }
-
-  // Get all requirements for this rank's current version
-  const { data: requirements, error: reqError } = await supabase
-    .from('bsa_rank_requirements')
-    .select('id, requirement_number, description, parent_requirement_id, is_alternative, alternatives_group, version_year')
-    .eq('rank_id', rank.id)
-    .eq('version_year', versionYear)
-    .order('display_order')
-
-  if (reqError) {
-    console.error('Error fetching requirements:', reqError)
-    return null
-  }
-
-  return {
-    rank,
-    requirements: requirements || [],
-  }
-}
-
-/**
  * Get pending parent submissions for a unit
  */
 export async function getPendingSubmissions(unitId: string) {
@@ -854,6 +267,140 @@ export async function getScoutMeritBadgeVersion(
   }
 }
 
+// ==========================================
+// REQUIREMENT QUERIES
+// ==========================================
+
+/**
+ * Get requirements for a specific merit badge
+ * @param meritBadgeId - The merit badge ID
+ * @param versionYear - Optional version year. If not provided, uses the current active version.
+ */
+export async function getMeritBadgeRequirements(meritBadgeId: string, versionYear?: number) {
+  const supabase = createAdminClient()
+
+  let effectiveVersionYear = versionYear
+
+  // If no version year provided, get the current active version
+  if (!effectiveVersionYear) {
+    const { data: currentVersion } = await supabase
+      .from('bsa_merit_badge_versions')
+      .select('version_year')
+      .eq('merit_badge_id', meritBadgeId)
+      .eq('is_current', true)
+      .maybeSingle()
+
+    if (currentVersion) {
+      effectiveVersionYear = currentVersion.version_year
+    } else {
+      // Fallback: get the badge's requirement_version_year
+      const { data: badge } = await supabase
+        .from('bsa_merit_badges')
+        .select('requirement_version_year')
+        .eq('id', meritBadgeId)
+        .single()
+
+      if (!badge?.requirement_version_year) {
+        console.error('Merit badge does not have a version year set')
+        return []
+      }
+      effectiveVersionYear = badge.requirement_version_year
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('bsa_merit_badge_requirements')
+    .select(`
+      id,
+      version_year,
+      merit_badge_id,
+      requirement_number,
+      parent_requirement_id,
+      sub_requirement_letter,
+      description,
+      display_order,
+      is_alternative,
+      alternatives_group,
+      nesting_depth,
+      required_count,
+      is_header
+    `)
+    .eq('merit_badge_id', meritBadgeId)
+    .eq('version_year', effectiveVersionYear)
+    .order('display_order')
+
+  if (error) {
+    console.error('Error fetching merit badge requirements:', error)
+    return []
+  }
+
+  return data as Array<{
+    id: string
+    version_year: number | null
+    merit_badge_id: string
+    requirement_number: string
+    parent_requirement_id: string | null
+    sub_requirement_letter: string | null
+    description: string
+    display_order: number
+    is_alternative: boolean | null
+    alternatives_group: string | null
+    nesting_depth: number | null
+    required_count: number | null
+    is_header: boolean | null
+  }>
+}
+
+/**
+ * Get rank requirements by rank code
+ * Returns requirements for display even when scout has no progress record
+ */
+export async function getRankRequirements(rankCode: string) {
+  const supabase = await createClient()
+
+  // Get the rank with its requirement_version_year
+  const { data: rankData, error: rankError } = await supabase
+    .from('bsa_ranks')
+    .select('id, code, name, display_order, requirement_version_year')
+    .eq('code', rankCode)
+    .single()
+
+  if (rankError || !rankData) {
+    console.error('Error fetching rank:', rankError)
+    return null
+  }
+
+  if (!rankData.requirement_version_year) {
+    console.error('Rank does not have a version year set')
+    return null
+  }
+
+  const versionYear = rankData.requirement_version_year
+
+  const rank = {
+    ...rankData,
+    image_url: null as string | null,
+  }
+
+  // Get all requirements for this rank's current version
+  const { data: requirements, error: reqError } = await supabase
+    .from('bsa_rank_requirements')
+    .select('id, requirement_number, description, parent_requirement_id, is_alternative, alternatives_group, version_year')
+    .eq('rank_id', rank.id)
+    .eq('version_year', versionYear)
+    .order('display_order')
+
+  if (reqError) {
+    console.error('Error fetching requirements:', reqError)
+    return null
+  }
+
+  return {
+    rank,
+    requirements: requirements || [],
+  }
+}
+
 /**
  * Get requirements for a specific version of a merit badge
  * Used for version comparison/switching
@@ -871,7 +418,6 @@ export async function getMeritBadgeRequirementsForVersion(
   nesting_depth: number | null
   is_header: boolean | null
 }>>> {
-  // Use admin client to bypass RLS for this read-only BSA reference query
   const supabase = createAdminClient()
 
   const { data, error } = await supabase
@@ -899,13 +445,12 @@ export async function getMeritBadgeRequirementsForVersion(
 }
 
 // ==========================================
-// OPTIMIZED UNIT ADVANCEMENT QUERIES
+// UNIT ADVANCEMENT QUERIES
 // ==========================================
 
 /**
  * Get unit advancement summary stats in a single optimized query.
  * Returns counts needed for the summary tab without loading all data.
- * Uses admin client for read-only access - authorization handled by calling page.
  */
 export async function getUnitAdvancementSummary(unitId: string): Promise<ActionResult<{
   scoutCount: number
@@ -929,7 +474,6 @@ export async function getUnitAdvancementSummary(unitId: string): Promise<ActionR
     meritBadges: number
   }
 }>> {
-  // Use admin client for read-only query - authorization handled by calling page
   const supabase = createAdminClient()
 
   // Get scouts with minimal data
@@ -968,7 +512,6 @@ export async function getUnitAdvancementSummary(unitId: string): Promise<ActionR
 
   // Run parallel queries for stats only
   const [rankProgressResult, badgeProgressResult, pendingRankResult, pendingBadgeResult] = await Promise.all([
-    // Rank progress with requirement counts
     supabase
       .from('scout_rank_progress')
       .select(`
@@ -982,19 +525,16 @@ export async function getUnitAdvancementSummary(unitId: string): Promise<ActionR
       .in('scout_id', scoutIds)
       .eq('status', 'in_progress'),
 
-    // Merit badge counts by status
     supabase
       .from('scout_merit_badge_progress')
       .select('id, status')
       .in('scout_id', scoutIds),
 
-    // Pending rank requirement approvals count
     supabase
       .from('scout_rank_requirement_progress')
       .select('id', { count: 'exact', head: true })
       .eq('approval_status', 'pending_approval'),
 
-    // Pending merit badge approvals count
     supabase
       .from('scout_merit_badge_progress')
       .select('id', { count: 'exact', head: true })
@@ -1049,13 +589,10 @@ export async function getUnitAdvancementSummary(unitId: string): Promise<ActionR
 
 /**
  * Get distinct merit badge categories.
- * Much lighter than loading all 141 badges just to extract categories.
- * Uses admin client for read-only access - authorization handled by calling page.
  */
 export async function getMeritBadgeCategories(): Promise<ActionResult<string[]>> {
   const supabase = createAdminClient()
 
-  // Use distinct query to get only unique categories
   const { data, error } = await supabase
     .from('bsa_merit_badges')
     .select('category')
@@ -1067,15 +604,12 @@ export async function getMeritBadgeCategories(): Promise<ActionResult<string[]>>
     return { success: false, error: 'Failed to fetch categories' }
   }
 
-  // Extract unique categories
   const categories = [...new Set(data?.map(b => b.category).filter(Boolean) as string[])]
   return { success: true, data: categories.sort() }
 }
 
 /**
  * Get rank requirements filtered by version year.
- * Only loads requirements for the current version, not all 1000+ historical requirements.
- * Uses admin client for read-only access - authorization handled by calling page.
  */
 export async function getRankRequirementsForUnit(
   versionYear?: number
@@ -1104,7 +638,6 @@ export async function getRankRequirementsForUnit(
 }>> {
   const supabase = createAdminClient()
 
-  // Get ranks with their version years
   const { data: ranks, error: ranksError } = await supabase
     .from('bsa_ranks')
     .select('id, code, name, display_order, is_eagle_required, description, requirement_version_year')
@@ -1115,18 +648,14 @@ export async function getRankRequirementsForUnit(
     return { success: false, error: 'Failed to fetch ranks' }
   }
 
-  // Build query for requirements - filter by version year if provided
   let reqQuery = supabase
     .from('bsa_rank_requirements')
     .select('id, rank_id, version_year, requirement_number, parent_requirement_id, sub_requirement_letter, description, is_alternative, alternatives_group, display_order')
     .order('display_order')
 
-  // If version year specified, filter to that year
-  // Otherwise, filter to each rank's requirement_version_year
   if (versionYear) {
     reqQuery = reqQuery.eq('version_year', versionYear)
   } else {
-    // Get only requirements matching each rank's current version
     const rankVersionYears = [...new Set(
       (ranks || [])
         .map(r => r.requirement_version_year)
@@ -1153,10 +682,12 @@ export async function getRankRequirementsForUnit(
   }
 }
 
+// ==========================================
+// BROWSER DATA (LAZY-LOADED TABS)
+// ==========================================
+
 /**
  * Get data for the Rank Requirements Browser tab (lazy loaded).
- * Fetches scouts with their rank progress for a unit.
- * Uses admin client for read-only access - authorization handled by calling page.
  */
 export async function getRankBrowserData(unitId: string): Promise<ActionResult<{
   scouts: Array<{
@@ -1217,8 +748,6 @@ export async function getRankBrowserData(unitId: string): Promise<ActionResult<{
 
 /**
  * Get data for the Merit Badge Browser tab (lazy loaded).
- * Fetches scouts with badge progress and all active badges.
- * Uses admin client for read-only access - authorization handled by calling page.
  */
 export async function getMeritBadgeBrowserData(unitId: string): Promise<ActionResult<{
   badges: Array<{
@@ -1259,7 +788,6 @@ export async function getMeritBadgeBrowserData(unitId: string): Promise<ActionRe
 }>> {
   const supabase = createAdminClient()
 
-  // Run both queries in parallel
   const [badgesResult, scoutsResult] = await Promise.all([
     supabase
       .from('bsa_merit_badges')
