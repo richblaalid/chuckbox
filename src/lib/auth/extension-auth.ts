@@ -38,10 +38,9 @@ function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
 
-// Helper to get typed table access (table not in generated types yet)
- 
+// Helper for extension_auth_tokens table access
 function getTokensTable(supabase: SupabaseClient<Database>) {
-  return (supabase as any).from('extension_auth_tokens')
+  return supabase.from('extension_auth_tokens')
 }
 
 /**

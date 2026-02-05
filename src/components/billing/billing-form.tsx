@@ -107,9 +107,7 @@ export function BillingForm({ unitId, scouts }: BillingFormProps) {
       const billingDate = new Date().toISOString().split('T')[0]
 
       // Call the atomic billing function - all operations happen in a single transaction
-      // TODO: create_billing_with_journal function needs to be added to the schema
-       
-      const { data, error: rpcError } = await (supabase.rpc as any)('create_billing_with_journal', {
+      const { data, error: rpcError } = await supabase.rpc('create_billing_with_journal', {
         p_unit_id: unitId,
         p_description: description,
         p_total_amount: totalAmount,

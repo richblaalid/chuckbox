@@ -64,18 +64,7 @@ describe('roles', () => {
       })
     })
 
-    describe('members', () => {
-      it('should only allow admin to access members', () => {
-        expect(canAccessPage('admin', 'members')).toBe(true)
-      })
-
-      it('should deny all other roles access to members', () => {
-        expect(canAccessPage('treasurer', 'members')).toBe(false)
-        expect(canAccessPage('leader', 'members')).toBe(false)
-        expect(canAccessPage('parent', 'members')).toBe(false)
-        expect(canAccessPage('scout', 'members')).toBe(false)
-      })
-    })
+    // Note: 'members' page was removed - functionality moved to Settings > Users tab
 
     describe('reports', () => {
       it('should allow admin, treasurer, leader to access reports', () => {
@@ -177,8 +166,9 @@ describe('roles', () => {
   describe('getVisibleNavItems', () => {
     it('should return all nav items for admin', () => {
       const items = getVisibleNavItems('admin')
+      // Note: 'members' page was removed - functionality moved to Settings > Users tab
       expect(items.map(i => i.page)).toEqual([
-        'dashboard', 'scouts', 'finances', 'advancement', 'members'
+        'dashboard', 'scouts', 'finances', 'advancement'
       ])
     })
 

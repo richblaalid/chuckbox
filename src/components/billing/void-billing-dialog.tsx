@@ -54,13 +54,15 @@ export function VoidBillingDialog({
     const supabase = createClient()
 
     try {
-       
-      const { error: rpcError } = await (supabase.rpc as any)(
-        type === 'record' ? 'void_billing_record' : 'void_billing_charge',
-        type === 'record'
-          ? { p_billing_record_id: billingRecordId, p_void_reason: reason }
-          : { p_billing_charge_id: billingChargeId, p_void_reason: reason }
-      )
+      const { error: rpcError } = type === 'record'
+        ? await supabase.rpc('void_billing_record', {
+            p_billing_record_id: billingRecordId!,
+            p_void_reason: reason,
+          })
+        : await supabase.rpc('void_billing_charge', {
+            p_billing_charge_id: billingChargeId!,
+            p_void_reason: reason,
+          })
 
       if (rpcError) throw rpcError
 
