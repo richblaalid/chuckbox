@@ -58,8 +58,6 @@ export async function GET() {
 
     if (testAccessToken && testMerchantId) {
       // Bypass OAuth and directly save test credentials
-      console.log('Using test Square credentials (SQUARE_TEST_ACCESS_TOKEN)')
-
       // Set expiration to 30 days from now (test tokens don't expire but we need a value)
       const expiresAt = new Date()
       expiresAt.setDate(expiresAt.getDate() + 30)

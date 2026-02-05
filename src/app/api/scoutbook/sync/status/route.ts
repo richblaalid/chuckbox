@@ -104,12 +104,9 @@ export async function GET(request: NextRequest) {
 
     // Build staging info for staged sessions
     let staging = null
-    console.log(`[Status] Session ${sessionId} status: ${session.status}`)
     if (session.status === 'staged') {
       try {
-        console.log(`[Status] Fetching staged members for session ${sessionId}`)
         const stagedMembers = await getStagedMembers(supabase, sessionId)
-        console.log(`[Status] Got ${stagedMembers.length} staged members`)
 
         // Separate scouts and adults
         const scouts = stagedMembers.filter((m) => m.memberType === 'YOUTH')
@@ -137,7 +134,6 @@ export async function GET(request: NextRequest) {
             adultsTotal,
           },
         }
-        console.log(`[Status] Staging summary: Scouts (${toCreate} create, ${toUpdate} update, ${toSkip} skip), Adults (${adultsToCreate} create, ${adultsToUpdate} update)`)
       } catch (err) {
         console.error('[Status] Failed to get staged members:', err)
       }

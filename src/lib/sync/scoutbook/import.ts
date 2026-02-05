@@ -255,10 +255,6 @@ export async function stageRosterMembers(
     return { profileId: null, matchType: 'none' }
   }
 
-  console.log(
-    `[Staging] Analyzing ${rosterMembers.length} members (${existingScoutsByBsaId.size} scouts, ${existingAdultsByBsaId.size} adult profiles)`
-  )
-
   const stagedRows: Database['public']['Tables']['sync_staged_members']['Insert'][] = []
   let toCreate = 0
   let toUpdate = 0
@@ -472,10 +468,6 @@ export async function stageRosterMembers(
   // Scouts = YOUTH + P 18+ (scouts who aged past 18), Adults = LEADER only
   const scoutsTotal = rosterMembers.filter((m) => m.type === 'YOUTH' || m.type === 'P 18+').length
   const adultsTotal = rosterMembers.filter((m) => m.type === 'LEADER').length
-
-  console.log(
-    `[Staging] Complete: Scouts (${toCreate} create, ${toUpdate} update, ${toSkip} skip), Adults (${adultsToCreate} create, ${adultsToUpdate} update)`
-  )
 
   return {
     sessionId,
@@ -844,10 +836,6 @@ export async function confirmStagedImport(
     .delete()
     .eq('session_id', sessionId)
 
-  console.log(
-    `[Import] Complete: Scouts (${result.created} created, ${result.updated} updated), Adults (${result.adultsCreated} created, ${result.adultsUpdated} updated, ${result.adultsLinked} linked), ${result.skipped} skipped`
-  )
-
   return result
 }
 
@@ -896,9 +884,6 @@ export async function importRosterMembers(
   // Filter to scouts (YOUTH + P 18+), skip adult leaders (LEADER only)
   const scoutMembers = rosterMembers.filter((m) => m.type === 'YOUTH' || m.type === 'P 18+')
   const leaderCount = rosterMembers.filter((m) => m.type === 'LEADER').length
-  if (leaderCount > 0) {
-    console.log(`[Import] Skipping ${leaderCount} adult leader members (LEADER)`)
-  }
 
   // Get existing scouts by BSA member ID for this unit
   const { data: existingScouts, error: fetchError } = await supabase
@@ -915,10 +900,6 @@ export async function importRosterMembers(
   // Create lookup map by BSA member ID
   const existingByBsaId = new Map(
     (existingScouts || []).map((s) => [s.bsa_member_id!, s])
-  )
-
-  console.log(
-    `[Import] Processing ${scoutMembers.length} scout members (${existingByBsaId.size} existing scouts in unit)`
   )
 
   // Get or create patrols for this unit
@@ -986,10 +967,6 @@ export async function importRosterMembers(
 
   result.skipped = leaderCount
 
-  console.log(
-    `[Import] Complete: ${result.created} created, ${result.updated} updated, ${result.skipped} skipped, ${result.errors.length} errors`
-  )
-
   return result
 }
 
@@ -1031,7 +1008,6 @@ async function getOrCreatePatrols(
 
       if (!error && newPatrol) {
         patrolMap.set(name, newPatrol.id)
-        console.log(`[Import] Created patrol: ${name}`)
       }
     }
   }

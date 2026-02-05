@@ -106,6 +106,7 @@ export function AdultForm({ unitId, adult, onClose, onSuccess }: AdultFormProps)
   // Fetch scouts and guardianships when editing
   useEffect(() => {
     if (!isCreateMode && adult && mounted) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentional: loading state for data fetch
       setLoadingScoutData(true)
       getAdultFormData(unitId, adult.id)
         .then(result => {

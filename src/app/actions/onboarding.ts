@@ -11,11 +11,9 @@ import {
   type UnitMetadata,
   getScoutPosition,
 } from '@/lib/import/bsa-roster-parser'
+import type { Json } from '@/types/database'
 
-// Note: These tables will be created by migration 20260118000000_unit_provisioning.sql
-// Using type assertions to work with tables not yet in generated types
-const fromNewTable = (client: ReturnType<typeof createAdminClient>, table: string) =>
-  (client as any).from(table)
+// Provisioning tables are now in generated types (migration 20260118000000_unit_provisioning.sql)
 
 // ============================================
 // Types
@@ -77,7 +75,7 @@ async function checkRateLimit(ipAddress: string, email?: string): Promise<{ allo
 
   // Check IP-based rate limit
   // Note: signup_rate_limits table will be created by migration 20260118000000_unit_provisioning.sql
-  const { data: ipRecord } = await fromNewTable(adminSupabase, 'signup_rate_limits')
+  const { data: ipRecord } = await adminSupabase.from('signup_rate_limits')
     .select('*')
     .eq('ip_address', ipAddress)
     .gte('first_attempt_at', windowStart.toISOString())
@@ -87,9 +85,10 @@ async function checkRateLimit(ipAddress: string, email?: string): Promise<{ allo
     if (ipRecord.blocked_until && new Date(ipRecord.blocked_until) > now) {
       return { allowed: false, error: 'Too many signup attempts. Please try again later.' }
     }
-    if (ipRecord.attempts >= RATE_LIMIT_MAX_ATTEMPTS) {
+    const attempts = ipRecord.attempts ?? 0
+    if (attempts >= RATE_LIMIT_MAX_ATTEMPTS) {
       // Block for 1 hour
-      await fromNewTable(adminSupabase, 'signup_rate_limits')
+      await adminSupabase.from('signup_rate_limits')
         .update({
           blocked_until: new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
           last_attempt_at: now.toISOString(),
@@ -98,16 +97,16 @@ async function checkRateLimit(ipAddress: string, email?: string): Promise<{ allo
       return { allowed: false, error: 'Too many signup attempts. Please try again in an hour.' }
     }
     // Increment attempts
-    await fromNewTable(adminSupabase, 'signup_rate_limits')
+    await adminSupabase.from('signup_rate_limits')
       .update({
-        attempts: ipRecord.attempts + 1,
+        attempts: attempts + 1,
         last_attempt_at: now.toISOString(),
         email: email || ipRecord.email,
       })
       .eq('id', ipRecord.id)
   } else {
     // Create new rate limit record
-    await fromNewTable(adminSupabase, 'signup_rate_limits').insert({
+    await adminSupabase.from('signup_rate_limits').insert({
       ip_address: ipAddress,
       email,
       attempts: 1,
@@ -289,7 +288,7 @@ export async function provisionUnit(input: ProvisionUnitInput, ipAddress: string
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
 
-    const { data: provisioningToken, error: tokenError } = await fromNewTable(adminSupabase, 'unit_provisioning_tokens')
+    const { data: provisioningToken, error: tokenError } = await adminSupabase.from('unit_provisioning_tokens')
       .insert({
         unit_id: unit.id,
         profile_id: profile.id,
@@ -310,11 +309,11 @@ export async function provisionUnit(input: ProvisionUnitInput, ipAddress: string
     }
 
     // 5. Stage the roster data for later import
-    const { error: stageError } = await fromNewTable(adminSupabase, 'staged_roster_imports').insert({
+    const { error: stageError } = await adminSupabase.from('staged_roster_imports').insert({
       provisioning_token_id: provisioningToken.id,
-      parsed_adults: parsedAdults,
-      parsed_scouts: parsedScouts,
-      unit_metadata: unitMetadata,
+      parsed_adults: parsedAdults as unknown as Json,
+      parsed_scouts: parsedScouts as unknown as Json,
+      unit_metadata: unitMetadata as unknown as Json,
     })
 
     if (stageError) {
@@ -357,7 +356,7 @@ export async function verifyProvisioningToken(token: string): Promise<VerifyProv
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
 
   // Find the provisioning token
-  const { data: provisioningToken, error: tokenError } = await fromNewTable(adminSupabase, 'unit_provisioning_tokens')
+  const { data: provisioningToken, error: tokenError } = await adminSupabase.from('unit_provisioning_tokens')
     .select('*, units(id, name), profiles(id)')
     .eq('token_hash', tokenHash)
     .maybeSingle()
@@ -396,7 +395,7 @@ export async function verifyProvisioningToken(token: string): Promise<VerifyProv
 
   try {
     // 1. Mark token as verified
-    await fromNewTable(adminSupabase, 'unit_provisioning_tokens')
+    await adminSupabase.from('unit_provisioning_tokens')
       .update({ verified_at: new Date().toISOString() })
       .eq('id', provisioningToken.id)
 
@@ -418,7 +417,7 @@ export async function verifyProvisioningToken(token: string): Promise<VerifyProv
       .eq('profile_id', provisioningToken.profile_id)
 
     // 5. Import staged roster data
-    const { data: stagedData } = await fromNewTable(adminSupabase, 'staged_roster_imports')
+    const { data: stagedData } = await adminSupabase.from('staged_roster_imports')
       .select('*')
       .eq('provisioning_token_id', provisioningToken.id)
       .maybeSingle()
@@ -428,12 +427,12 @@ export async function verifyProvisioningToken(token: string): Promise<VerifyProv
     if (stagedData) {
       importResult = await importRosterData(
         provisioningToken.unit_id,
-        stagedData.parsed_adults as ParsedAdult[],
-        stagedData.parsed_scouts as ParsedScout[]
+        stagedData.parsed_adults as unknown as ParsedAdult[],
+        stagedData.parsed_scouts as unknown as ParsedScout[]
       )
 
       // Clean up staged data
-      await fromNewTable(adminSupabase, 'staged_roster_imports')
+      await adminSupabase.from('staged_roster_imports')
         .delete()
         .eq('id', stagedData.id)
     }

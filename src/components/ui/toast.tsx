@@ -172,19 +172,19 @@ function ToastContainer({
 
 /**
  * Convenience functions for creating toasts
+ * Note: These are stub functions - actual toast implementation uses ToastContext
  */
 export const toast = {
-  success: (title: string, description?: string) => {
-    // This will be implemented when the context is available
-    console.log('Toast:', { title, description, variant: 'success' })
+  success: (_title: string, _description?: string) => {
+    // Stub - use ToastContext.showToast() instead
   },
-  error: (title: string, description?: string) => {
-    console.log('Toast:', { title, description, variant: 'error' })
+  error: (_title: string, _description?: string) => {
+    // Stub - use ToastContext.showToast() instead
   },
-  warning: (title: string, description?: string) => {
-    console.log('Toast:', { title, description, variant: 'warning' })
+  warning: (_title: string, _description?: string) => {
+    // Stub - use ToastContext.showToast() instead
   },
-  info: (title: string, description?: string) => {
-    console.log('Toast:', { title, description, variant: 'info' })
+  info: (_title: string, _description?: string) => {
+    // Stub - use ToastContext.showToast() instead
   },
 }

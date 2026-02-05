@@ -51,7 +51,7 @@ export function EditBillingDialog({
 
     try {
        
-      const { error: rpcError } = await (supabase.rpc as any)('update_billing_description', {
+      const { error: rpcError } = await supabase.rpc('update_billing_description', {
         p_billing_record_id: billingRecordId,
         p_new_description: description.trim(),
       })
