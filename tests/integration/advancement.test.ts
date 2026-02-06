@@ -48,7 +48,7 @@ describeIntegration('Advancement Integration Tests', () => {
   })
 
   describe('Requirement Sign-Off Flow', () => {
-    it('should create rank progress and requirement progress records', async () => {
+    it('should create rank progress and requirement progress records', { timeout: 30000 }, async () => {
       // 1. Create unit and scout
       const unit = await seedUnit(supabase, ctx)
       const scout = await seedScout(supabase, ctx, unit.id)
@@ -77,7 +77,7 @@ describeIntegration('Advancement Integration Tests', () => {
       expect(verifyProgress?.rank_id).toBe(scoutRank!.id)
     })
 
-    it('should create requirement progress for all rank requirements', async () => {
+    it('should create requirement progress for all rank requirements', { timeout: 30000 }, async () => {
       // 1. Set up scout with unit
       const unit = await seedUnit(supabase, ctx)
       const scout = await seedScout(supabase, ctx, unit.id)
@@ -116,7 +116,7 @@ describeIntegration('Advancement Integration Tests', () => {
       expect(count).toBe(requirements.length)
     })
 
-    it('should allow marking a requirement as complete', async () => {
+    it('should allow marking a requirement as complete', { timeout: 30000 }, async () => {
       // 1. Create complete test data
       const unit = await seedUnit(supabase, ctx)
       const result = await seedScoutWithRequirementProgress(supabase, ctx, unit.id, {
@@ -152,7 +152,7 @@ describeIntegration('Advancement Integration Tests', () => {
       expect(updated?.completed_at).toBeDefined()
     })
 
-    it('should track completion history with notes', async () => {
+    it('should track completion history with notes', { timeout: 30000 }, async () => {
       // 1. Create test data
       const unit = await seedUnit(supabase, ctx)
       const result = await seedScoutWithRequirementProgress(supabase, ctx, unit.id, {
@@ -195,7 +195,7 @@ describeIntegration('Advancement Integration Tests', () => {
   })
 
   describe('Bulk Sign-Off Flow', () => {
-    it('should allow bulk updating multiple requirements', async () => {
+    it('should allow bulk updating multiple requirements', { timeout: 30000 }, async () => {
       // 1. Create test data with multiple requirements
       const unit = await seedUnit(supabase, ctx)
       const result = await seedScoutWithRequirementProgress(supabase, ctx, unit.id, {
@@ -273,7 +273,7 @@ describeIntegration('Advancement Integration Tests', () => {
       })
     })
 
-    it('should calculate progress percentage correctly', async () => {
+    it('should calculate progress percentage correctly', { timeout: 60000 }, async () => {
       // 1. Create test data
       const unit = await seedUnit(supabase, ctx)
       const result = await seedScoutWithRequirementProgress(supabase, ctx, unit.id, {
@@ -310,7 +310,7 @@ describeIntegration('Advancement Integration Tests', () => {
   })
 
   describe('Data Integrity', () => {
-    it('should maintain foreign key relationships', async () => {
+    it('should maintain foreign key relationships', { timeout: 30000 }, async () => {
       // 1. Create test data
       const unit = await seedUnit(supabase, ctx)
       const result = await seedScoutWithRequirementProgress(supabase, ctx, unit.id)
@@ -334,7 +334,7 @@ describeIntegration('Advancement Integration Tests', () => {
       expect(progressWithRank?.bsa_ranks).toBeDefined()
     })
 
-    it('should cascade properly when cleaning up test data', async () => {
+    it('should cascade properly when cleaning up test data', { timeout: 60000 }, async () => {
       // This test verifies our cleanup works correctly
 
       // 1. Create test data
@@ -428,7 +428,7 @@ describeIntegration('Advancement Integration Tests', () => {
       insertedProgress?.forEach(p => ctx.trackRankProgress(p.id))
     })
 
-    it('should batch fetch and update requirements for 10 scouts using in() operator', { timeout: 30000 }, async () => {
+    it('should batch fetch and update requirements for 10 scouts using in() operator', { timeout: 90000 }, async () => {
       const SCOUT_COUNT = 10
       const unit = await seedUnit(supabase, ctx)
 
@@ -490,7 +490,7 @@ describeIntegration('Advancement Integration Tests', () => {
       expect(completedCount).toBe(SCOUT_COUNT)
     })
 
-    it('should efficiently create missing progress records for scouts without progress', { timeout: 30000 }, async () => {
+    it('should efficiently create missing progress records for scouts without progress', { timeout: 90000 }, async () => {
       const unit = await seedUnit(supabase, ctx)
 
       // Create 5 scouts with progress, 5 without

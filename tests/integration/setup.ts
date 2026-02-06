@@ -130,8 +130,9 @@ export async function cleanupTestData(supabase: SupabaseClient<Database>, option
   unitIds?: string[]
   scoutIds?: string[]
   profileIds?: string[]
+  rankProgressIds?: string[]
 } = {}): Promise<void> {
-  const { unitIds = [], scoutIds = [], profileIds = [] } = options
+  const { unitIds = [], scoutIds = [], profileIds = [], rankProgressIds = [] } = options
 
   // Delete in order of dependencies (most dependent first)
 
@@ -190,6 +191,21 @@ export async function cleanupTestData(supabase: SupabaseClient<Database>, option
       .from('scouts')
       .delete()
       .in('id', scoutIds)
+  }
+
+  // Delete directly-tracked rank progress (for batch insert tests)
+  if (rankProgressIds.length > 0) {
+    // First delete any requirement progress linked to these rank progress records
+    await supabase
+      .from('scout_rank_requirement_progress')
+      .delete()
+      .in('scout_rank_progress_id', rankProgressIds)
+
+    // Then delete the rank progress records themselves
+    await supabase
+      .from('scout_rank_progress')
+      .delete()
+      .in('id', rankProgressIds)
   }
 
   // 5. Delete memberships and profiles
@@ -257,6 +273,7 @@ export class TestContext {
   private createdUnits: string[] = []
   private createdScouts: string[] = []
   private createdProfiles: string[] = []
+  private createdRankProgress: string[] = []
 
   constructor(supabase: SupabaseClient<Database>) {
     this.supabase = supabase
@@ -274,17 +291,23 @@ export class TestContext {
     this.createdProfiles.push(profileId)
   }
 
+  trackRankProgress(progressId: string): void {
+    this.createdRankProgress.push(progressId)
+  }
+
   async cleanup(): Promise<void> {
     await cleanupTestData(this.supabase, {
       unitIds: this.createdUnits,
       scoutIds: this.createdScouts,
       profileIds: this.createdProfiles,
+      rankProgressIds: this.createdRankProgress,
     })
 
     // Reset tracking
     this.createdUnits = []
     this.createdScouts = []
     this.createdProfiles = []
+    this.createdRankProgress = []
   }
 }
 
