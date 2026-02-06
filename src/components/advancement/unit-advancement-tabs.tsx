@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Award, Medal, BarChart3 } from 'lucide-react'
 import { LazyRankBrowser } from './lazy-rank-browser'
 import { LazyMeritBadgeBrowser } from './lazy-merit-badge-browser'
-import { AdvancementSummaryView } from './advancement-summary-view'
+import { LazySummaryView } from './lazy-summary-view'
 
 interface Scout {
   id: string
@@ -185,16 +185,19 @@ export function UnitAdvancementTabs({
         )}
       </TabsContent>
 
-      {/* Summary Tab - Data loaded upfront */}
+      {/* Summary Tab - Data lazy-loaded when visited (unless prefetched) */}
       <TabsContent value="summary" className="mt-4">
-        <AdvancementSummaryView
-          scouts={scouts}
-          rankProgress={rankProgress}
-          pendingApprovals={pendingApprovals}
-          pendingBadgeApprovals={pendingBadgeApprovals}
-          onPendingApprovalsClick={onPendingApprovalsClick}
-          canEdit={canEdit}
-        />
+        {visitedTabs.has('summary') && (
+          <LazySummaryView
+            scouts={scouts}
+            rankProgress={rankProgress.length > 0 ? rankProgress : undefined}
+            pendingApprovals={pendingApprovals}
+            pendingBadgeApprovals={pendingBadgeApprovals}
+            onPendingApprovalsClick={onPendingApprovalsClick}
+            canEdit={canEdit}
+            unitId={unitId}
+          />
+        )}
       </TabsContent>
     </Tabs>
   )

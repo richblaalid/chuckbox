@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { MeritBadgeBrowser } from './merit-badge-browser'
 import { getMeritBadgeBrowserData, getMeritBadgeCategories } from '@/app/actions/advancement'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -94,9 +94,21 @@ export function LazyMeritBadgeBrowser({
   const [categories, setCategories] = useState<string[]>([])
   const [scouts, setScouts] = useState<Scout[]>([])
 
+  // Refresh key - increment to force re-fetch of scout data after sign-offs
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  // Track if data has been loaded at least once (to avoid showing skeleton on refresh)
+  const hasLoadedOnce = useRef(false)
+
   useEffect(() => {
+    let cancelled = false
+    const isInitialLoad = !hasLoadedOnce.current
+
     async function loadData() {
-      setIsLoading(true)
+      // Only show loading skeleton on initial load, not on refresh
+      if (isInitialLoad) {
+        setIsLoading(true)
+      }
       setError(null)
 
       try {
@@ -105,6 +117,8 @@ export function LazyMeritBadgeBrowser({
           getMeritBadgeCategories(),
           getMeritBadgeBrowserData(unitId),
         ])
+
+        if (cancelled) return
 
         if (!categoriesResult.success) {
           setError(categoriesResult.error || 'Failed to load categories')
@@ -119,18 +133,33 @@ export function LazyMeritBadgeBrowser({
         setCategories(categoriesResult.data || [])
         setBadges(browserDataResult.data?.badges || [])
         setScouts(browserDataResult.data?.scouts || [])
+        hasLoadedOnce.current = true
       } catch (err) {
-        console.error('Error loading merit badge browser data:', err)
-        setError('An unexpected error occurred')
+        if (!cancelled) {
+          console.error('Error loading merit badge browser data:', err)
+          setError('An unexpected error occurred')
+        }
       } finally {
-        setIsLoading(false)
+        if (!cancelled) {
+          setIsLoading(false)
+        }
       }
     }
 
     loadData()
-  }, [unitId])
 
-  if (isLoading) {
+    return () => {
+      cancelled = true
+    }
+  }, [unitId, refreshKey])
+
+  // Handle data change (called after sign-off to refresh scout data)
+  const handleDataChange = useCallback(() => {
+    setRefreshKey(k => k + 1)
+  }, [])
+
+  // Only show skeleton on initial load (no data yet)
+  if (isLoading && badges.length === 0) {
     return <MeritBadgeBrowserSkeleton />
   }
 
@@ -157,6 +186,7 @@ export function LazyMeritBadgeBrowser({
       unitId={unitId}
       canEdit={canEdit}
       currentUserName={currentUserName}
+      onDataChange={handleDataChange}
     />
   )
 }

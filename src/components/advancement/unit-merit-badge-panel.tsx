@@ -46,6 +46,8 @@ interface UnitMeritBadgePanelProps {
   isLoading?: boolean
   onBack: () => void
   currentUserName?: string
+  /** Called when data changes (e.g., after sign-offs) to trigger a refresh */
+  onDataChange?: () => void
 }
 
 /**
@@ -61,6 +63,7 @@ export function UnitMeritBadgePanel({
   isLoading = false,
   onBack,
   currentUserName = 'Leader',
+  onDataChange,
 }: UnitMeritBadgePanelProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -172,6 +175,7 @@ export function UnitMeritBadgePanel({
       if (result.success) {
         setScoutSelectionOpen(false)
         setSelectedIds(new Set())
+        onDataChange?.() // Notify parent to refresh scout data
         router.refresh()
       }
     })

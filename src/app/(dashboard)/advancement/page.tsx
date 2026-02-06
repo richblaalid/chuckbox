@@ -1,17 +1,24 @@
+import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { isFeatureEnabled, FeatureFlag } from '@/lib/feature-flags'
-import { UnitAdvancementContent } from '@/components/advancement/unit-advancement-content'
-import {
-  getUnitAdvancementSummary,
-  getRankRequirementsForUnit,
-  getRankBrowserData,
-} from '@/app/actions/advancement'
+import { AdvancementContentLoader } from '@/components/advancement/advancement-content-loader'
+import { AdvancementContentSkeleton } from '@/components/advancement/advancement-content-skeleton'
 
 interface AdvancementPageProps {
   searchParams: Promise<{ tab?: string }>
 }
 
+/**
+ * Advancement Page with Streaming
+ *
+ * Architecture:
+ * 1. Header renders immediately (no data dependency)
+ * 2. Content streams in via Suspense when data is ready
+ *
+ * This improves LCP by showing meaningful content (header) instantly
+ * while data-dependent content loads in the background.
+ */
 export default async function AdvancementPage({ searchParams }: AdvancementPageProps) {
   const { tab } = await searchParams
   const initialTab = (tab === 'summary' || tab === 'badges' || tab === 'ranks') ? tab : 'ranks'
@@ -30,6 +37,7 @@ export default async function AdvancementPage({ searchParams }: AdvancementPageP
   if (!user) redirect('/login')
 
   // Get user's profile and membership
+  // These queries are fast and needed for auth/routing decisions
   const { data: profileData } = await supabase
     .from('profiles')
     .select('id, first_name, last_name')
@@ -55,205 +63,27 @@ export default async function AdvancementPage({ searchParams }: AdvancementPageP
   const canEdit = ['admin', 'treasurer', 'leader'].includes(membership.role)
 
   // ==========================================
-  // OPTIMIZED DATA FETCHING
-  // Fetch all data in parallel:
-  // - Summary stats
-  // - Pending approvals (for modal)
-  // - Rank browser data (prefetched for instant Ranks tab)
-  // Merit Badge browser data is lazy loaded when tab is clicked
-  // ==========================================
-
-  const [
-    summaryResult,
-    pendingApprovalsResult,
-    pendingBadgeApprovalsResult,
-    rankRequirementsResult,
-    rankBrowserDataResult,
-  ] = await Promise.all([
-    // Optimized summary stats
-    getUnitAdvancementSummary(membership.unit_id),
-
-    // Pending rank requirement approvals (needed for modal)
-    supabase
-      .from('scout_rank_requirement_progress')
-      .select(`
-        id,
-        status,
-        approval_status,
-        submission_notes,
-        submitted_at,
-        scout_rank_progress (
-          id,
-          scout_id,
-          scouts (
-            id,
-            first_name,
-            last_name
-          ),
-          bsa_ranks (
-            name
-          )
-        ),
-        bsa_rank_requirements (
-          requirement_number,
-          description
-        )
-      `)
-      .eq('approval_status', 'pending_approval')
-      .order('submitted_at', { ascending: false }),
-
-    // Pending badge approvals (needed for modal)
-    (async () => {
-      const { data: scouts } = await supabase
-        .from('scouts')
-        .select('id')
-        .eq('unit_id', membership.unit_id)
-        .eq('is_active', true)
-      const scoutIds = scouts?.map(s => s.id) || []
-      if (scoutIds.length === 0) return { data: [] }
-      return supabase
-        .from('scout_merit_badge_progress')
-        .select(`
-          id,
-          status,
-          completed_at,
-          scout_id,
-          scouts (
-            id,
-            first_name,
-            last_name
-          ),
-          bsa_merit_badges (
-            id,
-            name,
-            is_eagle_required
-          )
-        `)
-        .eq('status', 'completed')
-        .in('scout_id', scoutIds)
-        .order('completed_at', { ascending: false })
-    })(),
-
-    // Rank requirements (for Ranks tab - prefetched)
-    getRankRequirementsForUnit(),
-
-    // Scouts with rank progress (for Ranks tab - prefetched)
-    getRankBrowserData(membership.unit_id),
-  ])
-
-  // Extract data from results
-  const summary = summaryResult.success ? summaryResult.data : null
-
-  // We need rank progress data for the summary tab
-  const { data: rankProgressData } = await supabase
-    .from('scout_rank_progress')
-    .select(`
-      id,
-      scout_id,
-      status,
-      awarded_at,
-      bsa_ranks (
-        id,
-        code,
-        name,
-        display_order
-      ),
-      scout_rank_requirement_progress (
-        id,
-        status,
-        completed_at
-      )
-    `)
-    .in('scout_id', summary?.scouts.map(s => s.id) || [])
-
-  interface RankProgress {
-    id: string
-    scout_id: string
-    status: string
-    awarded_at: string | null
-    bsa_ranks: { id: string; code: string; name: string; display_order: number } | null
-    scout_rank_requirement_progress: Array<{ id: string; status: string; completed_at: string | null }>
-  }
-
-  const rankProgress = (rankProgressData || []) as RankProgress[]
-
-  // Format scouts for component
-  const scouts = (summary?.scouts || []).map(s => ({
-    id: s.id,
-    first_name: s.first_name,
-    last_name: s.last_name,
-    rank: s.rank,
-    is_active: true as const,
-    patrols: s.patrol_name ? { name: s.patrol_name } : null,
-  }))
-
-  // Type definitions for pending approvals
-  interface PendingApproval {
-    id: string
-    status: string
-    approval_status: string | null
-    submission_notes: string | null
-    submitted_at: string | null
-    scout_rank_progress: {
-      id: string
-      scout_id: string
-      scouts: { id: string; first_name: string; last_name: string } | null
-      bsa_ranks: { name: string } | null
-    } | null
-    bsa_rank_requirements: { requirement_number: string; description: string } | null
-  }
-
-  interface PendingBadgeApproval {
-    id: string
-    status: string
-    completed_at: string | null
-    scout_id: string
-    scouts: { id: string; first_name: string; last_name: string } | null
-    bsa_merit_badges: { id: string; name: string; is_eagle_required: boolean | null } | null
-  }
-
-  const pendingApprovals = (pendingApprovalsResult.data || []) as PendingApproval[]
-  const pendingBadgeApprovals = (pendingBadgeApprovalsResult.data || []) as PendingBadgeApproval[]
-
-  // Build prefetched rank data for instant Ranks tab load
-  const prefetchedRankData = (rankRequirementsResult.success && rankBrowserDataResult.success)
-    ? {
-        ranks: rankRequirementsResult.data?.ranks || [],
-        requirements: rankRequirementsResult.data?.requirements || [],
-        scouts: rankBrowserDataResult.data?.scouts || [],
-      }
-    : undefined
-
-  // ==========================================
-  // RENDER
+  // STREAMING RENDER
+  // Header renders instantly, content streams via Suspense
   // ==========================================
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header - Renders immediately (no data dependency) */}
       <div>
         <h1 className="text-3xl font-bold text-stone-900">Advancement</h1>
         <p className="text-stone-500">Track rank progress, merit badges, and activities across the unit</p>
       </div>
 
-      {/* Main Content */}
-      <UnitAdvancementContent
-        scouts={scouts}
-        rankProgress={rankProgress}
-        pendingApprovals={pendingApprovals}
-        pendingBadgeApprovals={pendingBadgeApprovals}
-        stats={{
-          rankProgressPercent: summary?.rankStats.avgProgressPercent || 0,
-          scoutsWorkingOnRanks: summary?.rankStats.scoutsWorkingOnRanks || 0,
-          meritBadgesInProgress: summary?.badgeStats.inProgress || 0,
-          meritBadgesEarned: summary?.badgeStats.earned || 0,
-        }}
-        prefetchedRankData={prefetchedRankData}
-        unitId={membership.unit_id}
-        canEdit={canEdit}
-        currentUserName={currentUserName}
-        initialTab={initialTab}
-      />
+      {/* Main Content - Streams when data is ready */}
+      <Suspense fallback={<AdvancementContentSkeleton />}>
+        <AdvancementContentLoader
+          unitId={membership.unit_id}
+          canEdit={canEdit}
+          currentUserName={currentUserName}
+          initialTab={initialTab}
+        />
+      </Suspense>
     </div>
   )
 }
