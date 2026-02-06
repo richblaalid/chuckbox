@@ -62,6 +62,8 @@ interface UnitRankPanelProps {
   unitId: string
   canEdit: boolean
   currentUserName?: string
+  /** Callback to notify parent that data has changed (for cache invalidation) */
+  onDataChange?: () => void
 }
 
 // Requirement node for tree structure
@@ -328,6 +330,7 @@ export function UnitRankPanel({
   unitId,
   canEdit,
   currentUserName = 'Leader',
+  onDataChange,
 }: UnitRankPanelProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -448,6 +451,8 @@ export function UnitRankPanel({
       if (result.success) {
         setScoutSelectionOpen(false)
         setSelectedIds(new Set())
+        // Notify parent to invalidate cached data before refresh
+        onDataChange?.()
         router.refresh()
       }
     })

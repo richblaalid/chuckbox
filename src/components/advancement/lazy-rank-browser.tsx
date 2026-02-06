@@ -162,6 +162,9 @@ export function LazyRankBrowser({
   const [selectedRankCode, setSelectedRankCode] = useState<string | null>(null)
   const [rankDataLoading, setRankDataLoading] = useState(false)
 
+  // Refresh key - increment to force re-fetch of current rank data
+  const [refreshKey, setRefreshKey] = useState(0)
+
   // Cache for loaded rank data (persists across rank switches)
   const rankDataCache = useRef<Map<string, RankDataCache>>(new Map())
 
@@ -254,12 +257,25 @@ export function LazyRankBrowser({
     return () => {
       cancelled = true
     }
-  }, [selectedRankCode, ranks, unitId])
+  }, [selectedRankCode, ranks, unitId, refreshKey])
 
   // Handle rank selection
   const handleRankSelect = useCallback((code: string) => {
     setSelectedRankCode(code)
   }, [])
+
+  // Handle data change (called after sign-off to invalidate cache)
+  const handleDataChange = useCallback(() => {
+    // Clear the cache for the current rank so fresh data is fetched
+    if (selectedRankCode) {
+      const selectedRank = ranks.find(r => r.code === selectedRankCode)
+      if (selectedRank) {
+        rankDataCache.current.delete(selectedRank.id)
+        // Increment refresh key to trigger re-fetch via useEffect
+        setRefreshKey(k => k + 1)
+      }
+    }
+  }, [selectedRankCode, ranks])
 
   // Loading state for initial ranks
   if (ranksLoading) {
@@ -345,6 +361,7 @@ export function LazyRankBrowser({
               unitId={unitId}
               canEdit={canEdit}
               currentUserName={currentUserName}
+              onDataChange={handleDataChange}
             />
           </CardContent>
         </Card>
