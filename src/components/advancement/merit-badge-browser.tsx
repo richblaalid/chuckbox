@@ -49,6 +49,8 @@ interface MeritBadgeBrowserProps {
   unitId: string
   canEdit: boolean
   currentUserName?: string
+  /** Called when data changes (e.g., after sign-offs) to trigger a refresh */
+  onDataChange?: () => void
 }
 
 type FilterType = 'all' | 'eagle' | 'in_progress' | 'category'
@@ -61,6 +63,7 @@ export function MeritBadgeBrowser({
   unitId,
   canEdit,
   currentUserName = 'Leader',
+  onDataChange,
 }: MeritBadgeBrowserProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState<FilterType>('all')
@@ -172,6 +175,7 @@ export function MeritBadgeBrowser({
         isLoading={isLoadingRequirements}
         onBack={handleBack}
         currentUserName={currentUserName}
+        onDataChange={onDataChange}
       />
     )
   }

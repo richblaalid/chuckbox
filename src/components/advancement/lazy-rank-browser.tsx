@@ -171,6 +171,9 @@ export function LazyRankBrowser({
   // Current rank's data (from cache or loading)
   const [currentRankData, setCurrentRankData] = useState<RankDataCache | null>(null)
 
+  // Track which rank's data is currently loaded (to distinguish refresh from rank switch)
+  const [loadedRankId, setLoadedRankId] = useState<string | null>(null)
+
   // Load ranks list on mount (fast query)
   useEffect(() => {
     async function loadRanks() {
@@ -213,9 +216,19 @@ export function LazyRankBrowser({
     // Capture rank ID before async function to satisfy TypeScript
     const rankId = selectedRank.id
 
+    // Determine if this is a rank switch (different rank) vs refresh (same rank)
+    const isRankSwitch = loadedRankId !== null && loadedRankId !== rankId
+
+    // When switching ranks, clear old data immediately so we show skeleton
+    if (isRankSwitch) {
+      setCurrentRankData(null)
+      setLoadedRankId(null)
+    }
+
     // Check cache first
     if (rankDataCache.current.has(rankId)) {
       setCurrentRankData(rankDataCache.current.get(rankId)!)
+      setLoadedRankId(rankId)
       return
     }
 
@@ -241,6 +254,7 @@ export function LazyRankBrowser({
         // Cache the data
         rankDataCache.current.set(rankId, data)
         setCurrentRankData(data)
+        setLoadedRankId(rankId)
       } catch (err) {
         if (!cancelled) {
           console.error('Error loading rank data:', err)
@@ -257,7 +271,7 @@ export function LazyRankBrowser({
     return () => {
       cancelled = true
     }
-  }, [selectedRankCode, ranks, unitId, refreshKey])
+  }, [selectedRankCode, ranks, unitId, refreshKey, loadedRankId])
 
   // Handle rank selection
   const handleRankSelect = useCallback((code: string) => {
@@ -331,13 +345,13 @@ export function LazyRankBrowser({
         compact
       />
 
-      {/* Loading indicator for rank data */}
-      {rankDataLoading && (
+      {/* Loading indicator for rank data - only show if no data yet */}
+      {rankDataLoading && !currentRankData && (
         <RankContentSkeleton />
       )}
 
-      {/* Requirements panel for selected rank */}
-      {!rankDataLoading && currentRankData && currentRank && (
+      {/* Requirements panel for selected rank - show even during refresh */}
+      {currentRankData && currentRank && (
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
