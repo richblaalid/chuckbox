@@ -143,10 +143,10 @@ const [pendingApprovalsResult, ...] = await Promise.all([...])
 **Trade-off:** This adds a sequential dependency but eliminates a redundant query. Net effect should be neutral or slightly positive.
 
 **Steps:**
-- [ ] **3.1** Refactor to await summary first
-- [ ] **3.2** Extract scout IDs from summary result
-- [ ] **3.3** Use extracted IDs for badge approvals query
-- [ ] **3.4** Keep other queries parallel
+- [x] **3.1** Refactor to await summary first
+- [x] **3.2** Extract scout IDs from summary result
+- [x] **3.3** Use extracted IDs for badge approvals query
+- [x] **3.4** Keep other queries parallel
 
 ---
 
@@ -204,4 +204,5 @@ After all fixes:
 | Task | Date | Commit | Notes |
 |------|------|--------|-------|
 | 1 | 2026-02-06 | 979edae | Added trackRankProgress to TestContext, added timeouts to integration tests |
-| 2 | 2026-02-06 | pending | Fixed race condition in LazyRankBrowser useEffect |
+| 2 | 2026-02-06 | 8eab1eb | Fixed race condition in LazyRankBrowser useEffect |
+| 3 | 2026-02-06 | pending | Eliminated duplicate scout queries |

@@ -42,9 +42,14 @@ export async function AdvancementContentLoader({
   // The heavy rankProgress query is ONLY needed for 'summary' tab
   const needsRankProgress = initialTab === 'summary'
 
-  // Fast queries that always run
-  const summaryPromise = getUnitAdvancementSummary(unitId)
+  // OPTIMIZATION: Fetch summary first to get scout IDs, then reuse them
+  // This eliminates duplicate scout queries in badge/rank progress queries
+  const summaryResult = await getUnitAdvancementSummary(unitId)
+  const scoutIds = summaryResult.success
+    ? summaryResult.data?.scouts.map(s => s.id) || []
+    : []
 
+  // Pending rank approvals query (doesn't need scout IDs - filters by approval_status)
   const pendingApprovalsPromise = supabase
     .from('scout_rank_requirement_progress')
     .select(`
@@ -73,77 +78,62 @@ export async function AdvancementContentLoader({
     .eq('approval_status', 'pending_approval')
     .order('submitted_at', { ascending: false })
 
-  const pendingBadgeApprovalsPromise = (async () => {
-    const { data: scouts } = await supabase
-      .from('scouts')
-      .select('id')
-      .eq('unit_id', unitId)
-      .eq('is_active', true)
-    const scoutIds = scouts?.map(s => s.id) || []
-    if (scoutIds.length === 0) return { data: [] as unknown[] }
-    return supabase
-      .from('scout_merit_badge_progress')
-      .select(`
-        id,
-        status,
-        completed_at,
-        scout_id,
-        scouts (
-          id,
-          first_name,
-          last_name
-        ),
-        bsa_merit_badges (
-          id,
-          name,
-          is_eagle_required
-        )
-      `)
-      .eq('status', 'completed')
-      .in('scout_id', scoutIds)
-      .order('completed_at', { ascending: false })
-  })()
-
-  // SLOW query - ONLY load if summary tab is initial
-  // This is the query that was causing 7+ second loads
-  const rankProgressPromise = needsRankProgress ? (async () => {
-    const { data: unitScouts } = await supabase
-      .from('scouts')
-      .select('id')
-      .eq('unit_id', unitId)
-      .eq('is_active', true)
-    const scoutIds = unitScouts?.map(s => s.id) || []
-    if (scoutIds.length === 0) return { data: [] as unknown[] }
-    return supabase
-      .from('scout_rank_progress')
-      .select(`
-        id,
-        scout_id,
-        status,
-        awarded_at,
-        bsa_ranks (
-          id,
-          code,
-          name,
-          display_order
-        ),
-        scout_rank_requirement_progress (
+  // Pending badge approvals - uses scout IDs from summary (no extra query)
+  const pendingBadgeApprovalsPromise = scoutIds.length > 0
+    ? supabase
+        .from('scout_merit_badge_progress')
+        .select(`
           id,
           status,
-          completed_at
-        )
-      `)
-      .in('scout_id', scoutIds)
-  })() : Promise.resolve({ data: [] as unknown[] })
+          completed_at,
+          scout_id,
+          scouts (
+            id,
+            first_name,
+            last_name
+          ),
+          bsa_merit_badges (
+            id,
+            name,
+            is_eagle_required
+          )
+        `)
+        .eq('status', 'completed')
+        .in('scout_id', scoutIds)
+        .order('completed_at', { ascending: false })
+    : Promise.resolve({ data: [] as unknown[] })
 
-  // Fetch in parallel
+  // SLOW query - ONLY load if summary tab is initial
+  // Uses scout IDs from summary (no extra query)
+  const rankProgressPromise = needsRankProgress && scoutIds.length > 0
+    ? supabase
+        .from('scout_rank_progress')
+        .select(`
+          id,
+          scout_id,
+          status,
+          awarded_at,
+          bsa_ranks (
+            id,
+            code,
+            name,
+            display_order
+          ),
+          scout_rank_requirement_progress (
+            id,
+            status,
+            completed_at
+          )
+        `)
+        .in('scout_id', scoutIds)
+    : Promise.resolve({ data: [] as unknown[] })
+
+  // Fetch remaining queries in parallel
   const [
-    summaryResult,
     pendingApprovalsResult,
     pendingBadgeApprovalsResult,
     rankProgressResult,
   ] = await Promise.all([
-    summaryPromise,
     pendingApprovalsPromise,
     pendingBadgeApprovalsPromise,
     rankProgressPromise,
