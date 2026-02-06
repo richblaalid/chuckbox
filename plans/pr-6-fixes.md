@@ -206,4 +206,4 @@ After all fixes:
 | 1 | 2026-02-06 | 979edae | Added trackRankProgress to TestContext, added timeouts to integration tests |
 | 2 | 2026-02-06 | 8eab1eb | Fixed race condition in LazyRankBrowser useEffect |
 | 3 | 2026-02-06 | c1a33da | Eliminated duplicate scout queries |
-| 4 | 2026-02-06 | pending | Made default rank configurable |
+| 4 | 2026-02-06 | a47674c | Made default rank configurable |
