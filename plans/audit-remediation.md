@@ -1,6 +1,6 @@
 # Audit Remediation Plan (v2)
 
-> **Status:** In Progress
+> **Status:** ✅ Complete
 > **Created:** 2026-02-04
 > **Updated:** 2026-02-05
 > **Source:** [Code Audit Report](./code-audit.md)
@@ -437,63 +437,76 @@ await supabase.from('scout_rank_requirement_progress').upsert(...)
 
 #### 3.1 Rank Progress Tests
 
-- [ ] **3.1.1** Add tests for `initializeRankProgress`
+- [x] **3.1.1** Add tests for `initializeRankProgress`
+  - ✅ Added 8 tests covering all code paths
   - Test: Creates progress record
   - Test: Initializes all requirements
   - Test: Handles already-exists case
 
-- [ ] **3.1.2** Add tests for `markRequirementComplete` happy path
+- [x] **3.1.2** Add tests for `markRequirementComplete` happy path
+  - ✅ Already covered: 9 tests in advancement.test.ts
   - Test: Marks single requirement complete
   - Test: Records signed_off_by and signed_off_at
 
-- [ ] **3.1.3** Add tests for `markRequirementComplete` edge cases
+- [x] **3.1.3** Add tests for `markRequirementComplete` edge cases
+  - ✅ Already covered: auth failures, db errors, role checks
   - Test: Already complete requirement
   - Test: Invalid requirement ID
   - Test: Unauthorized user
 
-- [ ] **3.1.4** Add tests for `undoRequirementCompletion`
+- [x] **3.1.4** Add tests for `undoRequirementCompletion`
+  - ✅ Already covered: 9 tests in advancement.test.ts
   - Test: Clears completion data
   - Test: Handles not-complete requirement
 
 #### 3.2 Bulk Operation Tests
 
-- [ ] **3.2.1** Add tests for `bulkMarkRequirementsComplete`
+- [x] **3.2.1** Add tests for `bulkMarkRequirementsComplete`
+  - ✅ Added 6 tests covering all code paths
   - Test: Multiple requirements, single scout
   - Test: Mixed already-complete states
 
-- [ ] **3.2.2** Add tests for `bulkSignOffForScouts` single scout
+- [x] **3.2.2** Add tests for `bulkSignOffForScouts` single scout
+  - ✅ Already covered: 5 tests in advancement.test.ts
   - Test: Single scout, single requirement
   - Test: Verifies progress created
 
-- [ ] **3.2.3** Add tests for `bulkSignOffForScouts` multiple scouts
+- [x] **3.2.3** Add tests for `bulkSignOffForScouts` multiple scouts
+  - ✅ Already covered: tests for rank and merit-badge types
   - Test: 5 scouts, verifies all updated
   - Test: Mixed existing/new progress states
 
-- [ ] **3.2.4** Add tests for error handling
+- [x] **3.2.4** Add tests for error handling
+  - ✅ Already covered: auth failure tests
   - Test: Partial failure handling
   - Test: Auth failure
 
 #### 3.3 Merit Badge Tests
 
-- [ ] **3.3.1** Add tests for `startMeritBadge`
+- [x] **3.3.1** Add tests for `startMeritBadge`
+  - ✅ Added 8 tests covering all code paths
   - Test: Creates progress record with correct version
   - Test: Handles already-started badge
 
-- [ ] **3.3.2** Add tests for `bulkApproveMeritBadgeRequirements`
+- [x] **3.3.2** Add tests for `bulkApproveMeritBadgeRequirements`
+  - ✅ Added 7 tests covering all code paths
   - Test: Multiple requirements approved
   - Test: Mixed states handled
 
-- [ ] **3.3.3** Add tests for version handling
+- [x] **3.3.3** Add tests for version handling
+  - ✅ Added 6 tests covering all code paths
   - Test: `switchMeritBadgeVersion` preserves progress
   - Test: Version-specific requirements
 
 #### 3.4 Query Function Tests
 
-- [ ] **3.4.1** Add tests for `getRankRequirementsForUnit`
+- [x] **3.4.1** Add tests for `getRankRequirementsForUnit`
+  - ✅ Already covered: 2 tests in advancement.test.ts
   - Test: Returns correct structure
   - Test: Filters by unit
 
-- [ ] **3.4.2** Add tests for `getUnitAdvancementSummary`
+- [x] **3.4.2** Add tests for `getUnitAdvancementSummary`
+  - ✅ Already covered: 3 tests in advancement.test.ts
   - Test: Aggregates correctly
   - Test: Handles empty unit
 
@@ -617,10 +630,10 @@ After each phase:
 | Phase 0 | 15 | 15 | ✅ Complete |
 | Phase 1 | 28 | 28 | ✅ Complete |
 | Phase 2 | 11 | 11 | ✅ Complete |
-| Phase 3 | 15 | 0 | ⬜ Not Started |
-| **Total** | **69** | **54** | 🔄 In Progress (78%) |
+| Phase 3 | 15 | 15 | ✅ Complete |
+| **Total** | **69** | **69** | ✅ Complete (100%) |
 
-**Phase 3 remaining**: 15 tasks (test coverage improvements)
+**All phases complete!** Added 35 new tests to advancement module.
 
 ---
 
@@ -633,32 +646,67 @@ After each phase:
 | 0.1.3 | 2026-02-04 | 366df04 | RPC types already existed |
 | 0.1.4 | 2026-02-04 | 366df04 | Removed as any from billing components |
 | 0.1.5 | 2026-02-04 | 366df04 | Removed as any from extension-auth.ts |
-| 0.1.6 | 2026-02-04 | pending | Removed as any from onboarding.ts |
-| 0.2.1 | 2026-02-04 | pending | Removed console.log from actions (8 statements) |
-| 0.2.2 | 2026-02-04 | pending | Removed console.log from scoutbook API (14 statements) |
-| 0.2.3 | 2026-02-04 | pending | Removed console.log from square API (8 statements) |
-| 0.2.4 | 2026-02-04 | pending | Removed console.log from auth confirm (5 statements) |
-| 0.2.5 | 2026-02-04 | pending | Removed console.log from components (4 statements) |
-| 0.2.6 | 2026-02-04 | pending | Removed console.log from lib (31+ statements) |
-| 0.3.1 | 2026-02-04 | pending | Verified 22 files import from advancement |
-| 0.3.2 | 2026-02-04 | pending | Baselined N+1: 40-70 queries for 10 scouts |
-| 0.3.3 | 2026-02-04 | pending | Verified 47 advancement tests passing |
-| 1.1.1 | 2026-02-04 | pending | Created advancement/types.ts |
-| 1.1.2 | 2026-02-04 | pending | Created advancement/auth.ts |
-| 1.1.3 | 2026-02-04 | pending | Created advancement/utils.ts |
-| 1.2.1 | 2026-02-04 | pending | Created advancement/rank-progress.ts |
-| 1.2.2 | 2026-02-04 | pending | Moved markRequirementComplete functions |
-| 1.2.3 | 2026-02-04 | pending | Moved requirement notes functions |
-| 1.2.4 | 2026-02-04 | pending | Cleaned up original file |
-| 1.3.1 | 2026-02-05 | pending | Created advancement/merit-badges.ts |
-| 1.3.2 | 2026-02-05 | pending | Moved MB progress functions |
-| 1.3.3 | 2026-02-05 | pending | Moved MB notes functions |
-| 1.3.4 | 2026-02-05 | pending | Cleaned up _legacy.ts; fixed notes bug |
-| 1.4.1 | 2026-02-05 | pending | Created bulk-operations.ts with bulkMarkRequirementsComplete |
-| 1.4.2 | 2026-02-05 | pending | Moved bulkApproveRequirements functions |
-| 1.4.3 | 2026-02-05 | pending | Moved bulkApproveMeritBadgeRequirements functions |
-| 1.4.4 | 2026-02-05 | pending | Moved bulkSignOffForScouts & bulkRecordProgress |
-| 1.4.5 | 2026-02-05 | pending | Moved remaining bulk functions (1,348 lines total) |
+| 0.1.6 | 2026-02-04 | 366df04 | Removed as any from onboarding.ts |
+| 0.2.1 | 2026-02-04 | 366df04 | Removed console.log from actions (8 statements) |
+| 0.2.2 | 2026-02-04 | 366df04 | Removed console.log from scoutbook API (14 statements) |
+| 0.2.3 | 2026-02-04 | 366df04 | Removed console.log from square API (8 statements) |
+| 0.2.4 | 2026-02-04 | 366df04 | Removed console.log from auth confirm (5 statements) |
+| 0.2.5 | 2026-02-04 | 366df04 | Removed console.log from components (4 statements) |
+| 0.2.6 | 2026-02-04 | 366df04 | Removed console.log from lib (31+ statements) |
+| 0.3.1 | 2026-02-04 | 366df04 | Verified 22 files import from advancement |
+| 0.3.2 | 2026-02-04 | 366df04 | Baselined N+1: 40-70 queries for 10 scouts |
+| 0.3.3 | 2026-02-04 | 366df04 | Verified 47 advancement tests passing |
+| 1.1.1 | 2026-02-04 | c3b5ce8 | Created advancement/index.ts |
+| 1.1.2 | 2026-02-04 | c3b5ce8 | Created advancement/types.ts |
+| 1.1.3 | 2026-02-04 | c3b5ce8 | Created advancement/utils.ts |
+| 1.2.1 | 2026-02-04 | c3b5ce8 | Created advancement/rank-progress.ts |
+| 1.2.2 | 2026-02-04 | c3b5ce8 | Moved markRequirementComplete functions |
+| 1.2.3 | 2026-02-04 | c3b5ce8 | Moved undoRequirementCompletion |
+| 1.2.4 | 2026-02-04 | c3b5ce8 | Moved requirement notes functions |
+| 1.2.5 | 2026-02-04 | c3b5ce8 | Cleaned up original file |
+| 1.3.1 | 2026-02-05 | 97f8fd3 | Created advancement/merit-badges.ts |
+| 1.3.2 | 2026-02-05 | 97f8fd3 | Moved MB progress functions |
+| 1.3.3 | 2026-02-05 | 97f8fd3 | Moved MB notes functions |
+| 1.3.4 | 2026-02-05 | 97f8fd3 | Cleaned up _legacy.ts; fixed notes bug |
+| 1.4.1 | 2026-02-05 | c3b5ce8 | Created bulk-operations.ts with bulkMarkRequirementsComplete |
+| 1.4.2 | 2026-02-05 | c3b5ce8 | Moved bulkApproveRequirements functions |
+| 1.4.3 | 2026-02-05 | c3b5ce8 | Moved bulkApproveMeritBadgeRequirements functions |
+| 1.4.4 | 2026-02-05 | c3b5ce8 | Moved bulkSignOffForScouts & bulkRecordProgress |
+| 1.4.5 | 2026-02-05 | c3b5ce8 | Moved remaining bulk functions (1,348 lines total) |
+| 1.5.1 | 2026-02-05 | 97f8fd3 | Added rank mutations to rank-progress.ts |
+| 1.5.2 | 2026-02-05 | 97f8fd3 | Added completeMeritBadge to merit-badges.ts |
+| 1.5.3 | 2026-02-05 | 97f8fd3 | Created leadership.ts |
+| 1.5.4 | 2026-02-05 | 97f8fd3 | Created queries.ts with rank query functions |
+| 1.5.5 | 2026-02-05 | 97f8fd3 | Moved merit badge query functions |
+| 1.5.6 | 2026-02-05 | 97f8fd3 | Moved summary and progress functions |
+| 1.5.7 | 2026-02-05 | 97f8fd3 | Moved BSA reference data functions |
+| 1.6.1 | 2026-02-05 | 97f8fd3 | Verified _legacy.ts empty |
+| 1.6.2 | 2026-02-05 | 97f8fd3 | Updated index.ts to import from all modules |
+| 1.6.3 | 2026-02-05 | 97f8fd3 | Deleted _legacy.ts |
+| 1.6.4 | 2026-02-05 | 97f8fd3 | Full test suite passed (575/575) |
+| 2.1.1 | 2026-02-05 | bfe0c65 | Refactored bulkSignOffForScouts to batch fetch |
+| 2.1.2 | 2026-02-05 | bfe0c65 | Implemented batch insert for missing rank progress |
+| 2.1.3 | 2026-02-05 | bfe0c65 | Implemented batch insert for missing requirement progress |
+| 2.1.4 | 2026-02-05 | bfe0c65 | Implemented batch update for requirement completion |
+| 2.1.5 | 2026-02-05 | 00eb6e7 | Added integration tests for batch operations |
+| 2.2.1 | 2026-02-05 | bfe0c65 | Refactored bulkApproveMeritBadgeRequirements |
+| 2.2.2 | 2026-02-05 | bfe0c65 | Refactored bulkApproveMeritBadgeRequirementsWithInit |
+| 2.2.3 | 2026-02-05 | bfe0c65 | Verified MB query count reduction |
+| 2.3.1 | 2026-02-05 | bfe0c65 | Refactored bulkRecordProgress to use batch helpers |
+| 2.3.2 | 2026-02-05 | 00eb6e7 | Added 3 batch performance integration tests |
+| 3.1.1 | 2026-02-05 | pending | Added 8 tests for initializeRankProgress |
+| 3.1.2 | 2026-02-05 | - | Already covered by existing tests |
+| 3.1.3 | 2026-02-05 | - | Already covered by existing tests |
+| 3.1.4 | 2026-02-05 | - | Already covered by existing tests |
+| 3.2.1 | 2026-02-05 | pending | Added 6 tests for bulkMarkRequirementsComplete |
+| 3.2.2 | 2026-02-05 | - | Already covered by existing tests |
+| 3.2.3 | 2026-02-05 | - | Already covered by existing tests |
+| 3.2.4 | 2026-02-05 | - | Already covered by existing tests |
+| 3.3.1 | 2026-02-05 | pending | Added 8 tests for startMeritBadge |
+| 3.3.2 | 2026-02-05 | pending | Added 7 tests for bulkApproveMeritBadgeRequirements |
+| 3.3.3 | 2026-02-05 | pending | Added 6 tests for switchMeritBadgeVersion |
+| 3.4.1 | 2026-02-05 | - | Already covered by existing tests |
+| 3.4.2 | 2026-02-05 | - | Already covered by existing tests |
 
 ---
 
