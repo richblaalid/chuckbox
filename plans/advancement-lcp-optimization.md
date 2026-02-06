@@ -161,10 +161,10 @@ Browser receives:
   - Test: Returns same data with flatter structure
   - Impact: Reduces query complexity, potentially faster execution
 
-- [ ] **1.2.2** Reduce nested select depth where possible
-  - Files: `src/app/actions/advancement/queries.ts`
+- [x] **1.2.2** Reduce nested select depth where possible
+  - Files: `src/app/(dashboard)/advancement/page.tsx`
   - Test: Queries return minimal required fields
-  - Impact: Less data transferred
+  - Result: Queries already optimized - all fields used by components. 3-level nesting in pending approvals required for data model. Further reduction requires Phase 2 (lazy-load modal data).
 
 ---
 
@@ -288,7 +288,7 @@ Browser receives:
 
 | Phase | Total | Complete | Status |
 |-------|-------|----------|--------|
-| Phase 1 | 3 | 0 | ⬜ Not Started |
+| Phase 1 | 3 | 3 | ✅ Complete |
 | Phase 2 | 5 | 0 | ⬜ Not Started |
 | Phase 3 | 2 | 0 | ⬜ Not Started |
 
@@ -298,7 +298,9 @@ Browser receives:
 
 | Task | Date | Commit | Notes |
 |------|------|--------|-------|
-| | | | |
+| 1.1.1 | 2026-02-05 | 188d6eb | Parallelized sequential query |
+| 1.2.1 | 2026-02-05 | 1b3b1d7 | Split getRankBrowserData into two parallel queries |
+| 1.2.2 | 2026-02-05 | pending | Audit confirmed queries already optimal |
 
 ---
 

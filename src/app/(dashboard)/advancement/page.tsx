@@ -75,6 +75,9 @@ export default async function AdvancementPage({ searchParams }: AdvancementPageP
     getUnitAdvancementSummary(membership.unit_id),
 
     // Pending rank requirement approvals (needed for modal)
+    // NOTE: 3-level nesting required to get scout name + rank name + requirement info
+    // All fields used by PendingApprovalsModal component. Further optimization
+    // would require lazy-loading modal data (Phase 2).
     supabase
       .from('scout_rank_requirement_progress')
       .select(`
