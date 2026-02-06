@@ -156,7 +156,7 @@ Browser receives:
   - Impact: Eliminates ~200-500ms sequential wait
 
 #### 1.2 Optimize Large Nested Query
-- [ ] **1.2.1** Split `getRankBrowserData` into two separate queries
+- [x] **1.2.1** Split `getRankBrowserData` into two separate queries
   - Files: `src/app/actions/advancement/queries.ts`
   - Test: Returns same data with flatter structure
   - Impact: Reduces query complexity, potentially faster execution

@@ -688,6 +688,12 @@ export async function getRankRequirementsForUnit(
 
 /**
  * Get data for the Rank Requirements Browser tab (lazy loaded).
+ *
+ * OPTIMIZATION: Split into two parallel queries instead of one deeply nested query.
+ * This improves performance by:
+ * 1. Reducing query complexity (2-level max vs 3-level nest)
+ * 2. Allowing database to parallelize the queries
+ * 3. Transferring flatter data structures
  */
 export async function getRankBrowserData(unitId: string): Promise<ActionResult<{
   scouts: Array<{
@@ -710,38 +716,84 @@ export async function getRankBrowserData(unitId: string): Promise<ActionResult<{
 }>> {
   const supabase = createAdminClient()
 
-  const { data: scouts, error } = await supabase
-    .from('scouts')
-    .select(`
-      id,
-      first_name,
-      last_name,
-      rank,
-      is_active,
-      scout_rank_progress (
+  // Run two parallel queries instead of one deeply nested query
+  const [scoutsResult, requirementProgressResult] = await Promise.all([
+    // Query 1: Scouts with their rank progress (2-level nest)
+    supabase
+      .from('scouts')
+      .select(`
         id,
-        rank_id,
-        status,
-        scout_rank_requirement_progress (
+        first_name,
+        last_name,
+        rank,
+        is_active,
+        scout_rank_progress (
           id,
-          requirement_id,
+          rank_id,
           status
         )
-      )
-    `)
-    .eq('unit_id', unitId)
-    .eq('is_active', true)
-    .order('last_name')
+      `)
+      .eq('unit_id', unitId)
+      .eq('is_active', true)
+      .order('last_name'),
 
-  if (error) {
-    console.error('Error fetching rank browser data:', error)
+    // Query 2: All requirement progress for scouts in this unit (flat query)
+    supabase
+      .from('scout_rank_requirement_progress')
+      .select(`
+        id,
+        requirement_id,
+        status,
+        scout_rank_progress!inner (
+          id,
+          scouts!inner (
+            unit_id
+          )
+        )
+      `)
+      .eq('scout_rank_progress.scouts.unit_id', unitId),
+  ])
+
+  if (scoutsResult.error) {
+    console.error('Error fetching scouts for rank browser:', scoutsResult.error)
     return { success: false, error: 'Failed to fetch rank browser data' }
   }
+
+  if (requirementProgressResult.error) {
+    console.error('Error fetching requirement progress:', requirementProgressResult.error)
+    return { success: false, error: 'Failed to fetch requirement progress' }
+  }
+
+  // Build a map of scout_rank_progress_id -> requirement progress array
+  const progressByRankProgressId = new Map<string, Array<{ id: string; requirement_id: string; status: string }>>()
+
+  for (const rp of requirementProgressResult.data || []) {
+    const rankProgressId = rp.scout_rank_progress?.id
+    if (!rankProgressId) continue
+
+    if (!progressByRankProgressId.has(rankProgressId)) {
+      progressByRankProgressId.set(rankProgressId, [])
+    }
+    progressByRankProgressId.get(rankProgressId)!.push({
+      id: rp.id,
+      requirement_id: rp.requirement_id,
+      status: rp.status,
+    })
+  }
+
+  // Combine the data into the expected nested structure
+  const scouts = (scoutsResult.data || []).map(scout => ({
+    ...scout,
+    scout_rank_progress: (scout.scout_rank_progress || []).map(srp => ({
+      ...srp,
+      scout_rank_requirement_progress: progressByRankProgressId.get(srp.id) || [],
+    })),
+  }))
 
   return {
     success: true,
     data: {
-      scouts: scouts || [],
+      scouts,
     },
   }
 }
