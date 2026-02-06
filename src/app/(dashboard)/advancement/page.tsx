@@ -69,6 +69,7 @@ export default async function AdvancementPage({ searchParams }: AdvancementPageP
     pendingBadgeApprovalsResult,
     rankRequirementsResult,
     rankBrowserDataResult,
+    rankProgressResult,
   ] = await Promise.all([
     // Optimized summary stats
     getUnitAdvancementSummary(membership.unit_id),
@@ -139,32 +140,42 @@ export default async function AdvancementPage({ searchParams }: AdvancementPageP
 
     // Scouts with rank progress (for Ranks tab - prefetched)
     getRankBrowserData(membership.unit_id),
+
+    // Rank progress data for summary tab (now parallel via unit_id join)
+    (async () => {
+      const { data: unitScouts } = await supabase
+        .from('scouts')
+        .select('id')
+        .eq('unit_id', membership.unit_id)
+        .eq('is_active', true)
+      const scoutIds = unitScouts?.map(s => s.id) || []
+      if (scoutIds.length === 0) return { data: [] }
+      return supabase
+        .from('scout_rank_progress')
+        .select(`
+          id,
+          scout_id,
+          status,
+          awarded_at,
+          bsa_ranks (
+            id,
+            code,
+            name,
+            display_order
+          ),
+          scout_rank_requirement_progress (
+            id,
+            status,
+            completed_at
+          )
+        `)
+        .in('scout_id', scoutIds)
+    })(),
   ])
 
   // Extract data from results
   const summary = summaryResult.success ? summaryResult.data : null
-
-  // We need rank progress data for the summary tab
-  const { data: rankProgressData } = await supabase
-    .from('scout_rank_progress')
-    .select(`
-      id,
-      scout_id,
-      status,
-      awarded_at,
-      bsa_ranks (
-        id,
-        code,
-        name,
-        display_order
-      ),
-      scout_rank_requirement_progress (
-        id,
-        status,
-        completed_at
-      )
-    `)
-    .in('scout_id', summary?.scouts.map(s => s.id) || [])
+  const rankProgressData = rankProgressResult.data
 
   interface RankProgress {
     id: string
