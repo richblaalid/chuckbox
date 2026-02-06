@@ -192,46 +192,62 @@ export function LazyRankBrowser({
     loadRanks()
   }, [])
 
-  // Load data for a specific rank (with caching)
-  const loadRankData = useCallback(async (rankId: string) => {
+  // Load rank data when selection changes
+  // Inlined to avoid dependency on callback that changes with unitId
+  useEffect(() => {
+    if (ranks.length === 0) return
+
+    const selectedRank = ranks.find(r => r.code === selectedRankCode)
+    if (!selectedRank) return
+
+    // Capture rank ID before async function to satisfy TypeScript
+    const rankId = selectedRank.id
+
     // Check cache first
     if (rankDataCache.current.has(rankId)) {
       setCurrentRankData(rankDataCache.current.get(rankId)!)
       return
     }
 
-    setRankDataLoading(true)
-    try {
-      const result = await getRankDataForRank(unitId, rankId)
-      if (!result.success) {
-        console.error('Failed to load rank data:', result.error)
-        return
+    // Load data with cleanup to prevent state updates after unmount
+    let cancelled = false
+
+    async function loadData() {
+      setRankDataLoading(true)
+      try {
+        const result = await getRankDataForRank(unitId, rankId)
+        if (cancelled) return
+
+        if (!result.success) {
+          console.error('Failed to load rank data:', result.error)
+          return
+        }
+
+        const data: RankDataCache = {
+          requirements: result.data?.requirements || [],
+          scoutProgress: result.data?.scoutProgress || [],
+        }
+
+        // Cache the data
+        rankDataCache.current.set(rankId, data)
+        setCurrentRankData(data)
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Error loading rank data:', err)
+        }
+      } finally {
+        if (!cancelled) {
+          setRankDataLoading(false)
+        }
       }
-
-      const data: RankDataCache = {
-        requirements: result.data?.requirements || [],
-        scoutProgress: result.data?.scoutProgress || [],
-      }
-
-      // Cache the data
-      rankDataCache.current.set(rankId, data)
-      setCurrentRankData(data)
-    } catch (err) {
-      console.error('Error loading rank data:', err)
-    } finally {
-      setRankDataLoading(false)
     }
-  }, [unitId])
 
-  // Load rank data when selection changes
-  useEffect(() => {
-    if (ranks.length === 0) return
+    loadData()
 
-    const selectedRank = ranks.find(r => r.code === selectedRankCode)
-    if (selectedRank) {
-      loadRankData(selectedRank.id)
+    return () => {
+      cancelled = true
     }
-  }, [selectedRankCode, ranks, loadRankData])
+  }, [selectedRankCode, ranks, unitId])
 
   // Handle rank selection
   const handleRankSelect = useCallback((code: string) => {
