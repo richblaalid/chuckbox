@@ -158,8 +158,8 @@ export function LazyRankBrowser({
   const [ranksLoading, setRanksLoading] = useState(true)
   const [ranksError, setRanksError] = useState<string | null>(null)
 
-  // State for selected rank
-  const [selectedRankCode, setSelectedRankCode] = useState<string>('scout')
+  // State for selected rank - null until ranks load, then defaults to first rank
+  const [selectedRankCode, setSelectedRankCode] = useState<string | null>(null)
   const [rankDataLoading, setRankDataLoading] = useState(false)
 
   // Cache for loaded rank data (persists across rank switches)
@@ -192,10 +192,17 @@ export function LazyRankBrowser({
     loadRanks()
   }, [])
 
+  // Set default rank when ranks load (first rank in sorted list)
+  useEffect(() => {
+    if (ranks.length > 0 && selectedRankCode === null) {
+      setSelectedRankCode(ranks[0].code)
+    }
+  }, [ranks, selectedRankCode])
+
   // Load rank data when selection changes
   // Inlined to avoid dependency on callback that changes with unitId
   useEffect(() => {
-    if (ranks.length === 0) return
+    if (ranks.length === 0 || selectedRankCode === null) return
 
     const selectedRank = ranks.find(r => r.code === selectedRankCode)
     if (!selectedRank) return
@@ -275,6 +282,16 @@ export function LazyRankBrowser({
         >
           Try again
         </button>
+      </div>
+    )
+  }
+
+  // Brief loading state between ranks loading and default selection being set
+  if (selectedRankCode === null) {
+    return (
+      <div className="space-y-4">
+        <RankSelectorSkeleton />
+        <RankContentSkeleton />
       </div>
     )
   }

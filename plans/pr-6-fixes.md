@@ -174,9 +174,9 @@ useEffect(() => {
 ```
 
 **Steps:**
-- [ ] **4.1** Change initial state to `null`
-- [ ] **4.2** Add effect to set default when ranks load
-- [ ] **4.3** Handle null state in render (show skeleton)
+- [x] **4.1** Change initial state to `null`
+- [x] **4.2** Add effect to set default when ranks load
+- [x] **4.3** Handle null state in render (show skeleton)
 
 ---
 
@@ -192,8 +192,8 @@ useEffect(() => {
 ## Verification
 
 After all fixes:
-- [ ] `npm test` passes (0 failures)
-- [ ] `npm run build` succeeds
+- [x] `npm test` passes (0 failures)
+- [x] `npm run build` succeeds
 - [ ] Manual test: Navigate to /advancement, switch ranks, verify no console errors
 - [ ] Manual test: Check Summary tab lazy-loads correctly
 
@@ -205,4 +205,5 @@ After all fixes:
 |------|------|--------|-------|
 | 1 | 2026-02-06 | 979edae | Added trackRankProgress to TestContext, added timeouts to integration tests |
 | 2 | 2026-02-06 | 8eab1eb | Fixed race condition in LazyRankBrowser useEffect |
-| 3 | 2026-02-06 | pending | Eliminated duplicate scout queries |
+| 3 | 2026-02-06 | c1a33da | Eliminated duplicate scout queries |
+| 4 | 2026-02-06 | pending | Made default rank configurable |
