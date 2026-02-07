@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { UnitInfoForm } from '@/components/settings/unit-info-form'
 import { PatrolList } from '@/components/settings/patrol-list'
@@ -11,8 +10,6 @@ import { InviteUserButton } from '@/components/settings/users/invite-user-button
 import { resendInvite, removeUser } from '@/app/actions/users'
 import { isFinancialRole, isAdmin as checkIsAdmin } from '@/lib/roles'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { FileSpreadsheet, Award, Users } from 'lucide-react'
 import { SettingsTabs } from '@/components/settings/settings-tabs'
 
 export default async function SettingsPage({
@@ -347,51 +344,6 @@ export default async function SettingsPage({
         lastSyncMemberCount={lastSyncSession?.records_extracted}
         isAdmin={isAdmin}
       />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Import Data</CardTitle>
-          <CardDescription>Import data from external sources</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between rounded-lg border border-stone-200 p-4">
-            <div className="flex items-center gap-3">
-              <FileSpreadsheet className="h-8 w-8 text-stone-400" />
-              <div>
-                <p className="font-medium">Import Roster</p>
-                <p className="text-sm text-stone-500">Import scouts and adults from BSA roster CSV</p>
-              </div>
-            </div>
-            <Button asChild variant="outline">
-              <Link href="/settings/import">Import</Link>
-            </Button>
-          </div>
-          <div className="flex items-center justify-between rounded-lg border border-stone-200 p-4">
-            <div className="flex items-center gap-3">
-              <Award className="h-8 w-8 text-stone-400" />
-              <div>
-                <p className="font-medium">Import Advancement History</p>
-                <p className="text-sm text-stone-500">Import a scout&apos;s advancement from ScoutBook</p>
-              </div>
-            </div>
-            <Button asChild variant="outline">
-              <Link href="/settings/import/advancement">Import</Link>
-            </Button>
-          </div>
-          <div className="flex items-center justify-between rounded-lg border border-stone-200 p-4">
-            <div className="flex items-center gap-3">
-              <Users className="h-8 w-8 text-stone-400" />
-              <div>
-                <p className="font-medium">Import Troop Advancement</p>
-                <p className="text-sm text-stone-500">Bulk import advancement for all scouts from ScoutBook</p>
-              </div>
-            </div>
-            <Button asChild variant="outline">
-              <Link href="/settings/import/troop-advancement">Import</Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 
