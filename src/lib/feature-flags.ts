@@ -25,6 +25,13 @@ export enum FeatureFlag {
    * Enables syncing data with Scoutbook via browser extension.
    */
   SCOUTBOOK_SYNC = 'SCOUTBOOK_SYNC',
+
+  /**
+   * CLI Automation
+   * Shows CLI-based browser automation for Scoutbook sync.
+   * Dev-only feature - hidden in production.
+   */
+  CLI_AUTOMATION = 'CLI_AUTOMATION',
 }
 
 /**
@@ -39,6 +46,10 @@ const featureFlagConfig: Record<FeatureFlag, { envVar: string; defaultValue: boo
   [FeatureFlag.SCOUTBOOK_SYNC]: {
     envVar: 'NEXT_PUBLIC_FEATURE_SCOUTBOOK_SYNC',
     defaultValue: true, // Already implemented
+  },
+  [FeatureFlag.CLI_AUTOMATION]: {
+    envVar: 'NEXT_PUBLIC_FEATURE_CLI_AUTOMATION',
+    defaultValue: false, // Dev-only, hidden in production
   },
 }
 
