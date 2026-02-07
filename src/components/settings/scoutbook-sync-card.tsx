@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { isFeatureEnabled, FeatureFlag } from '@/lib/feature-flags'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -406,6 +407,7 @@ export function ScoutbookSyncCard({
   const isCliReady = cliStatus?.installed && cliStatus?.browsersInstalled
   const isServerless = cliStatus?.reason === 'serverless'
   const hasStaging = stagedMembers.length > 0
+  const showCliAutomation = isFeatureEnabled(FeatureFlag.CLI_AUTOMATION)
 
   // Helper functions for scout selection
   const importableScouts = stagedMembers.filter((m) => (m.memberType === 'YOUTH' || m.memberType === 'P 18+') && m.changeType !== 'skip')
@@ -513,8 +515,8 @@ export function ScoutbookSyncCard({
           </p>
         )}
 
-        {/* CLI Status Section */}
-        {!isCheckingCli && !isServerless && !hasStaging && (
+        {/* CLI Status Section - Dev only */}
+        {showCliAutomation && !isCheckingCli && !isServerless && !hasStaging && (
           <div
             className={`rounded-md p-3 text-sm ${
               isCliReady
@@ -1188,8 +1190,8 @@ export function ScoutbookSyncCard({
           </div>
         )}
 
-        {/* CLI Sync Button - only in local dev environment */}
-        {!hasStaging && !isServerless && isAdmin ? (
+        {/* CLI Sync Button - only when CLI automation is enabled */}
+        {showCliAutomation && !hasStaging && !isServerless && isAdmin ? (
           <div className="flex gap-2">
             <Button
               onClick={handleSync}
@@ -1198,14 +1200,14 @@ export function ScoutbookSyncCard({
               {isSyncing ? 'Syncing...' : 'Sync from Scoutbook'}
             </Button>
           </div>
-        ) : !hasStaging && !isServerless && !isAdmin ? (
+        ) : showCliAutomation && !hasStaging && !isServerless && !isAdmin ? (
           <p className="text-sm text-stone-500">
             Only unit administrators can sync from Scoutbook.
           </p>
         ) : null}
 
-        {/* Requirements Info - only in local dev */}
-        {!hasStaging && !isServerless && (
+        {/* Requirements Info - only when CLI automation is enabled */}
+        {showCliAutomation && !hasStaging && !isServerless && (
           <div className="rounded-md bg-stone-50 dark:bg-stone-900 p-3 text-xs text-stone-500">
             <p className="font-medium text-stone-600 dark:text-stone-300">How it works:</p>
             <ol className="mt-1 list-inside list-decimal space-y-1">
@@ -1217,14 +1219,17 @@ export function ScoutbookSyncCard({
           </div>
         )}
 
-        {/* Import Options Section */}
+        {/* Roster Sync Section */}
         {isAdmin && !hasStaging && (
-          <div className={isServerless ? '' : 'mt-6 border-t border-stone-200 pt-4'}>
-            <h3 className="text-sm font-medium text-stone-700 dark:text-stone-200 mb-3">
-              Import Options
+          <div className={showCliAutomation && !isServerless ? 'mt-6 border-t border-stone-200 pt-4' : ''}>
+            <h3 className="text-sm font-medium text-stone-700 dark:text-stone-200 mb-1">
+              Roster Sync
             </h3>
+            <p className="text-xs text-stone-500 mb-3">
+              Choose how to sync your unit roster from Scoutbook
+            </p>
 
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {/* Browser Extension Option */}
               <div className="rounded-md border border-stone-200 p-3">
                 <div className="flex items-start gap-3">
@@ -1233,10 +1238,10 @@ export function ScoutbookSyncCard({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-stone-700 dark:text-stone-200">Browser Extension</p>
                     <p className="text-xs text-stone-500 mt-0.5">
-                      Sync directly from Scoutbook while browsing. Install the Chrome extension and generate a token.
+                      Sync while browsing Scoutbook
                     </p>
                     {extensionToken ? (
                       <div className="mt-3 space-y-2">
@@ -1325,15 +1330,77 @@ export function ScoutbookSyncCard({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-stone-700 dark:text-stone-200">CSV Upload</p>
                     <p className="text-xs text-stone-500 mt-0.5">
-                      Export your roster from my.scouting.org and upload the CSV file directly.
+                      Export from my.scouting.org and upload
                     </p>
                     <div className="mt-2">
                       <Link href="/settings/import">
                         <Button size="sm" variant="outline" className="h-7 text-xs">
                           Upload CSV
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Advancement Import Section */}
+        {!hasStaging && (
+          <div className="mt-6 border-t border-stone-200 pt-4">
+            <h3 className="text-sm font-medium text-stone-700 dark:text-stone-200 mb-1">
+              Advancement Import
+            </h3>
+            <p className="text-xs text-stone-500 mb-3">
+              Import advancement history from Scoutbook exports
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Single Scout Import */}
+              <div className="rounded-md border border-stone-200 p-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-sky-100 shrink-0">
+                    <svg className="h-4 w-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-stone-700 dark:text-stone-200">Single Scout</p>
+                    <p className="text-xs text-stone-500 mt-0.5">
+                      Import one scout&apos;s advancement history
+                    </p>
+                    <div className="mt-2">
+                      <Link href="/settings/import/advancement">
+                        <Button size="sm" variant="outline" className="h-7 text-xs">
+                          Import
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Entire Unit Import */}
+              <div className="rounded-md border border-stone-200 p-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-violet-100 shrink-0">
+                    <svg className="h-4 w-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-stone-700 dark:text-stone-200">Entire Unit</p>
+                    <p className="text-xs text-stone-500 mt-0.5">
+                      Bulk import for all scouts at once
+                    </p>
+                    <div className="mt-2">
+                      <Link href="/settings/import/troop-advancement">
+                        <Button size="sm" variant="outline" className="h-7 text-xs">
+                          Import
                         </Button>
                       </Link>
                     </div>
