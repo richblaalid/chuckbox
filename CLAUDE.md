@@ -166,6 +166,117 @@ supabase db push                                   # Push to PROD
 - Feature components in `src/components/{feature}/`
 - Use `cn()` from `src/lib/utils.ts` for class merging
 
+---
+
+## Available Skills & Plugins
+
+This project uses Claude Code plugins to enforce consistent workflows. **Skills are mandatory at specific workflow stages.**
+
+### Project Commands (`.claude/commands/`)
+
+| Command | Purpose | When to Use |
+|---------|---------|-------------|
+| `/plan [feature]` | Spec-driven feature planning | Starting any new feature |
+| `/bugfix [bug]` | Systematic bug investigation | Starting any bug fix |
+| `/execute [mode]` | Controlled task execution | Implementing approved plans |
+
+### Project Skills (`.claude/skills/`)
+
+| Skill | Purpose | Trigger |
+|-------|---------|---------|
+| `frontend-design` | High-quality UI development | **MANDATORY** for any UI work |
+| `mermaid-diagrams` | Generate architecture diagrams | When visualizations help |
+| `fix-mb-requirements` | Fix BSA data structure issues | BSA canonical data fixes |
+| `vercel-react-best-practices` | React/Next.js performance guide | Reference during implementation |
+
+### Superpowers Plugin (Workflow Enforcement)
+
+| Skill | Purpose | When Required |
+|-------|---------|---------------|
+| `superpowers:brainstorming` | Socratic design refinement | **MANDATORY** before any new feature |
+| `superpowers:test-driven-development` | RED-GREEN-REFACTOR cycle | **MANDATORY** for all implementation |
+| `superpowers:systematic-debugging` | 4-phase root cause analysis | **MANDATORY** for any debugging |
+| `superpowers:verification-before-completion` | Evidence before claims | **MANDATORY** before claiming done |
+| `superpowers:writing-plans` | Detailed implementation plans | After design approval |
+| `superpowers:requesting-code-review` | Pre-review checklist | Before requesting review |
+| `superpowers:finishing-a-development-branch` | Merge/PR decision workflow | When feature complete |
+
+### Code Quality Plugins
+
+| Plugin | Purpose | When Required |
+|--------|---------|---------------|
+| `code-simplifier:code-simplifier` | Simplify recently modified code | **After each task**, before verification |
+| `feature-dev:code-reviewer` | Deep code review against plan | After implementation complete |
+| `feature-dev:code-architect` | Architecture design decisions | During planning phase |
+
+### MCP Servers
+
+| Server | Purpose | When to Use |
+|--------|---------|-------------|
+| `context7` | Up-to-date library documentation | **Before** using any library API |
+| `playwright` | Browser automation testing | E2E testing, UI verification |
+
+### Hooks (Auto-Triggered)
+
+| Hook | Trigger | Purpose |
+|------|---------|---------|
+| `post-edit-lint.sh` | After Edit/Write on `.ts/.tsx` | Auto-runs ESLint on modified files |
+
+---
+
+## Core Philosophy
+
+### Verification Before Completion
+
+**No completion claims without fresh verification evidence.**
+
+This is non-negotiable. Before claiming ANY task is complete:
+
+1. **RUN** the verification command (`npm run build && npm test`)
+2. **READ** the full output, check exit codes
+3. **CONFIRM** output matches the claim
+4. **ONLY THEN** claim completion
+
+| Claim | Requires | NOT Sufficient |
+|-------|----------|----------------|
+| "Tests pass" | Test output: 0 failures | "Should pass", previous run |
+| "Build succeeds" | Build output: exit 0 | "Linter passed" |
+| "Bug fixed" | Regression test passes | "Code changed" |
+| "Task complete" | Build + tests + requirements | Tests passing alone |
+
+**Red Flags - STOP:**
+- Using "should", "probably", "seems to"
+- Expressing satisfaction before verification
+- About to commit without running tests
+- Relying on partial verification
+
+### Test-Driven Development
+
+**No production code without a failing test first.**
+
+The TDD cycle is mandatory for all implementation:
+
+```
+RED → Verify fails → GREEN → Verify passes → REFACTOR → Verify still green
+```
+
+- Write test first, watch it fail
+- Write minimal code to pass
+- Refactor only after green
+- **If you wrote code before the test, delete it and start over**
+
+### Simplification After Implementation
+
+After completing each task, **before verification**:
+
+1. Run `code-simplifier:code-simplifier` on modified files
+2. Review simplifications for correctness
+3. Then proceed to verification
+
+This ensures code meets project standards before review.
+
+---
+
 ## Development Workflow
 
 ### Spec-Driven Development
@@ -186,17 +297,31 @@ supabase db push                                   # Push to PROD
 
 ### Quality Gates
 
-Before implementing any feature:
-- [ ] Requirements gathered via questions (use AskUserQuestion)
-- [ ] Codebase explored for patterns (use Task with Explore agent)
-- [ ] Plan document created and approved
+**Phase 1: Before Implementation**
+- [ ] Used `superpowers:brainstorming` to refine requirements (MANDATORY for new features)
+- [ ] Researched library docs with `context7` MCP
+- [ ] Explored codebase for patterns (use Task with Explore agent)
+- [ ] Plan document created and approved in `/plans/`
 
-During implementation:
+**Phase 2: During Implementation**
 - [ ] Use TodoWrite to track progress
+- [ ] Use `superpowers:test-driven-development` - write test first, watch fail, then implement
 - [ ] Use `frontend-design` skill for all UI work
 - [ ] Use `context7` MCP for library documentation
 - [ ] Run `npm run build` after significant changes
 - [ ] Run `npm test` for affected areas
+
+**Phase 3: After Each Task**
+- [ ] Run `code-simplifier:code-simplifier` on modified files
+- [ ] Run `npm run build` - must pass
+- [ ] Run `npm test` - must pass
+- [ ] Only claim completion AFTER seeing passing output
+
+**Phase 4: Before Commit/PR**
+- [ ] Used `superpowers:verification-before-completion`
+- [ ] All tests passing (fresh run, not cached)
+- [ ] Build succeeds (fresh run)
+- [ ] Used `superpowers:requesting-code-review` or `feature-dev:code-reviewer`
 
 ### Plan Documents
 
@@ -252,12 +377,13 @@ Skip planning for:
 
 ### Completing a Task
 
-1. Ensure all tests pass: `npm test`
-2. Ensure build passes: `npm run build`
-3. Mark task complete in plan/tasks file
-4. Update Task Log with date and commit
-5. Commit with descriptive message
-6. Report what you completed
+1. **Simplify**: Run `code-simplifier:code-simplifier` on modified files
+2. **Verify**: Run `npm run build && npm test` - MUST see passing output
+3. **Confirm**: Only after seeing "0 failures" claim task complete
+4. Mark task complete in plan/tasks file
+5. Update Task Log with date and commit
+6. Commit with descriptive message
+7. Report what you completed with verification evidence
 
 ### Between Sessions
 
@@ -273,17 +399,31 @@ If continuing work from a previous session:
 
 **These rules are critical. Violating them wastes time and creates bugs.**
 
+### Process Violations
 - ❌ Modify multiple tasks without approval
 - ❌ Skip tests or type checking
 - ❌ Proceed after test/build failures without fixing
 - ❌ Make architectural changes without discussion
 - ❌ Install new dependencies without discussing first
+- ❌ Push to production database without explicit approval
+- ❌ Commit code that doesn't build or pass tests
+
+### Code Quality Violations
 - ❌ Use `any` types in TypeScript
 - ❌ Write code that doesn't match existing patterns
 - ❌ Create new files when editing existing ones would work
 - ❌ Add features beyond what was requested
-- ❌ Push to production database without explicit approval
-- ❌ Commit code that doesn't build or pass tests
+- ❌ Use nested ternary operators (prefer if/else or switch)
+- ❌ Write overly clever code that sacrifices readability
+
+### Verification Violations (from superpowers philosophy)
+- ❌ Claim "tests pass" without running them in this message
+- ❌ Say "should work", "probably fixed", "seems correct"
+- ❌ Express satisfaction before verification ("Great!", "Done!")
+- ❌ Write production code before writing a failing test
+- ❌ Keep code written before tests as "reference" (delete and rewrite)
+- ❌ Trust previous test runs - always run fresh
+- ❌ Skip the simplification step before verification
 
 ---
 
@@ -291,7 +431,7 @@ If continuing work from a previous session:
 
 ### `/plan [feature description]`
 
-Start spec-driven development for a new feature.
+Start spec-driven development for a new feature using `superpowers:brainstorming`.
 
 ```
 /plan Add CSV export for scout data
@@ -299,15 +439,16 @@ Start spec-driven development for a new feature.
 ```
 
 **Workflow:**
-1. Ask clarifying questions (AskUserQuestion)
+1. Use `superpowers:brainstorming` - one question at a time, refine requirements
 2. Research library docs (Context7)
 3. Explore codebase (Explore agent)
-4. Create plan in `/plans/[feature-name].md`
-5. Get approval before implementing
+4. Use `feature-dev:code-architect` for architecture decisions
+5. Create plan in `/plans/[feature-name].md` using `superpowers:writing-plans`
+6. Get approval before implementing
 
 ### `/bugfix [bug description]`
 
-Investigate and fix a bug systematically.
+Investigate and fix a bug systematically using `superpowers:systematic-debugging`.
 
 ```
 /bugfix Login redirect fails after session timeout
@@ -315,11 +456,15 @@ Investigate and fix a bug systematically.
 ```
 
 **Workflow:**
-1. Ask clarifying questions
-2. Investigate root cause (not symptoms)
-3. Document in `/plans/bugfix-[name].md`
-4. Confirm approach before implementing
-5. Write test, fix, verify
+1. Use `superpowers:systematic-debugging` (4-phase root cause analysis)
+2. Ask clarifying questions to reproduce
+3. Investigate root cause (not symptoms)
+4. Document in `/plans/bugfix-[name].md`
+5. Confirm approach before implementing
+6. Write failing test that reproduces bug (TDD RED)
+7. Fix bug, verify test passes (TDD GREEN)
+8. Run `code-simplifier:code-simplifier`
+9. Verify with `npm run build && npm test`
 
 ### `/execute [mode]`
 
@@ -332,11 +477,21 @@ Execute tasks from an approved plan with safeguards.
 /execute 1.2.3     # Execute only task 1.2.3
 ```
 
+**Per-Task Workflow:**
+1. Announce task number and description
+2. Use `context7` if task involves library APIs
+3. Use `superpowers:test-driven-development` - write test first
+4. Implement minimal code to pass test
+5. Run `code-simplifier:code-simplifier` on modified files
+6. Run `npm run build && npm test` - MUST pass
+7. Mark task complete, commit
+
 **Safeguards:**
 - Stops immediately on test/build failures
 - Maximum 5 tasks per `/execute phase`
 - Requires approval at phase checkpoints
 - Auto-commits after each successful task
+- **No completion claims without fresh verification output**
 
 ### Task Numbering
 

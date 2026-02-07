@@ -30,11 +30,13 @@ For EACH task:
 
 1. **Announce**: State the task number and description
 2. **Research**: Use Context7 if the task involves library APIs
-3. **Implement**: Write the code changes
-4. **Verify**: Run `npm run build` and `npm test`
-5. **Mark Complete**: Update the plan file checkbox
-6. **Log**: Add entry to Task Log with date
-7. **Commit**: Create a descriptive commit
+3. **Test First**: Use `superpowers:test-driven-development` - write failing test, watch it fail
+4. **Implement**: Write minimal code to pass the test
+5. **Simplify**: Run `code-simplifier:code-simplifier` on modified files
+6. **Verify**: Run `npm run build` and `npm test` - MUST see passing output before claiming done
+7. **Mark Complete**: Update the plan file checkbox (only AFTER seeing "0 failures")
+8. **Log**: Add entry to Task Log with date
+9. **Commit**: Create a descriptive commit
 
 ### Safeguards
 
@@ -57,6 +59,10 @@ For EACH task:
    ```
 
 6. **UI Tasks**: For any UI work, use the `frontend-design` skill.
+
+7. **Simplification Step**: Always run `code-simplifier:code-simplifier` before verification. This is mandatory.
+
+8. **Evidence Before Claims**: Never say "tests pass" without showing the test output in this message. Use `superpowers:verification-before-completion` philosophy.
 
 ### Failure Recovery
 
@@ -81,13 +87,17 @@ After completing each task, update the Task Log in the plan file:
 ## Quality Gates (per task)
 
 - [ ] Task understood and announced
-- [ ] Library docs researched (if applicable)
-- [ ] Implementation complete
-- [ ] `npm run build` passes
-- [ ] `npm test` passes
-- [ ] Task marked complete in plan
+- [ ] Library docs researched with Context7 (if applicable)
+- [ ] Test written FIRST and verified to fail (TDD RED)
+- [ ] Minimal implementation to pass test (TDD GREEN)
+- [ ] `code-simplifier:code-simplifier` run on modified files
+- [ ] `npm run build` passes - **verified with fresh output**
+- [ ] `npm test` passes - **verified with fresh output showing "0 failures"**
+- [ ] Task marked complete in plan (only AFTER verification)
 - [ ] Task Log updated
 - [ ] Commit created
+
+**Verification Rule**: Never claim a gate passes without seeing the output in this message. "Should pass" is not verification.
 
 ## Example Usage
 
