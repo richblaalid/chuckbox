@@ -204,6 +204,52 @@ export default async function SettingsPage({
     .limit(1)
     .single()
 
+  // Get balance import batches for this unit (most recent 10)
+  const { data: importBatchesData } = await supabase
+    .from('balance_import_batches')
+    .select(`
+      id,
+      created_at,
+      mode,
+      row_count,
+      status,
+      imported_by_profile:profiles!balance_import_batches_imported_by_fkey(
+        full_name,
+        email
+      )
+    `)
+    .eq('unit_id', membership.unit_id)
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  interface ImportBatch {
+    id: string
+    created_at: string
+    mode: 'set' | 'adjust'
+    row_count: number
+    status: 'active' | 'reversed'
+    imported_by_profile: {
+      full_name: string | null
+      email: string | null
+    } | null
+  }
+  const importBatches = (importBatchesData as unknown as ImportBatch[]) || []
+
+  // Check if the latest active batch can be undone
+  // It can be undone if there are no journal entries after it was created
+  let canUndoLatestBatch = false
+  const latestActiveBatch = importBatches.find((b) => b.status === 'active')
+  if (latestActiveBatch) {
+    const { count: subsequentEntries } = await supabase
+      .from('journal_entries')
+      .select('id', { count: 'exact', head: true })
+      .eq('unit_id', membership.unit_id)
+      .gt('created_at', latestActiveBatch.created_at)
+      .is('balance_import_batch_id', null) // Exclude entries from the same batch
+
+    canUndoLatestBatch = (subsequentEntries ?? 0) === 0
+  }
+
   // Unit Tab Content (admin only)
   const unitTabContent = isAdmin ? (
     <div className="grid gap-6">
@@ -345,7 +391,10 @@ export default async function SettingsPage({
         lastSyncMemberCount={lastSyncSession?.records_extracted}
         isAdmin={isAdmin}
       />
-      <BalanceImportCard />
+      <BalanceImportCard
+        batches={importBatches}
+        canUndoLatest={canUndoLatestBatch}
+      />
     </div>
   )
 
