@@ -8,6 +8,7 @@ import { StatusFilterButtons, BalanceFilterButtons, type StatusFilter, type Bala
 import { SearchInput } from '@/components/ui/search-input'
 import { SortIcon, type SortDirection } from '@/components/ui/sort-icon'
 import { ResponsiveTable, MobileSubInfo } from '@/components/ui/responsive-table'
+import { Button } from '@/components/ui/button'
 
 interface ScoutAccount {
   id: string
@@ -177,12 +178,9 @@ export function AccountsList({ accounts, showPatrolFilter = true }: AccountsList
 
         {/* Clear All Filters */}
         {(hasActiveFilters || searchQuery) && (
-          <button
-            onClick={clearAllFilters}
-            className="text-sm text-stone-500 hover:text-stone-700"
-          >
+          <Button variant="ghost" size="sm" onClick={clearAllFilters}>
             Clear all
-          </button>
+          </Button>
         )}
       </div>
 

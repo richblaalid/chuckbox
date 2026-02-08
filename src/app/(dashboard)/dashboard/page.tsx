@@ -6,6 +6,7 @@ import { getSquareEnvironment } from '@/lib/square/client'
 import { SquareEnvironment } from 'square'
 import Link from 'next/link'
 import { RefreshCw, Mail, CalendarCheck, Award } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { QuickPaymentDialog } from '@/components/payments/quick-payment-dialog'
 
 interface ScoutAccount {
@@ -400,22 +401,20 @@ export default async function DashboardPage() {
         <CardContent>
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             {isFinancialRole(role) && (
-              <Link
-                href="/settings/import"
-                className="inline-flex items-center justify-center gap-2.5 rounded-lg bg-green-700 text-white px-5 py-3 text-base font-semibold transition-colors hover:bg-green-800 shadow-sm w-full sm:w-auto"
-              >
-                <RefreshCw className="h-5 w-5" />
-                Sync Scoutbook
-              </Link>
+              <Button asChild className="gap-2">
+                <Link href="/settings/import">
+                  <RefreshCw className="h-4 w-4" />
+                  Sync Scoutbook
+                </Link>
+              </Button>
             )}
             {/* Advancement Tracking */}
-            <Link
-              href="/advancement?tab=summary"
-              className="inline-flex items-center justify-center gap-2.5 rounded-lg bg-amber-600 text-white px-5 py-3 text-base font-semibold transition-colors hover:bg-amber-700 shadow-sm w-full sm:w-auto"
-            >
-              <Award className="h-5 w-5" />
-              Advancement
-            </Link>
+            <Button asChild variant="accent" className="gap-2">
+              <Link href="/advancement?tab=summary">
+                <Award className="h-4 w-4" />
+                Advancement
+              </Link>
+            </Button>
             {/* Record Payment - opens dialog */}
             {isFinancialRole(role) && scoutAccounts && scoutAccounts.length > 0 && (
               <QuickPaymentDialog
@@ -435,26 +434,18 @@ export default async function DashboardPage() {
             )}
             {/* Future: Send Payment Reminders */}
             {isFinancialRole(role) && scoutsOwing > 0 && (
-              <button
-                disabled
-                className="inline-flex items-center justify-center gap-2.5 rounded-lg border-2 border-stone-200 bg-stone-50 px-5 py-3 text-base font-semibold text-stone-400 cursor-not-allowed w-full sm:w-auto"
-                title="Coming soon"
-              >
-                <Mail className="h-5 w-5" />
+              <Button variant="outline" disabled className="gap-2" title="Coming soon">
+                <Mail className="h-4 w-4" />
                 Send Reminders
                 <span className="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-medium">Soon</span>
-              </button>
+              </Button>
             )}
             {/* Future: Record Attendance */}
-            <button
-              disabled
-              className="inline-flex items-center justify-center gap-2.5 rounded-lg border-2 border-stone-200 bg-stone-50 px-5 py-3 text-base font-semibold text-stone-400 cursor-not-allowed w-full sm:w-auto"
-              title="Coming soon"
-            >
-              <CalendarCheck className="h-5 w-5" />
+            <Button variant="outline" disabled className="gap-2" title="Coming soon">
+              <CalendarCheck className="h-4 w-4" />
               Record Attendance
               <span className="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-medium">Soon</span>
-            </button>
+            </Button>
           </div>
         </CardContent>
       </Card>

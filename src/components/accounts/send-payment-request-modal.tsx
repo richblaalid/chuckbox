@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { formatCurrency } from '@/lib/utils'
+import { Mail } from 'lucide-react'
 
 interface Guardian {
   id: string
@@ -156,13 +157,15 @@ export function SendPaymentRequestModal({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button
-          className="rounded-md bg-forest-700 px-4 py-2 text-sm font-medium text-white hover:bg-forest-800"
+        <Button
+          variant="outline"
+          className="gap-2"
           disabled={!owesAmount}
           title={owesAmount ? 'Send payment request email' : 'No balance owed'}
         >
+          <Mail className="h-4 w-4" />
           Send Payment Request
-        </button>
+        </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>

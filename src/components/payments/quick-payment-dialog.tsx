@@ -9,6 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { QuickPaymentForm } from './quick-payment-form'
 import { DollarSign } from 'lucide-react'
 
@@ -58,13 +59,10 @@ export function QuickPaymentDialog({ unitId, scouts, squareConfig, preselectedSc
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button
-          type="button"
-          className="inline-flex items-center justify-center gap-2.5 rounded-lg bg-forest-700 text-white px-5 py-3 text-base font-semibold transition-colors hover:bg-forest-800 shadow-sm w-full sm:w-auto"
-        >
-          <DollarSign className="h-5 w-5" />
+        <Button variant="accent" className="gap-2">
+          <DollarSign className="h-4 w-4" />
           Record Payment
-        </button>
+        </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>

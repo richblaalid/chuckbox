@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { PaymentModal } from './payment-modal'
 import { SendPaymentRequestModal } from './send-payment-request-modal'
@@ -96,7 +95,7 @@ export function AccountActions({
         {/* Parent actions */}
         {isParent && owesBalance && squareConfig && (
           <>
-            <Button onClick={() => setIsPaymentModalOpen(true)}>Make a Payment</Button>
+            <Button variant="accent" onClick={() => setIsPaymentModalOpen(true)}>Make a Payment</Button>
             <PaymentModal
               isOpen={isPaymentModalOpen}
               onClose={() => setIsPaymentModalOpen(false)}
@@ -129,14 +128,6 @@ export function AccountActions({
             unitId={unitId}
           />
         )}
-
-        {/* Common actions */}
-        <Link
-          href={`/scouts/${scoutId}`}
-          className="rounded-md bg-stone-100 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-200"
-        >
-          View Scout Profile
-        </Link>
       </div>
     </div>
   )

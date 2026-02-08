@@ -640,6 +640,7 @@ export function QuickPaymentForm({
         )}
         <Button
           type="submit"
+          variant="accent"
           className="flex-1"
           disabled={
             isSubmitting ||

@@ -6,6 +6,7 @@ import { AccessDenied } from '@/components/ui/access-denied'
 import { formatCurrency } from '@/lib/utils'
 import { canAccessPage, isFinancialRole } from '@/lib/roles'
 import { FinanceSubnav } from '@/components/finances/finance-subnav'
+import { Button } from '@/components/ui/button'
 import { Receipt, CreditCard, TrendingDown, Wallet, PiggyBank, AlertTriangle } from 'lucide-react'
 
 interface ScoutAccount {
@@ -334,20 +335,18 @@ export default async function FinancesOverviewPage() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <Link
-                href="/finances/payments"
-                className="inline-flex items-center justify-center gap-2.5 rounded-lg bg-green-700 text-white px-5 py-3 text-base font-semibold transition-colors hover:bg-green-800 shadow-sm w-full sm:w-auto"
-              >
-                <CreditCard className="h-5 w-5" />
-                Record Payment
-              </Link>
-              <Link
-                href="/finances/billing"
-                className="inline-flex items-center justify-center gap-2.5 rounded-lg bg-amber-600 text-white px-5 py-3 text-base font-semibold transition-colors hover:bg-amber-700 shadow-sm w-full sm:w-auto"
-              >
-                <Receipt className="h-5 w-5" />
-                Create Billing
-              </Link>
+              <Button asChild className="gap-2">
+                <Link href="/finances/payments">
+                  <CreditCard className="h-4 w-4" />
+                  Record Payment
+                </Link>
+              </Button>
+              <Button asChild variant="accent" className="gap-2">
+                <Link href="/finances/billing">
+                  <Receipt className="h-4 w-4" />
+                  Create Billing
+                </Link>
+              </Button>
             </div>
           </CardContent>
         </Card>

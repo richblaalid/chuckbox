@@ -19,9 +19,9 @@ const buttonVariants = cva(
         // Outline - Forest green border
         outline:
           "border-2 border-forest-700 bg-transparent text-forest-700 hover:bg-forest-700 hover:text-white hover:-translate-y-0.5 active:translate-y-0",
-        // Secondary - Amber accent
+        // Secondary - Outline style (Brand Guide January 2026)
         secondary:
-          "bg-amber-400 text-forest-900 shadow-sm hover:bg-amber-300 hover:shadow-amber hover:-translate-y-0.5 active:translate-y-0",
+          "border border-stone-300 bg-transparent text-stone-700 hover:border-stone-400 hover:bg-stone-50 hover:-translate-y-0.5 active:translate-y-0",
         // Ghost - Subtle hover
         ghost:
           "text-forest-700 hover:bg-stone-100 hover:text-forest-800",
@@ -34,6 +34,9 @@ const buttonVariants = cva(
         // Warning - Amber action
         warning:
           "bg-warning text-white shadow-sm hover:bg-warning-dark hover:-translate-y-0.5 active:translate-y-0",
+        // Accent - Amber for high-visibility CTAs (Brand Guide: btn-primary)
+        accent:
+          "bg-amber-700 text-white shadow-sm hover:bg-amber-800 hover:shadow-amber hover:-translate-y-0.5 active:translate-y-0",
       },
       size: {
         default: "h-11 px-5 py-2.5",  // 44px min touch target

@@ -10,6 +10,7 @@ import { StatusFilterButtons, type StatusFilter } from '@/components/ui/filter-b
 import { SearchInput } from '@/components/ui/search-input'
 import { SortIcon, type SortDirection } from '@/components/ui/sort-icon'
 import { ResponsiveTable, MobileSubInfo } from '@/components/ui/responsive-table'
+import { Button } from '@/components/ui/button'
 
 interface Scout {
   id: string
@@ -222,12 +223,9 @@ export function ScoutsList({ scouts, canManage, unitId }: ScoutsListProps) {
 
         {/* Clear All Filters */}
         {(hasActiveFilters || searchQuery) && (
-          <button
-            onClick={clearAllFilters}
-            className="text-sm text-stone-500 hover:text-stone-700 dark:text-stone-400 dark:hover:text-stone-200"
-          >
+          <Button variant="ghost" size="sm" onClick={clearAllFilters}>
             Clear all
-          </button>
+          </Button>
         )}
       </div>
 
