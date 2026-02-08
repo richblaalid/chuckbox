@@ -1,5 +1,8 @@
+import Link from 'next/link'
+import { Upload } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
 import { hasFilteredView, isFinancialRole } from '@/lib/roles'
 import { AccountsList } from '@/components/accounts/accounts-list'
@@ -134,17 +137,27 @@ export default async function AccountsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-stone-900">
-          {isScout ? 'My Account' : isParent ? 'Family Accounts' : 'Scout Accounts'}
-        </h1>
-        <p className="mt-1 text-stone-600">
-          {isScout
-            ? 'View your account balance and transactions'
-            : isParent
-              ? 'View your scouts\' account balances'
-              : 'View and manage scout financial accounts'}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-stone-900">
+            {isScout ? 'My Account' : isParent ? 'Family Accounts' : 'Scout Accounts'}
+          </h1>
+          <p className="mt-1 text-stone-600">
+            {isScout
+              ? 'View your account balance and transactions'
+              : isParent
+                ? 'View your scouts\' account balances'
+                : 'View and manage scout financial accounts'}
+          </p>
+        </div>
+        {isFinancialRole(role) && (
+          <Link href="/settings/import/balances">
+            <Button variant="outline">
+              <Upload className="mr-2 h-4 w-4" />
+              Import Balances
+            </Button>
+          </Link>
+        )}
       </div>
 
       <FinanceSubnav showFinancialTabs={canTakeActions} />
