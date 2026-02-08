@@ -1671,6 +1671,62 @@ export type Database = {
           },
         ]
       }
+      plaid_connections: {
+        Row: {
+          access_token: string
+          accounts: Json | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          id: string
+          institution_id: string | null
+          institution_name: string | null
+          item_id: string
+          last_synced_at: string | null
+          status: string
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          accounts?: Json | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          institution_id?: string | null
+          institution_name?: string | null
+          item_id: string
+          last_synced_at?: string | null
+          status?: string
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          accounts?: Json | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          institution_id?: string | null
+          institution_name?: string | null
+          item_id?: string
+          last_synced_at?: string | null
+          status?: string
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plaid_connections_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: true
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           address_city: string | null
@@ -3289,6 +3345,7 @@ export type Database = {
       units: {
         Row: {
           chartered_org: string | null
+          collection_settings: Json | null
           council: string | null
           created_at: string | null
           district: string | null
@@ -3309,6 +3366,7 @@ export type Database = {
         }
         Insert: {
           chartered_org?: string | null
+          collection_settings?: Json | null
           council?: string | null
           created_at?: string | null
           district?: string | null
@@ -3329,6 +3387,7 @@ export type Database = {
         }
         Update: {
           chartered_org?: string | null
+          collection_settings?: Json | null
           council?: string | null
           created_at?: string | null
           district?: string | null
