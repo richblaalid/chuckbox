@@ -202,9 +202,12 @@ export function BalanceImportWizard({ scouts, onComplete }: BalanceImportWizardP
       const payload = {
         mode,
         rows: rowsToImport.map((row) => ({
-          scoutId: row.matchedScout?.id || row.manualMatchScoutId,
+          scoutId: row.matchedScout?.id,
+          scoutAccountId: row.matchedScout?.scout_accounts?.id,
           billingBalance: row.billingBalance,
           fundsBalance: row.fundsBalance,
+          action: row.action,
+          manualMatchScoutId: row.manualMatchScoutId,
         })),
       }
 
