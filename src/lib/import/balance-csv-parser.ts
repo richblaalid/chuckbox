@@ -237,8 +237,27 @@ export function parseBalanceCSV(content: string): ParsedBalanceCSV {
     return { headers: [], rows: [], errors: [] }
   }
 
-  const headers = parseCSVLine(lines[0])
-  const rows = lines.slice(1).map(line => parseCSVLine(line))
+  // Find the first non-empty row (skip rows with only commas/whitespace)
+  let headerIndex = 0
+  while (headerIndex < lines.length) {
+    const parsed = parseCSVLine(lines[headerIndex])
+    // Check if any cell has meaningful content
+    const hasMeaningfulContent = parsed.some(cell => cell.trim().length > 0)
+    if (hasMeaningfulContent) {
+      break
+    }
+    headerIndex++
+  }
+
+  if (headerIndex >= lines.length) {
+    return { headers: [], rows: [], errors: [] }
+  }
+
+  const headers = parseCSVLine(lines[headerIndex])
+  const rows = lines.slice(headerIndex + 1)
+    .map(line => parseCSVLine(line))
+    // Also filter out empty data rows
+    .filter(row => row.some(cell => cell.trim().length > 0))
 
   return { headers, rows, errors: [] }
 }

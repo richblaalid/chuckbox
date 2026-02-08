@@ -77,6 +77,19 @@ John,,50
     expect(result.rows).toHaveLength(1)
     expect(result.rows[0]).toEqual(['123', 'John Doe', '50.00'])
   })
+
+  it('skips empty first rows (Google Sheets export artifact)', () => {
+    // Google Sheets sometimes exports empty rows before headers
+    const csv = `, ,,,,,
+Member_ID,Scout,Current Balance
+123,John Doe,50.00
+,,`
+
+    const result = parseBalanceCSV(csv)
+    expect(result.headers).toEqual(['Member_ID', 'Scout', 'Current Balance'])
+    expect(result.rows).toHaveLength(1) // Truly empty data row should be filtered
+    expect(result.rows[0]).toEqual(['123', 'John Doe', '50.00'])
+  })
 })
 
 describe('autoDetectColumns', () => {
