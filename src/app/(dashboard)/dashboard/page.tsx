@@ -2,9 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
 import { isFinancialRole, isManagementRole, hasFilteredView } from '@/lib/roles'
+import { getSquareEnvironment } from '@/lib/square/client'
+import { SquareEnvironment } from 'square'
 import Link from 'next/link'
-import { RefreshCw, Mail, CalendarCheck, Award, DollarSign } from 'lucide-react'
-import { QuickPaymentForm } from '@/components/payments/quick-payment-form'
+import { RefreshCw, Mail, CalendarCheck, Award } from 'lucide-react'
+import { QuickPaymentDialog } from '@/components/payments/quick-payment-dialog'
 
 interface ScoutAccount {
   id: string
@@ -169,6 +171,25 @@ export default async function DashboardPage() {
       .order('created_at', { ascending: false })
       .limit(5)
     scoutRecentTransactions = journalLinesData as JournalLine[] | null
+  }
+
+  // Get Square credentials for payment integration (management roles only)
+  let squareConfig: { applicationId: string; locationId: string; environment: 'sandbox' | 'production' } | undefined
+  if (isFinancialRole(role)) {
+    const { data: squareCredentials } = await supabase
+      .from('unit_square_credentials')
+      .select('location_id')
+      .eq('unit_id', membership.unit_id)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (squareCredentials?.location_id) {
+      squareConfig = {
+        applicationId: process.env.SQUARE_APPLICATION_ID || '',
+        locationId: squareCredentials.location_id,
+        environment: getSquareEnvironment() === SquareEnvironment.Production ? 'production' : 'sandbox',
+      }
+    }
   }
 
   // Scout Dashboard - Simple view with their own account
@@ -393,6 +414,22 @@ export default async function DashboardPage() {
               <Award className="h-5 w-5" />
               Advancement
             </Link>
+            {/* Record Payment - opens dialog */}
+            {isFinancialRole(role) && scoutAccounts && scoutAccounts.length > 0 && (
+              <QuickPaymentDialog
+                unitId={membership.unit_id}
+                scouts={scoutAccounts.map((acc) => ({
+                  id: acc.scouts?.id || acc.scout_id,
+                  first_name: acc.scouts?.first_name || '',
+                  last_name: acc.scouts?.last_name || '',
+                  scout_accounts: {
+                    id: acc.id,
+                    billing_balance: acc.billing_balance,
+                  },
+                }))}
+                squareConfig={squareConfig}
+              />
+            )}
             {/* Future: Send Payment Reminders */}
             {isFinancialRole(role) && scoutsOwing > 0 && (
               <button
@@ -419,35 +456,8 @@ export default async function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Quick Payment + Recent Activity */}
+      {/* Recent Activity */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Quick Payment Form - Admin/Treasurer only */}
-        {isFinancialRole(role) && scoutAccounts && scoutAccounts.length > 0 && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-forest-600" />
-                <CardTitle>Quick Payment</CardTitle>
-              </div>
-              <CardDescription>Record cash or check payments received at meetings</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <QuickPaymentForm
-                unitId={membership.unit_id}
-                scouts={scoutAccounts.map((acc) => ({
-                  id: acc.scouts?.id || acc.scout_id,
-                  first_name: acc.scouts?.first_name || '',
-                  last_name: acc.scouts?.last_name || '',
-                  scout_accounts: {
-                    id: acc.id,
-                    billing_balance: acc.billing_balance,
-                  },
-                }))}
-              />
-            </CardContent>
-          </Card>
-        )}
-
         {isFinancialRole(role) && (
           <Card>
             <CardHeader>
