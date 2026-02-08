@@ -219,8 +219,14 @@ export function parseBalanceCSV(content: string): ParsedBalanceCSV {
     return { headers: [], rows: [], errors: [] }
   }
 
+  // Remove BOM (Byte Order Mark) if present - common in Excel/Google Sheets exports
+  let cleanContent = content
+  if (cleanContent.charCodeAt(0) === 0xFEFF) {
+    cleanContent = cleanContent.slice(1)
+  }
+
   // Normalize line endings and split
-  const lines = content
+  const lines = cleanContent
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
     .split('\n')

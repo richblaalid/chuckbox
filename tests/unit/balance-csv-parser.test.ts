@@ -67,6 +67,16 @@ John,,50
     expect(result.rows[0]).toEqual(['John', '', '50'])
     expect(result.rows[1]).toEqual(['', 'Smith', '25'])
   })
+
+  it('handles BOM (Byte Order Mark) from Excel/Google Sheets', () => {
+    // UTF-8 BOM is \uFEFF
+    const csv = '\uFEFFMember_ID,Scout,Current Balance\n123,John Doe,50.00'
+
+    const result = parseBalanceCSV(csv)
+    expect(result.headers).toEqual(['Member_ID', 'Scout', 'Current Balance'])
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0]).toEqual(['123', 'John Doe', '50.00'])
+  })
 })
 
 describe('autoDetectColumns', () => {
