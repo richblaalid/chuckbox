@@ -97,6 +97,33 @@ export async function POST(
   }
 
   const { mode, rows } = data
+
+  // Validate mode field
+  if (mode !== 'set' && mode !== 'adjust') {
+    return NextResponse.json(
+      {
+        success: false,
+        imported: 0,
+        skipped: 0,
+        errors: ['Invalid mode: must be "set" or "adjust"'],
+      },
+      { status: 400 }
+    )
+  }
+
+  // Validate rows field
+  if (!Array.isArray(rows)) {
+    return NextResponse.json(
+      {
+        success: false,
+        imported: 0,
+        skipped: 0,
+        errors: ['Invalid rows: must be an array'],
+      },
+      { status: 400 }
+    )
+  }
+
   const importRows = rows.filter(
     (r) => r.action === 'import' || r.action === 'manual_match'
   )
@@ -194,13 +221,14 @@ export async function POST(
         continue
       }
 
-      // Get current balances
+      // Get current balances - verify account belongs to user's unit
       const { data: currentAccount } = await adminSupabase
         .from('scout_accounts')
         .select(
           'billing_balance, funds_balance, scout_id, scouts(first_name, last_name)'
         )
         .eq('id', scoutAccountId)
+        .eq('unit_id', unitId)
         .single()
 
       if (!currentAccount) {
@@ -339,18 +367,17 @@ export async function POST(
         }
 
         if (journalLines.length > 0) {
-          await adminSupabase.from('journal_lines').insert(journalLines)
-        }
+          const { error: linesError } = await adminSupabase
+            .from('journal_lines')
+            .insert(journalLines)
 
-        // Update scout account balances
-        await adminSupabase
-          .from('scout_accounts')
-          .update({
-            billing_balance: newBilling,
-            funds_balance: newFunds,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', scoutAccountId)
+          if (linesError) {
+            errors.push(`${scoutName}: Failed to create journal lines`)
+            continue
+          }
+        }
+        // Note: scout_accounts balances are updated automatically by
+        // the trigger_update_scout_balance_insert database trigger
       }
 
       imported++
