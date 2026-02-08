@@ -336,13 +336,13 @@ export default async function FinancesOverviewPage() {
           <CardContent>
             <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <Button asChild className="gap-2">
-                <Link href="/finances/payments">
+                <Link href="/finances/payments?action=record">
                   <CreditCard className="h-4 w-4" />
                   Record Payment
                 </Link>
               </Button>
               <Button asChild variant="accent" className="gap-2">
-                <Link href="/finances/billing">
+                <Link href="/finances/billing?action=create">
                   <Receipt className="h-4 w-4" />
                   Create Billing
                 </Link>

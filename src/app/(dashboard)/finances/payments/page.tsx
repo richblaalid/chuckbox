@@ -52,7 +52,13 @@ interface FundraiserType {
   description: string | null
 }
 
-export default async function PaymentsPage() {
+interface PageProps {
+  searchParams: Promise<{ action?: string }>
+}
+
+export default async function PaymentsPage({ searchParams }: PageProps) {
+  const params = await searchParams
+  const shouldOpenForm = params.action === 'record'
   const supabase = await createClient()
 
   const {
@@ -248,6 +254,7 @@ export default async function PaymentsPage() {
           description={isSquareConnected
             ? 'Accept card payments or record cash/check payments'
             : 'Record cash, check, or other payments'}
+          defaultOpen={shouldOpenForm}
         >
           <QuickPaymentForm
             unitId={membership.unit_id}

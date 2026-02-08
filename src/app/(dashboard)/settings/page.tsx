@@ -6,6 +6,7 @@ import { LogoUpload } from '@/components/settings/logo-upload'
 import { PaymentProcessingCard } from '@/components/settings/payment-processing-card'
 import { ScoutbookSyncCardLazy } from '@/components/settings/scoutbook-sync-card-lazy'
 import { BalanceImportCard } from '@/components/settings/balance-import-card'
+import { CollectionSettingsCard } from '@/components/settings/collection-settings-card'
 import { UsersList } from '@/components/settings/users/users-list'
 import { InviteUserButton } from '@/components/settings/users/invite-user-button'
 import { resendInvite, removeUser } from '@/app/actions/users'
@@ -55,7 +56,8 @@ export default async function SettingsPage({
         logo_url,
         processing_fee_percent,
         processing_fee_fixed,
-        pass_fees_to_payer
+        pass_fees_to_payer,
+        collection_settings
       )`
     )
     .eq('profile_id', profile.id)
@@ -84,6 +86,12 @@ export default async function SettingsPage({
     processing_fee_percent: number | null
     processing_fee_fixed: number | null
     pass_fees_to_payer: boolean | null
+    collection_settings: {
+      overdue_threshold_days: number
+      overdue_threshold_amount_cents: number
+      reminder_email_subject: string
+      reminder_email_template: string
+    } | null
   } | null
 
   if (!unit) {
@@ -394,6 +402,15 @@ export default async function SettingsPage({
       <BalanceImportCard
         batches={importBatches}
         canUndoLatest={canUndoLatestBatch}
+      />
+      <CollectionSettingsCard
+        unitId={unit.id}
+        settings={unit.collection_settings || {
+          overdue_threshold_days: 30,
+          overdue_threshold_amount_cents: 0,
+          reminder_email_subject: 'Payment Reminder - {unit_name}',
+          reminder_email_template: 'default',
+        }}
       />
     </div>
   )

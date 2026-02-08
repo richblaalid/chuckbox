@@ -5,6 +5,7 @@ import { AccessDenied } from '@/components/ui/access-denied'
 import { formatCurrency } from '@/lib/utils'
 import { canAccessPage, canPerformAction } from '@/lib/roles'
 import { BillingForm } from '@/components/billing/billing-form'
+import { QuickBillingForm } from '@/components/billing/quick-billing-form'
 import { BillingRecordCard } from '@/components/billing/billing-record-card'
 import { FinanceSubnav } from '@/components/finances/finance-subnav'
 import Link from 'next/link'
@@ -45,7 +46,20 @@ interface Scout {
   patrols: { name: string } | null
 }
 
-export default async function BillingPage() {
+interface Event {
+  id: string
+  title: string
+  start_date: string
+  cost_per_scout: number | null
+}
+
+interface PageProps {
+  searchParams: Promise<{ action?: string }>
+}
+
+export default async function BillingPage({ searchParams }: PageProps) {
+  const params = await searchParams
+  const shouldOpenForm = params.action === 'create'
   const supabase = await createClient()
 
   const {
@@ -110,6 +124,19 @@ export default async function BillingPage() {
 
   const scouts = (scoutsData as Scout[]) || []
 
+  // Get upcoming events with costs for quick billing
+  const today = new Date().toISOString().split('T')[0]
+  const { data: eventsData } = await supabase
+    .from('events')
+    .select('id, title, start_date, cost_per_scout')
+    .eq('unit_id', membership.unit_id)
+    .gte('start_date', today)
+    .not('cost_per_scout', 'is', null)
+    .order('start_date', { ascending: true })
+    .limit(10)
+
+  const events = (eventsData as Event[]) || []
+
   // Get recent billing records
   const { data: billingData } = await supabase
     .from('billing_records')
@@ -157,11 +184,30 @@ export default async function BillingPage() {
 
       <FinanceSubnav showFinancialTabs={true} />
 
+      {/* Quick Billing - Event-based */}
+      {canCreateBilling && events.length > 0 && (
+        <Card className="border-forest-200 dark:border-forest-700/50 bg-forest-50/50 dark:bg-forest-900/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <span className="text-forest-700 dark:text-forest-400">⚡</span>
+              Quick Event Billing
+            </CardTitle>
+            <CardDescription>
+              Bill all scouts for an upcoming event in just 2 clicks
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <QuickBillingForm unitId={membership.unit_id} scouts={scouts} events={events} />
+          </CardContent>
+        </Card>
+      )}
+
       {/* Create New Billing */}
       {canCreateBilling && (
         <CollapsibleCard
-          title="Create New Billing"
+          title="Custom Billing"
           description="Split costs among scouts or apply fixed charges"
+          defaultOpen={shouldOpenForm}
         >
           <BillingForm unitId={membership.unit_id} scouts={scouts} />
         </CollapsibleCard>

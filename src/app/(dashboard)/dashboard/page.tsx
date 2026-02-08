@@ -27,6 +27,25 @@ interface JournalEntry {
   entry_date: string
   description: string
   entry_type: string | null
+  journal_lines: { debit: number | null; credit: number | null }[]
+}
+
+// Map entry_type to user-friendly labels
+function formatEntryType(entryType: string | null): string {
+  const typeMap: Record<string, string> = {
+    payment: 'Payment',
+    billing: 'Billing',
+    funds_transfer: 'Funds Transfer',
+    fundraising: 'Fundraising',
+    refund: 'Refund',
+    adjustment: 'Adjustment',
+  }
+  return typeMap[entryType || ''] || 'Entry'
+}
+
+// Calculate total amount from journal lines (sum of debits, which equals sum of credits)
+function getEntryAmount(lines: { debit: number | null; credit: number | null }[]): number {
+  return lines.reduce((sum, line) => sum + (line.debit || 0), 0)
 }
 
 interface JournalLine {
@@ -148,7 +167,7 @@ export default async function DashboardPage() {
   if (isManagementRole(role)) {
     const { data: recentTransactionsData } = await supabase
       .from('journal_entries')
-      .select('id, entry_date, description, entry_type')
+      .select('id, entry_date, description, entry_type, journal_lines(debit, credit)')
       .eq('unit_id', membership.unit_id)
       .eq('is_posted', true)
       .order('entry_date', { ascending: false })
@@ -454,24 +473,40 @@ export default async function DashboardPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         {isFinancialRole(role) && (
           <Card>
-            <CardHeader>
-              <CardTitle>Recent Transactions</CardTitle>
-              <CardDescription>Latest financial activity</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Recent Transactions</CardTitle>
+                <CardDescription>Latest financial activity</CardDescription>
+              </div>
+              <Link
+                href="/finances"
+                className="text-sm text-forest-600 hover:text-forest-800 hover:underline"
+              >
+                View all →
+              </Link>
             </CardHeader>
             <CardContent>
               {recentTransactions && recentTransactions.length > 0 ? (
                 <div className="space-y-4">
-                  {recentTransactions.map((tx) => (
-                    <div key={tx.id} className="flex items-center justify-between border-b pb-2">
-                      <div>
-                        <p className="font-medium">{tx.description}</p>
-                        <p className="text-sm text-stone-500">{tx.entry_date}</p>
+                  {recentTransactions.map((tx) => {
+                    const amount = getEntryAmount(tx.journal_lines || [])
+                    const isPayment = tx.entry_type === 'payment'
+                    return (
+                      <div key={tx.id} className="flex items-center justify-between border-b pb-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{tx.description}</p>
+                          <div className="flex items-center gap-2 text-sm text-stone-500">
+                            <span>{new Date(tx.entry_date).toLocaleDateString()}</span>
+                            <span className="text-stone-300">•</span>
+                            <span>{formatEntryType(tx.entry_type)}</span>
+                          </div>
+                        </div>
+                        <span className={`font-medium ml-3 ${isPayment ? 'text-success' : 'text-stone-700'}`}>
+                          {isPayment ? '+' : ''}{formatCurrency(amount)}
+                        </span>
                       </div>
-                      <span className="rounded bg-stone-100 px-2 py-1 text-xs capitalize">
-                        {tx.entry_type || 'entry'}
-                      </span>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <p className="text-stone-500">No recent transactions</p>
@@ -481,9 +516,17 @@ export default async function DashboardPage() {
         )}
 
         <Card className={!isFinancialRole(role) ? 'lg:col-span-2' : ''}>
-          <CardHeader>
-            <CardTitle>Scout Account Summary</CardTitle>
-            <CardDescription>Current balances</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Scout Account Summary</CardTitle>
+              <CardDescription>Current balances</CardDescription>
+            </div>
+            <Link
+              href="/finances/accounts"
+              className="text-sm text-forest-600 hover:text-forest-800 hover:underline"
+            >
+              View all →
+            </Link>
           </CardHeader>
           <CardContent>
             {scoutAccounts && scoutAccounts.length > 0 ? (
