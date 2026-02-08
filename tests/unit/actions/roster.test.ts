@@ -249,7 +249,7 @@ describe('Roster Actions', () => {
       const result = await updateRosterAdult('unit-123', 'profile-456', validData)
 
       expect(result.success).toBe(false)
-      expect(result.error).toBe('Adult not found in your unit')
+      expect(result.error).toBe('Adult not found')
     })
 
     it('should return error when target profile check fails', async () => {
@@ -354,13 +354,23 @@ describe('Roster Actions', () => {
               data: {
                 id: 'profile-456',
                 user_id: null, // No user account
-                unit_memberships: [{ id: 'membership-1' }],
               },
               error: null,
             }),
           }
         }
-        // Second call: update profile
+        if (adminCalls === 2) {
+          // Second call: verify membership
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: 'membership-1' },
+              error: null,
+            }),
+          }
+        }
+        // Third call: update profile
         return {
           update: vi.fn().mockReturnThis(),
           eq: vi.fn().mockResolvedValue({ error: null }),
@@ -417,6 +427,7 @@ describe('Roster Actions', () => {
       mockAdminSupabase.from.mockImplementation(() => {
         adminCalls++
         if (adminCalls === 1) {
+          // First call: get target profile
           return {
             select: vi.fn().mockReturnThis(),
             eq: vi.fn().mockReturnThis(),
@@ -424,13 +435,23 @@ describe('Roster Actions', () => {
               data: {
                 id: 'profile-456',
                 user_id: null, // No user account - email CAN be updated
-                unit_memberships: [{ id: 'membership-1' }],
               },
               error: null,
             }),
           }
         }
-        // Update call
+        if (adminCalls === 2) {
+          // Second call: verify membership
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: 'membership-1' },
+              error: null,
+            }),
+          }
+        }
+        // Third call: update profile
         return {
           update: vi.fn().mockImplementation((data) => {
             updateCalled = true
@@ -492,6 +513,7 @@ describe('Roster Actions', () => {
       mockAdminSupabase.from.mockImplementation(() => {
         adminCalls++
         if (adminCalls === 1) {
+          // First call: get target profile
           return {
             select: vi.fn().mockReturnThis(),
             eq: vi.fn().mockReturnThis(),
@@ -499,12 +521,23 @@ describe('Roster Actions', () => {
               data: {
                 id: 'profile-456',
                 user_id: 'some-user-id', // Has user account - email should NOT be updated
-                unit_memberships: [{ id: 'membership-1' }],
               },
               error: null,
             }),
           }
         }
+        if (adminCalls === 2) {
+          // Second call: verify membership
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: 'membership-1' },
+              error: null,
+            }),
+          }
+        }
+        // Third call: update profile
         return {
           update: vi.fn().mockImplementation((data) => {
             updateData = data
@@ -562,6 +595,7 @@ describe('Roster Actions', () => {
       mockAdminSupabase.from.mockImplementation(() => {
         adminCalls++
         if (adminCalls === 1) {
+          // First call: get target profile
           return {
             select: vi.fn().mockReturnThis(),
             eq: vi.fn().mockReturnThis(),
@@ -569,12 +603,23 @@ describe('Roster Actions', () => {
               data: {
                 id: 'profile-456',
                 user_id: null,
-                unit_memberships: [{ id: 'membership-1' }],
               },
               error: null,
             }),
           }
         }
+        if (adminCalls === 2) {
+          // Second call: verify membership
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: 'membership-1' },
+              error: null,
+            }),
+          }
+        }
+        // Third call: update profile - fails
         return {
           update: vi.fn().mockReturnThis(),
           eq: vi.fn().mockResolvedValue({ error: { message: 'Update failed' } }),
