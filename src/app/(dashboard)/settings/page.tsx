@@ -5,6 +5,7 @@ import { PatrolList } from '@/components/settings/patrol-list'
 import { LogoUpload } from '@/components/settings/logo-upload'
 import { PaymentProcessingCard } from '@/components/settings/payment-processing-card'
 import { ScoutbookSyncCardLazy } from '@/components/settings/scoutbook-sync-card-lazy'
+import { BalanceImportCard } from '@/components/settings/balance-import-card'
 import { UsersList } from '@/components/settings/users/users-list'
 import { InviteUserButton } from '@/components/settings/users/invite-user-button'
 import { resendInvite, removeUser } from '@/app/actions/users'
@@ -344,6 +345,7 @@ export default async function SettingsPage({
         lastSyncMemberCount={lastSyncSession?.records_extracted}
         isAdmin={isAdmin}
       />
+      <BalanceImportCard />
     </div>
   )
 
