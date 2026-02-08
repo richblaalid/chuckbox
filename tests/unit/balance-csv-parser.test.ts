@@ -87,7 +87,7 @@ describe('autoDetectColumns', () => {
   })
 
   it('detects full name column', () => {
-    const variants = ['Name', 'Full Name', 'FullName', 'Scout Name', 'Student Name']
+    const variants = ['Name', 'Full Name', 'FullName', 'Scout Name', 'Student Name', 'Scout']
     for (const name of variants) {
       const mapping = autoDetectColumns([name, 'Balance'])
       expect(mapping.fullNameColumn).toBe(0)
@@ -95,7 +95,7 @@ describe('autoDetectColumns', () => {
   })
 
   it('detects BSA member ID column', () => {
-    const variants = ['BSA ID', 'BSA Member ID', 'Member ID', 'BSA Number', 'MemberID']
+    const variants = ['BSA ID', 'BSA Member ID', 'Member ID', 'BSA Number', 'MemberID', 'Member_ID']
     for (const name of variants) {
       const mapping = autoDetectColumns(['Name', name, 'Balance'])
       expect(mapping.bsaMemberIdColumn).toBe(1)
@@ -119,11 +119,19 @@ describe('autoDetectColumns', () => {
   })
 
   it('detects single generic balance column', () => {
-    const variants = ['Balance', 'Amount', 'Total']
+    const variants = ['Balance', 'Amount', 'Total', 'Current Balance']
     for (const name of variants) {
       const mapping = autoDetectColumns(['Name', name])
       expect(mapping.singleBalanceColumn).toBe(1)
     }
+  })
+
+  it('auto-detects typical finance workbook format', () => {
+    // Test format: Member_ID, Scout, Current Balance
+    const mapping = autoDetectColumns(['Member_ID', 'Scout', 'Current Balance'])
+    expect(mapping.bsaMemberIdColumn).toBe(0)
+    expect(mapping.fullNameColumn).toBe(1)
+    expect(mapping.singleBalanceColumn).toBe(2)
   })
 
   it('prioritizes specific balance columns over generic', () => {

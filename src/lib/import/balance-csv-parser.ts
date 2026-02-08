@@ -167,12 +167,14 @@ const COLUMN_PATTERNS = {
     /^fullname$/i,
     /^scout\s*name$/i,
     /^student\s*name$/i,
+    /^scout$/i,
   ],
   bsaMemberId: [
     /^bsa\s*id$/i,
     /^bsa\s*member\s*id$/i,
     /^member\s*id$/i,
     /^memberid$/i,
+    /^member_id$/i,
     /^bsa\s*number$/i,
   ],
   billingBalance: [
@@ -194,6 +196,7 @@ const COLUMN_PATTERNS = {
     /^balance$/i,
     /^amount$/i,
     /^total$/i,
+    /^current\s*balance$/i,
   ],
 }
 
