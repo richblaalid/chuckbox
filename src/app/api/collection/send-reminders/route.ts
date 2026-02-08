@@ -3,6 +3,11 @@ import { createClient } from '@/lib/supabase/server'
 import { sendEmail } from '@/lib/email/resend'
 import { generatePaymentReminderEmail } from '@/lib/email/templates/payment-reminder'
 import { canPerformAction } from '@/lib/roles'
+import { randomBytes } from 'crypto'
+
+function generateSecureToken(): string {
+  return randomBytes(32).toString('hex') // 64 characters
+}
 
 interface SendRemindersRequest {
   unitId: string
@@ -199,7 +204,41 @@ export async function POST(request: NextRequest) {
 
         const guardianName = guardian.profiles?.first_name || guardianEmail.split('@')[0]
         const scoutName = `${scout.first_name} ${scout.last_name}`
-        const paymentUrl = `${baseUrl}/finances/accounts/${account.id}`
+
+        // Create a payment link for this account (like payment request emails do)
+        const token = generateSecureToken()
+        const expiresAt = new Date()
+        expiresAt.setDate(expiresAt.getDate() + 7) // 7 days expiration
+
+        const amountCents = Math.round(Math.abs(account.billing_balance || 0) * 100)
+
+        const { error: linkError } = await supabase
+          .from('payment_links')
+          .insert({
+            unit_id: unitId,
+            scout_account_id: account.id,
+            amount: amountCents,
+            base_amount: amountCents,
+            fee_amount: 0,
+            fees_passed_to_payer: false,
+            description: `Payment reminder for ${scoutName}`,
+            token,
+            status: 'pending',
+            expires_at: expiresAt.toISOString(),
+          })
+
+        if (linkError) {
+          console.error(`Failed to create payment link for ${account.id}:`, linkError)
+          results.push({
+            accountId: account.id,
+            email: guardianEmail,
+            success: false,
+            error: 'Failed to create payment link',
+          })
+          continue
+        }
+
+        const paymentUrl = `${baseUrl}/pay/${token}`
 
         const emailContent = generatePaymentReminderEmail({
           guardianName,
