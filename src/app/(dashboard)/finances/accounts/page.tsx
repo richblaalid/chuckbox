@@ -1,9 +1,13 @@
+import Link from 'next/link'
+import { Upload } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
 import { hasFilteredView, isFinancialRole } from '@/lib/roles'
 import { AccountsList } from '@/components/accounts/accounts-list'
 import { FinanceSubnav } from '@/components/finances/finance-subnav'
+import { ImportUndoBanner } from '@/components/finances/import-undo-banner'
 
 interface ScoutAccount {
   id: string
@@ -121,6 +125,40 @@ export default async function AccountsPage() {
   const { data: accountsData } = await accountsQuery
   const accounts = (accountsData as ScoutAccount[]) || []
 
+  // Get most recent active import batch for undo banner
+  let latestBatch: { id: string; created_at: string; row_count: number } | null = null
+  let canUndo = false
+
+  if (isFinancialRole(role)) {
+    const { data: batchData } = await supabase
+      .from('balance_import_batches')
+      .select('id, created_at, row_count')
+      .eq('unit_id', membership.unit_id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (batchData && batchData.created_at) {
+      latestBatch = {
+        id: batchData.id,
+        created_at: batchData.created_at,
+        row_count: batchData.row_count,
+      }
+
+      // Check if there's subsequent activity (would disable undo)
+      const { data: newerEntries } = await supabase
+        .from('journal_entries')
+        .select('id')
+        .eq('unit_id', membership.unit_id)
+        .gt('created_at', batchData.created_at)
+        .is('balance_import_batch_id', null)
+        .limit(1)
+
+      canUndo = !newerEntries || newerEntries.length === 0
+    }
+  }
+
   // Calculate totals - now using separate billing and funds balances
   const totalOwed = accounts
     .filter((a) => (a.billing_balance || 0) < 0)
@@ -134,20 +172,39 @@ export default async function AccountsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-stone-900">
-          {isScout ? 'My Account' : isParent ? 'Family Accounts' : 'Scout Accounts'}
-        </h1>
-        <p className="mt-1 text-stone-600">
-          {isScout
-            ? 'View your account balance and transactions'
-            : isParent
-              ? 'View your scouts\' account balances'
-              : 'View and manage scout financial accounts'}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-stone-900">
+            {isScout ? 'My Account' : isParent ? 'Family Accounts' : 'Scout Accounts'}
+          </h1>
+          <p className="mt-1 text-stone-600">
+            {isScout
+              ? 'View your account balance and transactions'
+              : isParent
+                ? 'View your scouts\' account balances'
+                : 'View and manage scout financial accounts'}
+          </p>
+        </div>
+        {isFinancialRole(role) && (
+          <Link href="/settings/import/balances">
+            <Button variant="outline">
+              <Upload className="mr-2 h-4 w-4" />
+              Import Balances
+            </Button>
+          </Link>
+        )}
       </div>
 
       <FinanceSubnav showFinancialTabs={canTakeActions} />
+
+      {/* Undo Banner for recent imports */}
+      {isFinancialRole(role) && latestBatch && canUndo && (
+        <ImportUndoBanner
+          batchId={latestBatch.id}
+          importedAt={latestBatch.created_at}
+          rowCount={latestBatch.row_count}
+        />
+      )}
 
       {/* Summary Cards (only for management/financial roles) */}
       {isFinancialRole(role) && (

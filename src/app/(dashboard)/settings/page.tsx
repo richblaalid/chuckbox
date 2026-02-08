@@ -5,6 +5,7 @@ import { PatrolList } from '@/components/settings/patrol-list'
 import { LogoUpload } from '@/components/settings/logo-upload'
 import { PaymentProcessingCard } from '@/components/settings/payment-processing-card'
 import { ScoutbookSyncCardLazy } from '@/components/settings/scoutbook-sync-card-lazy'
+import { BalanceImportCard } from '@/components/settings/balance-import-card'
 import { UsersList } from '@/components/settings/users/users-list'
 import { InviteUserButton } from '@/components/settings/users/invite-user-button'
 import { resendInvite, removeUser } from '@/app/actions/users'
@@ -203,6 +204,52 @@ export default async function SettingsPage({
     .limit(1)
     .single()
 
+  // Get balance import batches for this unit (most recent 10)
+  const { data: importBatchesData } = await supabase
+    .from('balance_import_batches')
+    .select(`
+      id,
+      created_at,
+      mode,
+      row_count,
+      status,
+      imported_by_profile:profiles!balance_import_batches_imported_by_fkey(
+        full_name,
+        email
+      )
+    `)
+    .eq('unit_id', membership.unit_id)
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  interface ImportBatch {
+    id: string
+    created_at: string
+    mode: 'set' | 'adjust'
+    row_count: number
+    status: 'active' | 'reversed'
+    imported_by_profile: {
+      full_name: string | null
+      email: string | null
+    } | null
+  }
+  const importBatches = (importBatchesData as unknown as ImportBatch[]) || []
+
+  // Check if the latest active batch can be undone
+  // It can be undone if there are no journal entries after it was created
+  let canUndoLatestBatch = false
+  const latestActiveBatch = importBatches.find((b) => b.status === 'active')
+  if (latestActiveBatch) {
+    const { count: subsequentEntries } = await supabase
+      .from('journal_entries')
+      .select('id', { count: 'exact', head: true })
+      .eq('unit_id', membership.unit_id)
+      .gt('created_at', latestActiveBatch.created_at)
+      .is('balance_import_batch_id', null) // Exclude entries from the same batch
+
+    canUndoLatestBatch = (subsequentEntries ?? 0) === 0
+  }
+
   // Unit Tab Content (admin only)
   const unitTabContent = isAdmin ? (
     <div className="grid gap-6">
@@ -343,6 +390,10 @@ export default async function SettingsPage({
         lastSyncAt={lastSyncSession?.completed_at}
         lastSyncMemberCount={lastSyncSession?.records_extracted}
         isAdmin={isAdmin}
+      />
+      <BalanceImportCard
+        batches={importBatches}
+        canUndoLatest={canUndoLatestBatch}
       />
     </div>
   )

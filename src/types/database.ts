@@ -170,6 +170,64 @@ export type Database = {
           },
         ]
       }
+      balance_import_batches: {
+        Row: {
+          created_at: string | null
+          id: string
+          imported_by: string
+          mode: string
+          row_count: number
+          status: string
+          undone_at: string | null
+          undone_by: string | null
+          unit_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          imported_by: string
+          mode: string
+          row_count?: number
+          status?: string
+          undone_at?: string | null
+          undone_by?: string | null
+          unit_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          imported_by?: string
+          mode?: string
+          row_count?: number
+          status?: string
+          undone_at?: string | null
+          undone_by?: string | null
+          unit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "balance_import_batches_imported_by_fkey"
+            columns: ["imported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "balance_import_batches_undone_by_fkey"
+            columns: ["undone_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "balance_import_batches_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_charges: {
         Row: {
           amount: number
@@ -1101,6 +1159,7 @@ export type Database = {
       }
       journal_entries: {
         Row: {
+          balance_import_batch_id: string | null
           created_at: string | null
           created_by: string | null
           description: string
@@ -1116,6 +1175,7 @@ export type Database = {
           void_reason: string | null
         }
         Insert: {
+          balance_import_batch_id?: string | null
           created_at?: string | null
           created_by?: string | null
           description: string
@@ -1131,6 +1191,7 @@ export type Database = {
           void_reason?: string | null
         }
         Update: {
+          balance_import_batch_id?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string
@@ -1146,6 +1207,13 @@ export type Database = {
           void_reason?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "journal_entries_balance_import_batch_id_fkey"
+            columns: ["balance_import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "balance_import_batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "journal_entries_created_by_fkey"
             columns: ["created_by"]
@@ -3510,6 +3578,8 @@ export type Database = {
         | "adjustment"
         | "funds_transfer"
         | "fundraising_credit"
+        | "beginning_balance"
+        | "balance_import_reversal"
       membership_role: "admin" | "treasurer" | "leader" | "parent" | "scout"
       membership_status: "roster" | "invited" | "active" | "inactive"
       payment_link_status: "pending" | "completed" | "expired" | "cancelled"
@@ -3665,6 +3735,8 @@ export const Constants = {
         "adjustment",
         "funds_transfer",
         "fundraising_credit",
+        "beginning_balance",
+        "balance_import_reversal",
       ],
       membership_role: ["admin", "treasurer", "leader", "parent", "scout"],
       membership_status: ["roster", "invited", "active", "inactive"],
