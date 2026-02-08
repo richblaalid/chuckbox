@@ -11,6 +11,7 @@ import { QuickPaymentDialog } from '@/components/payments/quick-payment-dialog'
 interface ScoutAccount {
   id: string
   billing_balance: number | null
+  funds_balance: number | null
   scout_id: string
   scouts: {
     id: string
@@ -114,6 +115,7 @@ export default async function DashboardPage() {
       `
       id,
       billing_balance,
+      funds_balance,
       scout_id,
       scouts (
         id,
@@ -425,6 +427,7 @@ export default async function DashboardPage() {
                   scout_accounts: {
                     id: acc.id,
                     billing_balance: acc.billing_balance,
+                    funds_balance: acc.funds_balance,
                   },
                 }))}
                 squareConfig={squareConfig}

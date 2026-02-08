@@ -240,9 +240,6 @@ export default async function AccountDetailPage({ params }: AccountPageProps) {
               isParent={isParent}
               squareConfig={squareConfigForActions}
               unitId={unitId}
-              squareApplicationId={squareApplicationId}
-              squareLocationId={squareLocationId}
-              squareEnvironment={squareEnvironment}
             />
           )}
         </div>

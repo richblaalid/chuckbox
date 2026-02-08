@@ -19,6 +19,7 @@ interface Scout {
   scout_accounts: {
     id: string
     billing_balance: number | null
+    funds_balance?: number | null
   } | null
 }
 
@@ -31,9 +32,11 @@ interface QuickPaymentDialogProps {
     locationId: string
     environment: 'sandbox' | 'production'
   }
+  /** Pre-select a specific scout (for account detail page) */
+  preselectedScoutId?: string
 }
 
-export function QuickPaymentDialog({ unitId, scouts, squareConfig }: QuickPaymentDialogProps) {
+export function QuickPaymentDialog({ unitId, scouts, squareConfig, preselectedScoutId }: QuickPaymentDialogProps) {
   const [open, setOpen] = useState(false)
   const [formKey, setFormKey] = useState(0)
 
@@ -75,6 +78,7 @@ export function QuickPaymentDialog({ unitId, scouts, squareConfig }: QuickPaymen
           unitId={unitId}
           scouts={scouts}
           squareConfig={squareConfig}
+          preselectedScoutId={preselectedScoutId}
           onSuccess={handleSuccess}
           onCancel={handleCancel}
         />

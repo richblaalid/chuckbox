@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { formatCurrency } from '@/lib/utils'
 import { recordQuickPayment } from '@/app/actions/payments'
 import { SQUARE_FEE_PERCENT, SQUARE_FEE_FIXED_DOLLARS } from '@/lib/billing'
-import { Banknote, Check, CreditCard, Loader2, X } from 'lucide-react'
+import { trackPaymentInitiated, trackPaymentCompleted, trackPaymentFailed } from '@/lib/analytics'
+import { Banknote, Check, CreditCard, Loader2, X, Wallet } from 'lucide-react'
 import type { SquareCard } from '@/types/square'
 
 interface Scout {
@@ -18,6 +20,7 @@ interface Scout {
   scout_accounts: {
     id: string
     billing_balance: number | null
+    funds_balance?: number | null
   } | null
 }
 
@@ -30,18 +33,21 @@ interface QuickPaymentFormProps {
     locationId: string
     environment: 'sandbox' | 'production'
   }
+  /** Pre-select a specific scout (for account detail page) */
+  preselectedScoutId?: string
   onSuccess?: () => void
   onCancel?: () => void
 }
 
 const QUICK_AMOUNTS = [10, 20, 50, 100]
 
-type PaymentMethod = 'cash' | 'check' | 'card'
+type PaymentMethod = 'cash' | 'check' | 'card' | 'balance'
 
 export function QuickPaymentForm({
   unitId,
   scouts,
   squareConfig,
+  preselectedScoutId,
   onSuccess,
   onCancel,
 }: QuickPaymentFormProps) {
@@ -49,10 +55,11 @@ export function QuickPaymentForm({
   const cardContainerRef = useRef<HTMLDivElement>(null)
   const cardRef = useRef<SquareCard | null>(null)
 
-  const [selectedScoutId, setSelectedScoutId] = useState('')
+  const [selectedScoutId, setSelectedScoutId] = useState(preselectedScoutId || '')
   const [amount, setAmount] = useState('')
   const [method, setMethod] = useState<PaymentMethod>('cash')
   const [reference, setReference] = useState('')
+  const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -69,12 +76,27 @@ export function QuickPaymentForm({
 
   const selectedScout = scouts.find((s) => s.id === selectedScoutId)
   const currentBalance = selectedScout?.scout_accounts?.billing_balance || 0
+  const fundsBalance = selectedScout?.scout_accounts?.funds_balance || 0
   const parsedAmount = parseFloat(amount) || 0
+
+  // Check if scout has funds available to use
+  const hasFunds = fundsBalance > 0 && currentBalance < 0
+  const maxFromFunds = Math.min(fundsBalance, Math.abs(currentBalance))
 
   // Calculate fees for card payments
   const isCardPayment = method === 'card'
   const feeAmount = isCardPayment ? parsedAmount * SQUARE_FEE_PERCENT + SQUARE_FEE_FIXED_DOLLARS : 0
   const netAmount = parsedAmount - feeAmount
+
+  // Calculate new balance after payment
+  const newBalance = currentBalance + parsedAmount
+
+  // Reset method if switching to scout without funds
+  useEffect(() => {
+    if (method === 'balance' && !hasFunds) {
+      setMethod('cash')
+    }
+  }, [selectedScoutId, hasFunds, method])
 
   // Load Square SDK when card method is selected
   useEffect(() => {
@@ -152,12 +174,17 @@ export function QuickPaymentForm({
     }
   }
 
+  const handleUseMaxFunds = () => {
+    setAmount(maxFromFunds.toFixed(2))
+  }
+
   const handleCancel = () => {
     // Clear all form state
-    setSelectedScoutId('')
+    setSelectedScoutId(preselectedScoutId || '')
     setAmount('')
     setMethod('cash')
     setReference('')
+    setNotes('')
     setError(null)
     setSuccess(false)
     onCancel?.()
@@ -165,6 +192,12 @@ export function QuickPaymentForm({
 
   const handleCardPayment = async () => {
     if (!cardRef.current || !selectedScout?.scout_accounts?.id) return
+
+    trackPaymentInitiated({
+      amount: parsedAmount,
+      scoutAccountId: selectedScout.scout_accounts.id,
+      method: 'card',
+    })
 
     try {
       const tokenResult = await cardRef.current.tokenize()
@@ -188,8 +221,60 @@ export function QuickPaymentForm({
         throw new Error(result.error || 'Payment failed')
       }
 
+      trackPaymentCompleted({
+        amount: parsedAmount,
+        fee: feeAmount,
+        net: netAmount,
+        scoutAccountId: selectedScout.scout_accounts.id,
+        method: 'card',
+      })
+
       return true
     } catch (err) {
+      trackPaymentFailed({
+        amount: parsedAmount,
+        errorType: err instanceof Error ? err.message : 'Unknown error',
+        scoutAccountId: selectedScout.scout_accounts.id,
+      })
+      throw err
+    }
+  }
+
+  const handleBalancePayment = async () => {
+    if (!selectedScout?.scout_accounts?.id) return
+
+    trackPaymentInitiated({
+      amount: parsedAmount,
+      scoutAccountId: selectedScout.scout_accounts.id,
+      method: 'transfer',
+    })
+
+    try {
+      const supabase = createClient()
+
+      const { error: rpcError } = await supabase.rpc('transfer_funds_to_billing', {
+        p_scout_account_id: selectedScout.scout_accounts.id,
+        p_amount: parsedAmount,
+        p_description: notes || 'Transfer from Scout Funds to pay balance',
+      })
+
+      if (rpcError) {
+        throw new Error(rpcError.message)
+      }
+
+      trackPaymentCompleted({
+        amount: parsedAmount,
+        scoutAccountId: selectedScout.scout_accounts.id,
+        method: 'transfer',
+      })
+
+      return true
+    } catch (err) {
+      trackPaymentFailed({
+        amount: parsedAmount,
+        errorType: err instanceof Error ? err.message : 'Unknown error',
+        scoutAccountId: selectedScout.scout_accounts.id,
+      })
       throw err
     }
   }
@@ -197,20 +282,44 @@ export function QuickPaymentForm({
   const handleManualPayment = async () => {
     if (!selectedScout?.scout_accounts?.id) return
 
-    const result = await recordQuickPayment({
-      unitId,
+    const paymentMethod = method as 'cash' | 'check'
+
+    trackPaymentInitiated({
+      amount: parsedAmount,
       scoutAccountId: selectedScout.scout_accounts.id,
-      scoutName: `${selectedScout.first_name} ${selectedScout.last_name}`,
-      amountDollars: parsedAmount,
-      method: method as 'cash' | 'check',
-      reference: reference || undefined,
+      method: paymentMethod,
     })
 
-    if (!result.success) {
-      throw new Error(result.error || 'Payment failed')
-    }
+    try {
+      const result = await recordQuickPayment({
+        unitId,
+        scoutAccountId: selectedScout.scout_accounts.id,
+        scoutName: `${selectedScout.first_name} ${selectedScout.last_name}`,
+        amountDollars: parsedAmount,
+        method: paymentMethod,
+        reference: reference || undefined,
+        notes: notes || undefined,
+      })
 
-    return true
+      if (!result.success) {
+        throw new Error(result.error || 'Payment failed')
+      }
+
+      trackPaymentCompleted({
+        amount: parsedAmount,
+        scoutAccountId: selectedScout.scout_accounts.id,
+        method: paymentMethod,
+      })
+
+      return true
+    } catch (err) {
+      trackPaymentFailed({
+        amount: parsedAmount,
+        errorType: err instanceof Error ? err.message : 'Unknown error',
+        scoutAccountId: selectedScout.scout_accounts.id,
+      })
+      throw err
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -228,6 +337,14 @@ export function QuickPaymentForm({
       setError('Minimum card payment is $1.00')
       return
     }
+    if (method === 'balance' && parsedAmount > fundsBalance) {
+      setError(`Insufficient funds. Maximum available: ${formatCurrency(fundsBalance)}`)
+      return
+    }
+    if (method === 'balance' && parsedAmount > Math.abs(currentBalance)) {
+      setError(`Amount exceeds balance owed: ${formatCurrency(Math.abs(currentBalance))}`)
+      return
+    }
 
     setIsSubmitting(true)
     setError(null)
@@ -235,6 +352,8 @@ export function QuickPaymentForm({
     try {
       if (method === 'card') {
         await handleCardPayment()
+      } else if (method === 'balance') {
+        await handleBalancePayment()
       } else {
         await handleManualPayment()
       }
@@ -262,50 +381,61 @@ export function QuickPaymentForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Scout Selector */}
-      <div className="space-y-2">
-        <Label htmlFor="quick-scout">Scout</Label>
-        <select
-          id="quick-scout"
-          required
-          disabled={isSubmitting}
-          className="flex h-10 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest-600 focus-visible:ring-offset-2 disabled:opacity-50"
-          value={selectedScoutId}
-          onChange={(e) => setSelectedScoutId(e.target.value)}
-        >
-          <option value="">Select scout...</option>
-          {scoutsOwing.length > 0 && (
-            <optgroup label="Scouts with balance due">
-              {scoutsOwing.map((scout) => {
-                const balance = scout.scout_accounts?.billing_balance || 0
-                return (
-                  <option key={scout.id} value={scout.id}>
-                    {scout.first_name} {scout.last_name} (owes {formatCurrency(Math.abs(balance))})
-                  </option>
-                )
-              })}
-            </optgroup>
-          )}
-          {scouts.filter((s) => (s.scout_accounts?.billing_balance || 0) >= 0).length > 0 && (
-            <optgroup label="Paid up">
-              {scouts
-                .filter((s) => (s.scout_accounts?.billing_balance || 0) >= 0)
-                .map((scout) => (
-                  <option key={scout.id} value={scout.id}>
-                    {scout.first_name} {scout.last_name} (paid up)
-                  </option>
-                ))}
-            </optgroup>
-          )}
-        </select>
-      </div>
+      {/* Scout Selector - hide if preselected */}
+      {!preselectedScoutId && (
+        <div className="space-y-2">
+          <Label htmlFor="quick-scout">Scout</Label>
+          <select
+            id="quick-scout"
+            required
+            disabled={isSubmitting}
+            className="flex h-10 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest-600 focus-visible:ring-offset-2 disabled:opacity-50"
+            value={selectedScoutId}
+            onChange={(e) => setSelectedScoutId(e.target.value)}
+          >
+            <option value="">Select scout...</option>
+            {scoutsOwing.length > 0 && (
+              <optgroup label="Scouts with balance due">
+                {scoutsOwing.map((scout) => {
+                  const balance = scout.scout_accounts?.billing_balance || 0
+                  const funds = scout.scout_accounts?.funds_balance || 0
+                  return (
+                    <option key={scout.id} value={scout.id}>
+                      {scout.first_name} {scout.last_name} (owes {formatCurrency(Math.abs(balance))}
+                      {funds > 0 ? `, has ${formatCurrency(funds)} funds` : ''})
+                    </option>
+                  )
+                })}
+              </optgroup>
+            )}
+            {scouts.filter((s) => (s.scout_accounts?.billing_balance || 0) >= 0).length > 0 && (
+              <optgroup label="Paid up">
+                {scouts
+                  .filter((s) => (s.scout_accounts?.billing_balance || 0) >= 0)
+                  .map((scout) => (
+                    <option key={scout.id} value={scout.id}>
+                      {scout.first_name} {scout.last_name} (paid up)
+                    </option>
+                  ))}
+              </optgroup>
+            )}
+          </select>
+        </div>
+      )}
 
       {/* Balance Display */}
       {selectedScout && currentBalance < 0 && (
         <div className="flex items-center justify-between rounded-lg bg-stone-50 p-3">
-          <span className="text-sm text-stone-600">
-            Balance: <span className="font-medium text-error">{formatCurrency(currentBalance)}</span>
-          </span>
+          <div className="text-sm">
+            <span className="text-stone-600">
+              Owes: <span className="font-medium text-error">{formatCurrency(Math.abs(currentBalance))}</span>
+            </span>
+            {fundsBalance > 0 && (
+              <span className="ml-3 text-stone-600">
+                Funds: <span className="font-medium text-success">{formatCurrency(fundsBalance)}</span>
+              </span>
+            )}
+          </div>
           <Button type="button" variant="outline" size="sm" onClick={handlePayFullBalance}>
             Pay Full Balance
           </Button>
@@ -350,7 +480,7 @@ export function QuickPaymentForm({
       {/* Payment Method Toggle */}
       <div className="space-y-2">
         <Label>Method</Label>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant={method === 'cash' ? 'default' : 'outline'}
@@ -386,8 +516,41 @@ export function QuickPaymentForm({
               Card
             </Button>
           )}
+          {hasFunds && (
+            <Button
+              type="button"
+              variant={method === 'balance' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => {
+                setMethod('balance')
+                // Auto-fill max amount from funds
+                handleUseMaxFunds()
+              }}
+              disabled={isSubmitting}
+              className="flex-1"
+            >
+              <Wallet className="mr-1.5 h-4 w-4" />
+              From Funds
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* From Funds Info */}
+      {method === 'balance' && (
+        <div className="rounded-lg border border-success/20 bg-success/5 p-3">
+          <p className="text-sm text-stone-600">
+            Using Scout Funds to pay balance.{' '}
+            <button
+              type="button"
+              onClick={handleUseMaxFunds}
+              className="font-medium text-forest-600 hover:text-forest-800"
+            >
+              Use max ({formatCurrency(maxFromFunds)})
+            </button>
+          </p>
+        </div>
+      )}
 
       {/* Check Reference (only for check) */}
       {method === 'check' && (
@@ -427,6 +590,33 @@ export function QuickPaymentForm({
         </div>
       )}
 
+      {/* Notes (optional) */}
+      <div className="space-y-2">
+        <Label htmlFor="quick-notes">Notes (optional)</Label>
+        <Input
+          id="quick-notes"
+          type="text"
+          placeholder="Payment notes..."
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          disabled={isSubmitting}
+        />
+      </div>
+
+      {/* New Balance Preview */}
+      {selectedScout && parsedAmount > 0 && currentBalance < 0 && (
+        <div className="rounded-lg border border-stone-200 bg-stone-50 p-3">
+          <p className="text-sm font-medium text-stone-700">After payment:</p>
+          <div className="mt-1 flex justify-between text-sm">
+            <span className="text-stone-500">New balance:</span>
+            <span className={newBalance >= 0 ? 'font-medium text-success' : 'font-medium text-error'}>
+              {newBalance >= 0 ? 'Paid up' : formatCurrency(newBalance)}
+              {newBalance > 0 && ` (+${formatCurrency(newBalance)} credit)`}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Error Display */}
       {error && (
         <div className="rounded-lg border border-error/20 bg-error/5 p-3 text-sm text-error">
@@ -451,13 +641,20 @@ export function QuickPaymentForm({
         <Button
           type="submit"
           className="flex-1"
-          disabled={isSubmitting || !selectedScoutId || parsedAmount <= 0 || (method === 'card' && !cardInitialized)}
+          disabled={
+            isSubmitting ||
+            !selectedScoutId ||
+            parsedAmount <= 0 ||
+            (method === 'card' && !cardInitialized)
+          }
         >
           {isSubmitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Processing...
             </>
+          ) : method === 'balance' ? (
+            `Use ${formatCurrency(parsedAmount)} Funds`
           ) : (
             `Record ${formatCurrency(parsedAmount)}`
           )}

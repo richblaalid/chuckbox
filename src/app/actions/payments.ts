@@ -10,6 +10,7 @@ interface QuickPaymentParams {
   amountDollars: number
   method: 'cash' | 'check'
   reference?: string
+  notes?: string
 }
 
 interface ActionResult {
@@ -23,7 +24,7 @@ interface ActionResult {
  * Creates the necessary journal entries for double-entry accounting.
  */
 export async function recordQuickPayment(params: QuickPaymentParams): Promise<ActionResult> {
-  const { unitId, scoutAccountId, scoutName, amountDollars, method, reference } = params
+  const { unitId, scoutAccountId, scoutName, amountDollars, method, reference, notes } = params
 
   if (amountDollars <= 0) {
     return { success: false, error: 'Amount must be greater than zero' }
@@ -158,7 +159,7 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
         payment_method: method,
         status: 'completed',
         journal_entry_id: journalEntry.id,
-        notes: reference ? `Check #${reference}` : null,
+        notes: [reference ? `Check #${reference}` : null, notes].filter(Boolean).join(' - ') || null,
       })
       .select('id')
       .single()

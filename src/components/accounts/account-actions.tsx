@@ -1,29 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { PaymentModal } from './payment-modal'
 import { SendPaymentRequestModal } from './send-payment-request-modal'
 import { UseFundsModal } from './use-funds-modal'
 import { AddFundsModal } from './add-funds-modal'
-import { Card, CardContent } from '@/components/ui/card'
-import { ChevronDown, ChevronUp, CreditCard, Wallet, Loader2 } from 'lucide-react'
-
-// Dynamic import of PaymentEntry - defers Square SDK loading
-const PaymentEntry = dynamic(
-  () => import('@/components/payments/payment-entry').then(mod => ({ default: mod.PaymentEntry })),
-  {
-    loading: () => (
-      <div className="flex items-center justify-center py-4">
-        <Loader2 className="h-5 w-5 animate-spin text-stone-400" />
-        <span className="ml-2 text-sm text-stone-500">Loading...</span>
-      </div>
-    ),
-    ssr: false,
-  }
-)
+import { QuickPaymentDialog } from '@/components/payments/quick-payment-dialog'
+import { Wallet } from 'lucide-react'
 
 interface AccountActionsProps {
   scoutId: string
@@ -38,11 +23,7 @@ interface AccountActionsProps {
     locationId: string
     environment: 'sandbox' | 'production'
   } | null
-  // Payment entry props (for financial roles)
   unitId?: string
-  squareApplicationId?: string
-  squareLocationId?: string | null
-  squareEnvironment?: 'sandbox' | 'production'
 }
 
 export function AccountActions({
@@ -55,12 +36,8 @@ export function AccountActions({
   isParent,
   squareConfig,
   unitId,
-  squareApplicationId,
-  squareLocationId,
-  squareEnvironment = 'sandbox',
 }: AccountActionsProps) {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false)
-  const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false)
   const [isUseFundsModalOpen, setIsUseFundsModalOpen] = useState(false)
   const isFinancialRole = userRole === 'admin' || userRole === 'treasurer'
   const owesBalance = billingBalance < 0
@@ -68,25 +45,30 @@ export function AccountActions({
   const canUseFunds = hasFunds && owesBalance
   const canRecordPayment = isFinancialRole && unitId
 
+  // Create scout data for QuickPaymentDialog
+  const scoutData = [{
+    id: scoutId,
+    first_name: scoutName.split(' ')[0] || '',
+    last_name: scoutName.split(' ').slice(1).join(' ') || '',
+    scout_accounts: {
+      id: scoutAccountId,
+      billing_balance: billingBalance,
+      funds_balance: fundsBalance,
+    },
+  }]
+
   return (
     <div className="w-full space-y-4 sm:w-auto">
       {/* Action Buttons */}
       <div className="flex flex-wrap items-center gap-3">
-        {/* Financial role: Record Payment toggle */}
+        {/* Financial role: Record Payment - opens dialog */}
         {canRecordPayment && (
-          <Button
-            onClick={() => setIsPaymentFormOpen(!isPaymentFormOpen)}
-            variant={isPaymentFormOpen ? 'default' : 'outline'}
-            className="gap-2"
-          >
-            <CreditCard className="h-4 w-4" />
-            Record Payment
-            {isPaymentFormOpen ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </Button>
+          <QuickPaymentDialog
+            unitId={unitId}
+            scouts={scoutData}
+            squareConfig={squareConfig || undefined}
+            preselectedScoutId={scoutId}
+          />
         )}
 
         {/* Use Funds button - for parents when funds available and owes money */}
@@ -156,24 +138,6 @@ export function AccountActions({
           View Scout Profile
         </Link>
       </div>
-
-      {/* Collapsible Payment Form */}
-      {canRecordPayment && isPaymentFormOpen && (
-        <Card className="animate-in slide-in-from-top-2 duration-200">
-          <CardContent className="pt-6">
-            <PaymentEntry
-              unitId={unitId}
-              applicationId={squareApplicationId || ''}
-              locationId={squareLocationId || null}
-              environment={squareEnvironment}
-              scoutAccountId={scoutAccountId}
-              scoutName={scoutName}
-              currentBalance={billingBalance}
-              onPaymentComplete={() => setIsPaymentFormOpen(false)}
-            />
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }
