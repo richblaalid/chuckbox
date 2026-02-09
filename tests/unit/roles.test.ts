@@ -8,33 +8,53 @@ import {
   hasFilteredView,
   isAdmin,
   isTreasurer,
-  type MemberRole,
-  type AppPage,
-  type AppAction,
 } from '@/lib/roles'
 
 describe('roles', () => {
   describe('canAccessPage', () => {
-    const allRoles: MemberRole[] = ['admin', 'treasurer', 'leader', 'parent', 'scout']
-
     describe('dashboard', () => {
-      it('should allow all roles to access dashboard', () => {
-        allRoles.forEach(role => {
-          expect(canAccessPage(role, 'dashboard')).toBe(true)
-        })
+      it('should allow admin to access dashboard', () => {
+        expect(canAccessPage('admin', 'dashboard')).toBe(true)
+      })
+      it('should allow treasurer to access dashboard', () => {
+        expect(canAccessPage('treasurer', 'dashboard')).toBe(true)
+      })
+      it('should allow leader to access dashboard', () => {
+        expect(canAccessPage('leader', 'dashboard')).toBe(true)
+      })
+      it('should deny parent access to dashboard', () => {
+        expect(canAccessPage('parent', 'dashboard')).toBe(false)
+      })
+      it('should deny scout access to dashboard', () => {
+        expect(canAccessPage('scout', 'dashboard')).toBe(false)
       })
     })
 
-    describe('scouts', () => {
-      it('should allow admin, treasurer, leader, parent to access scouts', () => {
+    describe('finances', () => {
+      it('should allow admin to access finances', () => {
+        expect(canAccessPage('admin', 'finances')).toBe(true)
+      })
+      it('should allow treasurer to access finances', () => {
+        expect(canAccessPage('treasurer', 'finances')).toBe(true)
+      })
+      it('should deny leader access to finances', () => {
+        expect(canAccessPage('leader', 'finances')).toBe(false)
+      })
+      it('should deny parent access to finances', () => {
+        expect(canAccessPage('parent', 'finances')).toBe(false)
+      })
+      it('should deny scout access to finances', () => {
+        expect(canAccessPage('scout', 'finances')).toBe(false)
+      })
+    })
+
+    describe('scouts/roster', () => {
+      it('should allow all roles to access scouts (Roster page)', () => {
         expect(canAccessPage('admin', 'scouts')).toBe(true)
         expect(canAccessPage('treasurer', 'scouts')).toBe(true)
         expect(canAccessPage('leader', 'scouts')).toBe(true)
         expect(canAccessPage('parent', 'scouts')).toBe(true)
-      })
-
-      it('should deny scout role access to scouts page', () => {
-        expect(canAccessPage('scout', 'scouts')).toBe(false)
+        expect(canAccessPage('scout', 'scouts')).toBe(true)
       })
     })
 
@@ -166,38 +186,27 @@ describe('roles', () => {
   describe('getVisibleNavItems', () => {
     it('should return all nav items for admin', () => {
       const items = getVisibleNavItems('admin')
-      // Note: 'members' page was removed - functionality moved to Settings > Users tab
-      expect(items.map(i => i.page)).toEqual([
-        'dashboard', 'scouts', 'finances', 'advancement'
-      ])
+      expect(items.map(i => i.label)).toEqual(['Dashboard', 'Roster', 'Finances', 'Advancement'])
     })
 
-    it('should return correct items for treasurer', () => {
+    it('should return all nav items for treasurer', () => {
       const items = getVisibleNavItems('treasurer')
-      expect(items.map(i => i.page)).toEqual([
-        'dashboard', 'scouts', 'finances', 'advancement'
-      ])
+      expect(items.map(i => i.label)).toEqual(['Dashboard', 'Roster', 'Finances', 'Advancement'])
     })
 
-    it('should return correct items for leader', () => {
+    it('should return Dashboard, Roster, Advancement for leader (no Finances)', () => {
       const items = getVisibleNavItems('leader')
-      expect(items.map(i => i.page)).toEqual([
-        'dashboard', 'scouts', 'finances', 'advancement'
-      ])
+      expect(items.map(i => i.label)).toEqual(['Dashboard', 'Roster', 'Advancement'])
     })
 
-    it('should return correct items for parent', () => {
+    it('should return only Roster for parent', () => {
       const items = getVisibleNavItems('parent')
-      expect(items.map(i => i.page)).toEqual([
-        'dashboard', 'scouts', 'finances'
-      ])
+      expect(items.map(i => i.label)).toEqual(['Roster'])
     })
 
-    it('should return correct items for scout', () => {
+    it('should return only Roster for scout', () => {
       const items = getVisibleNavItems('scout')
-      expect(items.map(i => i.page)).toEqual([
-        'dashboard', 'finances'
-      ])
+      expect(items.map(i => i.label)).toEqual(['Roster'])
     })
   })
 

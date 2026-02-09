@@ -38,13 +38,13 @@ export type AppAction =
 
 // Page access by role
 const PAGE_ACCESS: Record<AppPage, MemberRole[]> = {
-  dashboard: ['admin', 'treasurer', 'leader', 'parent', 'scout'],
-  scouts: ['admin', 'treasurer', 'leader', 'parent'], // Parent sees filtered view
-  accounts: ['admin', 'treasurer', 'leader', 'parent', 'scout'], // Parent/Scout see filtered view
+  dashboard: ['admin', 'treasurer', 'leader'], // Parents/scouts redirected to Roster
+  scouts: ['admin', 'treasurer', 'leader', 'parent', 'scout'], // Parent/Scout see filtered view
+  accounts: ['admin', 'treasurer', 'leader', 'parent', 'scout'], // Kept for backwards compat
   billing: ['admin', 'treasurer'],
   payments: ['admin', 'treasurer'],
   reports: ['admin', 'treasurer', 'leader'],
-  finances: ['admin', 'treasurer', 'leader', 'parent', 'scout'], // Single nav entry for all financial pages
+  finances: ['admin', 'treasurer'], // Only financial roles can access
   advancement: ['admin', 'treasurer', 'leader'], // Feature flag controlled
 }
 

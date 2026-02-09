@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
       setupFiles: ['./tests/setup.ts'],
       globals: true,
       include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-      exclude: ['node_modules', '.next', 'dist'],
+      exclude: ['node_modules', '.next', 'dist', '.worktrees'],
       // Make env vars available to tests
       env,
       coverage: {
