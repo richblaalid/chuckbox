@@ -4,7 +4,7 @@ import { CollapsibleCard } from '@/components/ui/collapsible-card'
 import { AccessDenied } from '@/components/ui/access-denied'
 import { formatCurrency } from '@/lib/utils'
 import { canAccessPage, canPerformAction, isAdmin } from '@/lib/roles'
-import { PaymentEntryLazy } from '@/components/payments/payment-entry-lazy'
+import { QuickPaymentForm } from '@/components/payments/quick-payment-form'
 import { AddFundsForm } from '@/components/payments/add-funds-form'
 import { PaymentsList } from '@/components/payments/payments-list'
 import { PaymentsTabs } from '@/components/payments/payments-tabs'
@@ -52,7 +52,13 @@ interface FundraiserType {
   description: string | null
 }
 
-export default async function PaymentsPage() {
+interface PageProps {
+  searchParams: Promise<{ action?: string }>
+}
+
+export default async function PaymentsPage({ searchParams }: PageProps) {
+  const params = await searchParams
+  const shouldOpenForm = params.action === 'record'
   const supabase = await createClient()
 
   const {
@@ -248,13 +254,16 @@ export default async function PaymentsPage() {
           description={isSquareConnected
             ? 'Accept card payments or record cash/check payments'
             : 'Record cash, check, or other payments'}
+          defaultOpen={shouldOpenForm}
         >
-          <PaymentEntryLazy
+          <QuickPaymentForm
             unitId={membership.unit_id}
-            applicationId={squareApplicationId}
-            locationId={squareCredentials?.location_id || null}
-            environment={squareEnvironment}
             scouts={scouts}
+            squareConfig={isSquareConnected ? {
+              applicationId: squareApplicationId,
+              locationId: squareCredentials!.location_id!,
+              environment: squareEnvironment,
+            } : undefined}
           />
         </CollapsibleCard>
       )}

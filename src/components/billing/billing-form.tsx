@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,8 @@ import { ToggleButtonGroup } from '@/components/ui/toggle-button-group'
 import { useToast } from '@/components/ui/toast'
 import { formatCurrency } from '@/lib/utils'
 import { trackBillingCreated } from '@/lib/analytics'
+
+const BILLING_TYPE_KEY = 'chuckbox:billing:lastType'
 
 interface Scout {
   id: string
@@ -38,7 +40,37 @@ export function BillingForm({ unitId, scouts }: BillingFormProps) {
   const [billingType, setBillingType] = useState<BillingType>('fixed')
   const [sendNotifications, setSendNotifications] = useState(false)
 
+  // Load saved billing type preference on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(BILLING_TYPE_KEY)
+    if (saved === 'split' || saved === 'fixed') {
+      setBillingType(saved)
+    }
+  }, [])
+
+  // Handle billing type change and save preference
+  const handleBillingTypeChange = useCallback((newType: BillingType) => {
+    setBillingType(newType)
+    localStorage.setItem(BILLING_TYPE_KEY, newType)
+  }, [])
+
   const parsedAmount = parseFloat(amount) || 0
+
+  // Keyboard shortcut: Cmd/Ctrl+Enter to submit
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        // Only submit if form is valid
+        if (selectedScouts.size > 0 && parsedAmount > 0 && !isLoading) {
+          e.preventDefault()
+          const form = document.querySelector('form') as HTMLFormElement | null
+          form?.requestSubmit()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedScouts.size, parsedAmount, isLoading])
 
   // Calculate per-scout and total based on billing type
   const perScoutAmount = billingType === 'split'
@@ -194,7 +226,7 @@ export function BillingForm({ unitId, scouts }: BillingFormProps) {
               { value: 'split', label: 'Split Total' },
             ]}
             value={billingType}
-            onChange={setBillingType}
+            onChange={handleBillingTypeChange}
             aria-label="Billing type"
           />
         </div>
@@ -366,15 +398,20 @@ export function BillingForm({ unitId, scouts }: BillingFormProps) {
       )}
 
       {/* Submit */}
-      <Button
-        type="submit"
-        loading={isLoading}
-        loadingText="Creating..."
-        disabled={selectedScouts.size === 0 || parsedAmount <= 0}
-        className="w-full"
-      >
-        Create Billing
-      </Button>
+      <div className="space-y-2">
+        <Button
+          type="submit"
+          loading={isLoading}
+          loadingText="Creating..."
+          disabled={selectedScouts.size === 0 || parsedAmount <= 0}
+          className="w-full"
+        >
+          Create Billing
+        </Button>
+        <p className="text-xs text-center text-stone-400 dark:text-stone-500">
+          Tip: Press ⌘+Enter (Mac) or Ctrl+Enter to submit
+        </p>
+      </div>
     </form>
   )
 }

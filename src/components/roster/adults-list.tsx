@@ -9,6 +9,7 @@ import { SearchInput } from '@/components/ui/search-input'
 import { SortIcon, type SortDirection } from '@/components/ui/sort-icon'
 import { InviteRosterAdultDialog } from './invite-roster-adult-dialog'
 import { AdultForm } from './adult-form'
+import { Button } from '@/components/ui/button'
 
 interface RosterAdult {
   id: string
@@ -236,12 +237,9 @@ export function AdultsList({ adults, canManage, unitId }: AdultsListProps) {
         <StatusFilterButtons value={statusFilter} onChange={setStatusFilter} />
 
         {(hasActiveFilters || searchQuery) && (
-          <button
-            onClick={clearAllFilters}
-            className="text-sm text-stone-500 hover:text-stone-700"
-          >
+          <Button variant="ghost" size="sm" onClick={clearAllFilters}>
             Clear all
-          </button>
+          </Button>
         )}
       </div>
 

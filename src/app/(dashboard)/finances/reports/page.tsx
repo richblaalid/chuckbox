@@ -5,6 +5,9 @@ import { formatCurrency } from '@/lib/utils'
 import { canAccessPage } from '@/lib/roles'
 import { AgingReport } from '@/components/reports/aging-report'
 import { CollectionSummary } from '@/components/reports/collection-summary'
+import { BalanceSheetReport } from '@/components/reports/balance-sheet-report'
+import { IncomeExpenseReport } from '@/components/reports/income-expense-report'
+import { DuesByPatrolReport } from '@/components/reports/dues-by-patrol-report'
 import { FinanceSubnav } from '@/components/finances/finance-subnav'
 import Link from 'next/link'
 
@@ -309,8 +312,17 @@ export default async function ReportsPage() {
         </Card>
       </div>
 
+      {/* Balance Sheet */}
+      <BalanceSheetReport unitName={membership.units?.name || 'Your Unit'} />
+
+      {/* Income & Expense Statement */}
+      <IncomeExpenseReport unitName={membership.units?.name || 'Your Unit'} />
+
       {/* Aging Report */}
       <AgingReport charges={agingCharges} />
+
+      {/* Dues by Patrol */}
+      <DuesByPatrolReport unitName={membership.units?.name || 'Your Unit'} />
 
       {/* Collection & Cash Flow */}
       <CollectionSummary payments={paymentsForReport} billingRecords={billingForReport} />

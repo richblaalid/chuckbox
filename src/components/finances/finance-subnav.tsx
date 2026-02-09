@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Users, Receipt, CreditCard, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, Users, Receipt, CreditCard, BarChart3, AlertTriangle, FileText } from 'lucide-react'
 
 interface FinanceSubnavProps {
   /** Whether to show billing and payments tabs (admin/treasurer only) */
@@ -36,9 +36,21 @@ const tabs = [
     requiresFinancial: true,
   },
   {
+    label: 'Collection',
+    href: '/finances/collection',
+    icon: AlertTriangle,
+    requiresFinancial: true,
+  },
+  {
     label: 'Reports',
     href: '/finances/reports',
     icon: BarChart3,
+    requiresFinancial: true,
+  },
+  {
+    label: 'Transactions',
+    href: '/finances/transactions',
+    icon: FileText,
     requiresFinancial: true,
   },
 ]

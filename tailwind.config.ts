@@ -69,19 +69,18 @@ const config: Config = {
           DEFAULT: '#234D3E', // Pine 800 as default
         },
         // Chuckbox Brand Colors - Amber Accent (Brand Guide January 2026)
-        // amber-700 (#b45309) is the primary accent color
-        // amber-600 (#d97706) is used for UI actions (checkboxes, badges)
+        // amber-700 (#b45309) is the primary accent color for highlights and decorative
         amber: {
-          50: '#fffbeb',    // amber-50
-          100: '#fef3c7',   // amber-100
-          200: '#fde68a',   // amber-200
-          300: '#fcd34d',   // amber-300
-          400: '#fbbf24',   // amber-400
-          500: '#f59e0b',   // amber-500
-          600: '#d97706',   // amber-600 - UI actions
-          700: '#b45309',   // amber-700 - Primary accent
-          800: '#92400e',   // amber-800
-          900: '#78350f',   // amber-900
+          50: '#fffbeb',
+          100: '#fef3c7',
+          200: '#fde68a',
+          300: '#fcd34d',
+          400: '#fbbf24',
+          500: '#f59e0b',
+          600: '#d97706',
+          700: '#b45309',
+          800: '#92400e',
+          900: '#78350f',
           DEFAULT: '#b45309',
         },
         // Chuckbox Brand Colors - Cream backgrounds

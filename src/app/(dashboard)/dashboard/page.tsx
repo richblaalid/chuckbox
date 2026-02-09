@@ -3,12 +3,17 @@ import { redirect } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
 import { isFinancialRole, isManagementRole, hasFilteredView } from '@/lib/roles'
+import { getSquareEnvironment } from '@/lib/square/client'
+import { SquareEnvironment } from 'square'
 import Link from 'next/link'
 import { RefreshCw, Mail, CalendarCheck, Award } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { QuickPaymentDialog } from '@/components/payments/quick-payment-dialog'
 
 interface ScoutAccount {
   id: string
   billing_balance: number | null
+  funds_balance: number | null
   scout_id: string
   scouts: {
     id: string
@@ -23,6 +28,25 @@ interface JournalEntry {
   entry_date: string
   description: string
   entry_type: string | null
+  journal_lines: { debit: number | null; credit: number | null }[]
+}
+
+// Map entry_type to user-friendly labels
+function formatEntryType(entryType: string | null): string {
+  const typeMap: Record<string, string> = {
+    payment: 'Payment',
+    billing: 'Billing',
+    funds_transfer: 'Funds Transfer',
+    fundraising: 'Fundraising',
+    refund: 'Refund',
+    adjustment: 'Adjustment',
+  }
+  return typeMap[entryType || ''] || 'Entry'
+}
+
+// Calculate total amount from journal lines (sum of debits, which equals sum of credits)
+function getEntryAmount(lines: { debit: number | null; credit: number | null }[]): number {
+  return lines.reduce((sum, line) => sum + (line.debit || 0), 0)
 }
 
 interface JournalLine {
@@ -118,6 +142,7 @@ export default async function DashboardPage() {
       `
       id,
       billing_balance,
+      funds_balance,
       scout_id,
       scouts (
         id,
@@ -149,7 +174,7 @@ export default async function DashboardPage() {
   if (isManagementRole(role)) {
     const { data: recentTransactionsData } = await supabase
       .from('journal_entries')
-      .select('id, entry_date, description, entry_type')
+      .select('id, entry_date, description, entry_type, journal_lines(debit, credit)')
       .eq('unit_id', membership.unit_id)
       .eq('is_posted', true)
       .order('entry_date', { ascending: false })
@@ -175,6 +200,25 @@ export default async function DashboardPage() {
       .order('created_at', { ascending: false })
       .limit(5)
     scoutRecentTransactions = journalLinesData as JournalLine[] | null
+  }
+
+  // Get Square credentials for payment integration (management roles only)
+  let squareConfig: { applicationId: string; locationId: string; environment: 'sandbox' | 'production' } | undefined
+  if (isFinancialRole(role)) {
+    const { data: squareCredentials } = await supabase
+      .from('unit_square_credentials')
+      .select('location_id')
+      .eq('unit_id', membership.unit_id)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (squareCredentials?.location_id) {
+      squareConfig = {
+        applicationId: process.env.SQUARE_APPLICATION_ID || '',
+        locationId: squareCredentials.location_id,
+        environment: getSquareEnvironment() === SquareEnvironment.Production ? 'production' : 'sandbox',
+      }
+    }
   }
 
   // Scout Dashboard - Simple view with their own account
@@ -383,44 +427,51 @@ export default async function DashboardPage() {
         <CardContent>
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
             {isFinancialRole(role) && (
-              <Link
-                href="/settings/import"
-                className="inline-flex items-center justify-center gap-2.5 rounded-lg bg-green-700 text-white px-5 py-3 text-base font-semibold transition-colors hover:bg-green-800 shadow-sm w-full sm:w-auto"
-              >
-                <RefreshCw className="h-5 w-5" />
-                Sync Scoutbook
-              </Link>
+              <Button asChild className="gap-2">
+                <Link href="/settings/import">
+                  <RefreshCw className="h-4 w-4" />
+                  Sync Scoutbook
+                </Link>
+              </Button>
             )}
             {/* Advancement Tracking */}
-            <Link
-              href="/advancement?tab=summary"
-              className="inline-flex items-center justify-center gap-2.5 rounded-lg bg-amber-600 text-white px-5 py-3 text-base font-semibold transition-colors hover:bg-amber-700 shadow-sm w-full sm:w-auto"
-            >
-              <Award className="h-5 w-5" />
-              Advancement
-            </Link>
+            <Button asChild variant="accent" className="gap-2">
+              <Link href="/advancement?tab=summary">
+                <Award className="h-4 w-4" />
+                Advancement
+              </Link>
+            </Button>
+            {/* Record Payment - opens dialog */}
+            {isFinancialRole(role) && scoutAccounts && scoutAccounts.length > 0 && (
+              <QuickPaymentDialog
+                unitId={membership.unit_id}
+                scouts={scoutAccounts.map((acc) => ({
+                  id: acc.scouts?.id || acc.scout_id,
+                  first_name: acc.scouts?.first_name || '',
+                  last_name: acc.scouts?.last_name || '',
+                  scout_accounts: {
+                    id: acc.id,
+                    billing_balance: acc.billing_balance,
+                    funds_balance: acc.funds_balance,
+                  },
+                }))}
+                squareConfig={squareConfig}
+              />
+            )}
             {/* Future: Send Payment Reminders */}
             {isFinancialRole(role) && scoutsOwing > 0 && (
-              <button
-                disabled
-                className="inline-flex items-center justify-center gap-2.5 rounded-lg border-2 border-stone-200 bg-stone-50 px-5 py-3 text-base font-semibold text-stone-400 cursor-not-allowed w-full sm:w-auto"
-                title="Coming soon"
-              >
-                <Mail className="h-5 w-5" />
+              <Button variant="outline" disabled className="gap-2" title="Coming soon">
+                <Mail className="h-4 w-4" />
                 Send Reminders
                 <span className="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-medium">Soon</span>
-              </button>
+              </Button>
             )}
             {/* Future: Record Attendance */}
-            <button
-              disabled
-              className="inline-flex items-center justify-center gap-2.5 rounded-lg border-2 border-stone-200 bg-stone-50 px-5 py-3 text-base font-semibold text-stone-400 cursor-not-allowed w-full sm:w-auto"
-              title="Coming soon"
-            >
-              <CalendarCheck className="h-5 w-5" />
+            <Button variant="outline" disabled className="gap-2" title="Coming soon">
+              <CalendarCheck className="h-4 w-4" />
               Record Attendance
               <span className="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-medium">Soon</span>
-            </button>
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -429,24 +480,40 @@ export default async function DashboardPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         {isFinancialRole(role) && (
           <Card>
-            <CardHeader>
-              <CardTitle>Recent Transactions</CardTitle>
-              <CardDescription>Latest financial activity</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Recent Transactions</CardTitle>
+                <CardDescription>Latest financial activity</CardDescription>
+              </div>
+              <Link
+                href="/finances"
+                className="text-sm text-forest-600 hover:text-forest-800 hover:underline"
+              >
+                View all →
+              </Link>
             </CardHeader>
             <CardContent>
               {recentTransactions && recentTransactions.length > 0 ? (
                 <div className="space-y-4">
-                  {recentTransactions.map((tx) => (
-                    <div key={tx.id} className="flex items-center justify-between border-b pb-2">
-                      <div>
-                        <p className="font-medium">{tx.description}</p>
-                        <p className="text-sm text-stone-500">{tx.entry_date}</p>
+                  {recentTransactions.map((tx) => {
+                    const amount = getEntryAmount(tx.journal_lines || [])
+                    const isPayment = tx.entry_type === 'payment'
+                    return (
+                      <div key={tx.id} className="flex items-center justify-between border-b pb-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{tx.description}</p>
+                          <div className="flex items-center gap-2 text-sm text-stone-500">
+                            <span>{new Date(tx.entry_date).toLocaleDateString()}</span>
+                            <span className="text-stone-300">•</span>
+                            <span>{formatEntryType(tx.entry_type)}</span>
+                          </div>
+                        </div>
+                        <span className={`font-medium ml-3 ${isPayment ? 'text-success' : 'text-stone-700'}`}>
+                          {isPayment ? '+' : ''}{formatCurrency(amount)}
+                        </span>
                       </div>
-                      <span className="rounded bg-stone-100 px-2 py-1 text-xs capitalize">
-                        {tx.entry_type || 'entry'}
-                      </span>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <p className="text-stone-500">No recent transactions</p>
@@ -456,9 +523,17 @@ export default async function DashboardPage() {
         )}
 
         <Card className={!isFinancialRole(role) ? 'lg:col-span-2' : ''}>
-          <CardHeader>
-            <CardTitle>Scout Account Summary</CardTitle>
-            <CardDescription>Current balances</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Scout Account Summary</CardTitle>
+              <CardDescription>Current balances</CardDescription>
+            </div>
+            <Link
+              href="/finances/accounts"
+              className="text-sm text-forest-600 hover:text-forest-800 hover:underline"
+            >
+              View all →
+            </Link>
           </CardHeader>
           <CardContent>
             {scoutAccounts && scoutAccounts.length > 0 ? (

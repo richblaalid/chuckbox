@@ -33,6 +33,10 @@ describe('feature-flags', () => {
     it('should have SCOUTBOOK_SYNC flag', () => {
       expect(FeatureFlag.SCOUTBOOK_SYNC).toBe('SCOUTBOOK_SYNC')
     })
+
+    it('should have BANK_INTEGRATION flag', () => {
+      expect(FeatureFlag.BANK_INTEGRATION).toBe('BANK_INTEGRATION')
+    })
   })
 
   describe('isFeatureEnabled', () => {
@@ -95,22 +99,47 @@ describe('feature-flags', () => {
         expect(isFeatureEnabled(FeatureFlag.SCOUTBOOK_SYNC)).toBe(true)
       })
     })
+
+    describe('BANK_INTEGRATION flag', () => {
+      it('should return false by default (no env var)', () => {
+        vi.stubEnv('NEXT_PUBLIC_FEATURE_BANK_INTEGRATION', undefined as unknown as string)
+        delete process.env.NEXT_PUBLIC_FEATURE_BANK_INTEGRATION
+
+        expect(isFeatureEnabled(FeatureFlag.BANK_INTEGRATION)).toBe(false)
+      })
+
+      it('should return true when explicitly enabled', () => {
+        vi.stubEnv('NEXT_PUBLIC_FEATURE_BANK_INTEGRATION', 'true')
+
+        expect(isFeatureEnabled(FeatureFlag.BANK_INTEGRATION)).toBe(true)
+      })
+
+      it('should return false when explicitly disabled', () => {
+        vi.stubEnv('NEXT_PUBLIC_FEATURE_BANK_INTEGRATION', 'false')
+
+        expect(isFeatureEnabled(FeatureFlag.BANK_INTEGRATION)).toBe(false)
+      })
+    })
   })
 
   describe('getAllFeatureFlags', () => {
     it('should return all feature flags with their status', () => {
       vi.stubEnv('NEXT_PUBLIC_FEATURE_ADVANCEMENT_TRACKING', undefined as unknown as string)
       vi.stubEnv('NEXT_PUBLIC_FEATURE_SCOUTBOOK_SYNC', undefined as unknown as string)
+      vi.stubEnv('NEXT_PUBLIC_FEATURE_BANK_INTEGRATION', undefined as unknown as string)
       delete process.env.NEXT_PUBLIC_FEATURE_ADVANCEMENT_TRACKING
       delete process.env.NEXT_PUBLIC_FEATURE_SCOUTBOOK_SYNC
+      delete process.env.NEXT_PUBLIC_FEATURE_BANK_INTEGRATION
 
       const flags = getAllFeatureFlags()
 
       expect(flags).toHaveProperty('ADVANCEMENT_TRACKING')
       expect(flags).toHaveProperty('SCOUTBOOK_SYNC')
+      expect(flags).toHaveProperty('BANK_INTEGRATION')
       // Check default values
       expect(flags.ADVANCEMENT_TRACKING).toBe(false) // Default is false
       expect(flags.SCOUTBOOK_SYNC).toBe(true) // Default is true
+      expect(flags.BANK_INTEGRATION).toBe(false) // Default is false
     })
 
     it('should reflect environment variable overrides', () => {
