@@ -166,6 +166,39 @@ supabase db push                                   # Push to PROD
 - Feature components in `src/components/{feature}/`
 - Use `cn()` from `src/lib/utils.ts` for class merging
 
+### Feature Flags
+Feature flags control feature availability via environment variables. See `src/lib/feature-flags.ts`.
+
+| Flag | Env Variable | Default | Purpose |
+|------|--------------|---------|---------|
+| `ADVANCEMENT_TRACKING` | `NEXT_PUBLIC_FEATURE_ADVANCEMENT_TRACKING` | `false` | Rank/merit badge tracking |
+| `SCOUTBOOK_SYNC` | `NEXT_PUBLIC_FEATURE_SCOUTBOOK_SYNC` | `true` | Browser extension sync |
+| `CLI_AUTOMATION` | `NEXT_PUBLIC_FEATURE_CLI_AUTOMATION` | `false` | Dev-only CLI tools |
+| `BANK_INTEGRATION` | `NEXT_PUBLIC_FEATURE_BANK_INTEGRATION` | `false` | Plaid bank connection |
+
+Usage:
+```typescript
+import { isFeatureEnabled, FeatureFlag } from '@/lib/feature-flags'
+
+if (isFeatureEnabled(FeatureFlag.BANK_INTEGRATION)) {
+  // Show bank features
+}
+```
+
+### Third-Party Integrations
+
+**Square (Payment Processing)**
+- OAuth flow for merchant connection
+- Credentials stored in `unit_square_credentials`
+- Env vars: `SQUARE_APPLICATION_ID`, `SQUARE_APPLICATION_SECRET`, `SQUARE_ENVIRONMENT`
+
+**Plaid (Bank Integration)** - Feature-flagged
+- View-only bank account connection (no payment processing)
+- Uses Plaid Link for OAuth, access tokens encrypted in `plaid_connections`
+- Requires feature flag: `NEXT_PUBLIC_FEATURE_BANK_INTEGRATION=true`
+- Env vars: `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENVIRONMENT`, `ENCRYPTION_KEY`
+- Sandbox credentials: Use `user_good` / `pass_good` for testing
+
 ---
 
 ## Available Skills & Plugins
@@ -353,6 +386,8 @@ Skip planning for:
   - `funds_balance`: Scout savings from fundraising/overpayments (always >= 0)
 - Avoid reading localStorage in initial state - defer to useEffect to prevent hydration mismatches
 - Nested interactive elements (button inside button) cause React hydration issues - use `<div role="button">` with keyboard handlers instead
+- Plaid access tokens are encrypted at rest using `ENCRYPTION_KEY` - see `src/lib/plaid/encryption.ts`
+- Feature flags are checked at render time (not build time) - changes require page refresh, not rebuild
 
 ---
 
