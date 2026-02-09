@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
 import { isFinancialRole, isManagementRole, hasFilteredView } from '@/lib/roles'
@@ -75,6 +76,12 @@ export default async function DashboardPage() {
   }
 
   const role = membership.role
+
+  // Parents and scouts should be redirected to Roster instead of Dashboard
+  if (hasFilteredView(role)) {
+    redirect('/roster')
+  }
+
   const isParent = role === 'parent'
   const isScout = role === 'scout'
 
