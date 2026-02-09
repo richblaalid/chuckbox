@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { AccessDenied } from '@/components/ui/access-denied'
 import { formatCurrency } from '@/lib/utils'
 import { canAccessPage, isFinancialRole } from '@/lib/roles'
+import { isFeatureEnabled, FeatureFlag } from '@/lib/feature-flags'
 import { FinanceSubnav } from '@/components/finances/finance-subnav'
 import { Button } from '@/components/ui/button'
 import { Receipt, CreditCard, TrendingDown, Wallet, PiggyBank, AlertTriangle } from 'lucide-react'
@@ -457,8 +458,8 @@ export default async function FinancesOverviewPage() {
           </CardContent>
         </Card>
 
-        {/* Bank Account Widget (admin/treasurer only) */}
-        {canTakeActions && <BankWidget />}
+        {/* Bank Account Widget (admin/treasurer only, when enabled) */}
+        {canTakeActions && isFeatureEnabled(FeatureFlag.BANK_INTEGRATION) && <BankWidget />}
       </div>
     </div>
   )

@@ -32,6 +32,13 @@ export enum FeatureFlag {
    * Dev-only feature - hidden in production.
    */
   CLI_AUTOMATION = 'CLI_AUTOMATION',
+
+  /**
+   * Bank Integration
+   * Enables Plaid-based bank account connection for viewing
+   * balances and transactions. View-only, no payment processing.
+   */
+  BANK_INTEGRATION = 'BANK_INTEGRATION',
 }
 
 /**
@@ -50,6 +57,10 @@ const featureFlagConfig: Record<FeatureFlag, { envVar: string; defaultValue: boo
   [FeatureFlag.CLI_AUTOMATION]: {
     envVar: 'NEXT_PUBLIC_FEATURE_CLI_AUTOMATION',
     defaultValue: false, // Dev-only, hidden in production
+  },
+  [FeatureFlag.BANK_INTEGRATION]: {
+    envVar: 'NEXT_PUBLIC_FEATURE_BANK_INTEGRATION',
+    defaultValue: false, // Disabled by default, enable per environment
   },
 }
 

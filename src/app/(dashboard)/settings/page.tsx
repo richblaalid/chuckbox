@@ -12,6 +12,7 @@ import { InviteUserButton } from '@/components/settings/users/invite-user-button
 import { BankConnectionCard } from '@/components/plaid/bank-connection-card'
 import { resendInvite, removeUser } from '@/app/actions/users'
 import { isFinancialRole, isAdmin as checkIsAdmin } from '@/lib/roles'
+import { isFeatureEnabled, FeatureFlag } from '@/lib/feature-flags'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { SettingsTabs } from '@/components/settings/settings-tabs'
 
@@ -203,13 +204,16 @@ export default async function SettingsPage({
     }
   }
 
-  // Get Plaid connection for this unit
-  const { data: plaidConnection } = await supabase
-    .from('plaid_connections')
-    .select('id, institution_name, accounts, status, error_message, last_synced_at')
-    .eq('unit_id', membership.unit_id)
-    .eq('status', 'active')
-    .maybeSingle()
+  // Get Plaid connection for this unit (only if bank integration is enabled)
+  const bankIntegrationEnabled = isFeatureEnabled(FeatureFlag.BANK_INTEGRATION)
+  const { data: plaidConnection } = bankIntegrationEnabled
+    ? await supabase
+        .from('plaid_connections')
+        .select('id, institution_name, accounts, status, error_message, last_synced_at')
+        .eq('unit_id', membership.unit_id)
+        .eq('status', 'active')
+        .maybeSingle()
+    : { data: null }
 
   interface PlaidAccount {
     account_id: string
@@ -466,10 +470,12 @@ export default async function SettingsPage({
         isAdmin={isAdmin}
       />
 
-      <BankConnectionCard
-        connection={bankConnection}
-        isAdmin={isAdmin}
-      />
+      {bankIntegrationEnabled && (
+        <BankConnectionCard
+          connection={bankConnection}
+          isAdmin={isAdmin}
+        />
+      )}
 
       <Card>
         <CardHeader>
