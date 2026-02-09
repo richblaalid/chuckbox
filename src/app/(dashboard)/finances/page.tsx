@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { AccessDenied } from '@/components/ui/access-denied'
 import { formatCurrency } from '@/lib/utils'
 import { canAccessPage, isFinancialRole } from '@/lib/roles'
 import { FinanceSubnav } from '@/components/finances/finance-subnav'
@@ -73,14 +72,9 @@ export default async function FinancesOverviewPage() {
     redirect('/login')
   }
 
-  // Parents and scouts should go directly to accounts
-  if (membership.role === 'parent' || membership.role === 'scout') {
-    redirect('/finances/accounts')
-  }
-
-  // Check role-based access for overview (admin, treasurer, leader)
-  if (!canAccessPage(membership.role, 'reports')) {
-    return <AccessDenied message="Only administrators, treasurers, and leaders can access the finances overview." />
+  // Only admin and treasurer can access finances
+  if (!canAccessPage(membership.role, 'finances')) {
+    redirect('/roster')
   }
 
   const canTakeActions = isFinancialRole(membership.role)
