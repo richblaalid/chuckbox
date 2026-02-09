@@ -9,6 +9,7 @@ import { BalanceImportCard } from '@/components/settings/balance-import-card'
 import { CollectionSettingsCard } from '@/components/settings/collection-settings-card'
 import { UsersList } from '@/components/settings/users/users-list'
 import { InviteUserButton } from '@/components/settings/users/invite-user-button'
+import { BankConnectionCard } from '@/components/plaid/bank-connection-card'
 import { resendInvite, removeUser } from '@/app/actions/users'
 import { isFinancialRole, isAdmin as checkIsAdmin } from '@/lib/roles'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -201,6 +202,39 @@ export default async function SettingsPage({
       }
     }
   }
+
+  // Get Plaid connection for this unit
+  const { data: plaidConnection } = await supabase
+    .from('plaid_connections')
+    .select('id, institution_name, accounts, status, error_message, last_synced_at')
+    .eq('unit_id', membership.unit_id)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  interface PlaidAccount {
+    account_id: string
+    name: string
+    mask: string | null
+    type: string
+    subtype: string | null
+    balance?: {
+      available: number | null
+      current: number | null
+      limit: number | null
+      currency: string
+    }
+  }
+
+  interface PlaidConnectionData {
+    id: string
+    institution_name: string
+    accounts: PlaidAccount[]
+    status: 'active' | 'error' | 'disconnected'
+    error_message: string | null
+    last_synced_at: string | null
+  }
+
+  const bankConnection = plaidConnection as PlaidConnectionData | null
 
   // Get last Scoutbook sync session
   const { data: lastSyncSession } = await supabase
@@ -429,6 +463,11 @@ export default async function SettingsPage({
         processingFeeFixed={Number(unit.processing_fee_fixed) || 0.1}
         passFeesToPayer={unit.pass_fees_to_payer || false}
         effectiveRate={effectiveRate}
+        isAdmin={isAdmin}
+      />
+
+      <BankConnectionCard
+        connection={bankConnection}
         isAdmin={isAdmin}
       />
 

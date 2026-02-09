@@ -8,6 +8,7 @@ import { canAccessPage, isFinancialRole } from '@/lib/roles'
 import { FinanceSubnav } from '@/components/finances/finance-subnav'
 import { Button } from '@/components/ui/button'
 import { Receipt, CreditCard, TrendingDown, Wallet, PiggyBank, AlertTriangle } from 'lucide-react'
+import { BankWidget } from '@/components/plaid/bank-widget'
 
 interface ScoutAccount {
   id: string
@@ -455,6 +456,9 @@ export default async function FinancesOverviewPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Bank Account Widget (admin/treasurer only) */}
+        {canTakeActions && <BankWidget />}
       </div>
     </div>
   )
