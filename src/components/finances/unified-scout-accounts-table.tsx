@@ -182,15 +182,15 @@ export function UnifiedScoutAccountsTable({
     <div className="space-y-4">
       {/* Filters */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <SearchInput
-          value={searchTerm}
-          onChange={setSearchTerm}
-          placeholder="Search scouts..."
-          ariaLabel="Search scouts by name"
-          className="w-64"
-        />
-
         <div className="flex flex-wrap items-center gap-3">
+          <SearchInput
+            value={searchTerm}
+            onChange={setSearchTerm}
+            placeholder="Search scouts..."
+            ariaLabel="Search scouts by name"
+            className="w-64"
+          />
+
           <Select value={patrolFilter} onValueChange={setPatrolFilter}>
             <SelectTrigger className={cn(
               "w-[150px] border-stone-300 bg-white dark:border-stone-600 dark:bg-stone-800",
@@ -207,7 +207,9 @@ export function UnifiedScoutAccountsTable({
               ))}
             </SelectContent>
           </Select>
+        </div>
 
+        <div className="flex flex-wrap items-center gap-3">
           <ToggleButtonGroup
             options={BALANCE_OPTIONS}
             value={balanceFilter}
