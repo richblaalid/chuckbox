@@ -338,13 +338,21 @@ export function UnifiedScoutAccountsTable({
                           <button
                             data-action-button
                             onClick={() => onRecordPayment?.(scout)}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-stone-500 hover:bg-stone-100 hover:text-stone-700 dark:hover:bg-stone-800 dark:hover:text-stone-300"
+                            disabled={scout.billingBalance >= 0}
+                            className={cn(
+                              "inline-flex h-7 w-7 items-center justify-center rounded-md",
+                              scout.billingBalance >= 0
+                                ? "text-stone-300 cursor-not-allowed dark:text-stone-600"
+                                : "text-stone-500 hover:bg-stone-100 hover:text-stone-700 dark:hover:bg-stone-800 dark:hover:text-stone-300"
+                            )}
                             aria-label={`Record payment for ${scout.scoutName}`}
                           >
                             <CreditCard className="h-4 w-4" />
                           </button>
                         </TooltipTrigger>
-                        <TooltipContent>Record Payment</TooltipContent>
+                        <TooltipContent>
+                          {scout.billingBalance >= 0 ? "No balance owed" : "Record Payment"}
+                        </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                     <TooltipProvider delayDuration={200}>
