@@ -154,6 +154,34 @@ export default async function AccountsPage() {
     }
   }
 
+  // Get most recent activity date for each account from journal lines
+  const lastActivityByAccount: Record<string, string> = {}
+
+  if (accountIds.length > 0) {
+    const { data: recentActivityData } = await supabase
+      .from('journal_lines')
+      .select(`
+        scout_account_id,
+        journal_entries!inner (
+          created_at
+        )
+      `)
+      .in('scout_account_id', accountIds)
+      .order('journal_entries(created_at)', { ascending: false })
+
+    interface JournalLineWithEntry {
+      scout_account_id: string
+      journal_entries: { created_at: string }
+    }
+
+    for (const line of (recentActivityData as JournalLineWithEntry[]) || []) {
+      // Only keep the most recent (first) date per account
+      if (!lastActivityByAccount[line.scout_account_id]) {
+        lastActivityByAccount[line.scout_account_id] = line.journal_entries.created_at
+      }
+    }
+  }
+
   // Calculate days overdue for each account
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -176,7 +204,7 @@ export default async function AccountsPage() {
       patrolName: acc.scouts?.patrols?.name || null,
       billingBalance: acc.billing_balance || 0,
       fundsBalance: acc.funds_balance || 0,
-      lastActivity: null, // Would need to add this to the query
+      lastActivity: lastActivityByAccount[acc.id] || null,
       isActive: acc.scouts?.is_active ?? true,
       daysOverdue,
     }
