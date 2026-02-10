@@ -8,17 +8,14 @@ import { formatCurrency } from '@/lib/utils'
 import Link from 'next/link'
 import { ScoutGuardianAssociations } from './scout-guardian-associations'
 import { ScoutAdvancementSection } from '@/components/advancement/scout-advancement-section'
+import { PaginatedTransactionHistory } from '@/components/finances/paginated-transaction-history'
 import {
   Award,
   User,
   Wallet,
-  Users,
   Shield,
-  Receipt,
   MapPin,
-  Calendar,
   CreditCard,
-  Heart,
 } from 'lucide-react'
 
 interface Scout {
@@ -58,20 +55,6 @@ interface Guardian {
     position: string | null
     user_id: string | null
   }
-}
-
-interface Transaction {
-  id: string
-  debit: number | null
-  credit: number | null
-  memo: string | null
-  journal_entries: {
-    id: string
-    entry_date: string
-    description: string
-    entry_type: string | null
-    is_posted: boolean | null
-  } | null
 }
 
 interface AvailableProfile {
@@ -170,7 +153,6 @@ interface AdvancementData {
 interface ScoutProfileTabsProps {
   scout: Scout
   guardians: Guardian[]
-  transactions: Transaction[]
   availableProfiles: AvailableProfile[]
   advancementData: AdvancementData | null
   advancementEnabled: boolean
@@ -181,7 +163,6 @@ interface ScoutProfileTabsProps {
 export function ScoutProfileTabs({
   scout,
   guardians,
-  transactions,
   availableProfiles,
   advancementData,
   advancementEnabled,
@@ -457,70 +438,14 @@ export function ScoutProfileTabs({
           canEdit={canEditGuardians}
         />
 
-        {/* Recent Transactions */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Receipt className="h-4 w-4 text-forest-600" />
-                Recent Transactions
-              </CardTitle>
-              {scoutAccount && (
-                <Link
-                  href={`/finances/accounts/${scoutAccount.id}`}
-                  className="text-sm text-forest-600 hover:text-forest-800 hover:underline"
-                >
-                  View all
-                </Link>
-              )}
-            </div>
-            <CardDescription>Latest activity on this scout&apos;s account</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {transactions.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b text-left text-xs font-medium uppercase tracking-wider text-stone-500">
-                      <th className="pb-2 pr-4">Date</th>
-                      <th className="pb-2 pr-4">Description</th>
-                      <th className="pb-2 pr-4">Type</th>
-                      <th className="pb-2 pr-4 text-right">Debit</th>
-                      <th className="pb-2 text-right">Credit</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm">
-                    {transactions.map((tx) => (
-                      <tr key={tx.id} className="border-b last:border-0">
-                        <td className="py-2.5 pr-4 text-stone-600">
-                          {tx.journal_entries?.entry_date || '—'}
-                        </td>
-                        <td className="py-2.5 pr-4">
-                          <p className="font-medium text-stone-900">
-                            {tx.journal_entries?.description || tx.memo || '—'}
-                          </p>
-                        </td>
-                        <td className="py-2.5 pr-4">
-                          <Badge variant="outline" className="text-xs capitalize">
-                            {tx.journal_entries?.entry_type || 'entry'}
-                          </Badge>
-                        </td>
-                        <td className="py-2.5 pr-4 text-right text-red-600">
-                          {tx.debit && tx.debit > 0 ? formatCurrency(tx.debit) : '—'}
-                        </td>
-                        <td className="py-2.5 text-right text-emerald-600">
-                          {tx.credit && tx.credit > 0 ? formatCurrency(tx.credit) : '—'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p className="py-4 text-center text-sm text-stone-500">No transactions yet</p>
-            )}
-          </CardContent>
-        </Card>
+        {/* Transaction History */}
+        {scoutAccount && (
+          <PaginatedTransactionHistory
+            scoutAccountId={scoutAccount.id}
+            title="Transaction History"
+            description="All transactions on this scout's account"
+          />
+        )}
       </TabsContent>
     </Tabs>
   )

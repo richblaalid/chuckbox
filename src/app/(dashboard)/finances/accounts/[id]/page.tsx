@@ -3,30 +3,13 @@ import { formatCurrency } from '@/lib/utils'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { AccountActions } from '@/components/accounts/account-actions'
-import { AccountTransactions } from '@/components/accounts/account-transactions'
+import { PaginatedTransactionHistory } from '@/components/finances/paginated-transaction-history'
 import { isFinancialRole } from '@/lib/roles'
 import { getDefaultLocationId } from '@/lib/square/client'
 import { FinanceSubnav } from '@/components/finances/finance-subnav'
 
 interface AccountPageProps {
   params: Promise<{ id: string }>
-}
-
-interface JournalLine {
-  id: string
-  debit: number | null
-  credit: number | null
-  memo: string | null
-  journal_entries: {
-    id: string
-    entry_date: string
-    created_at: string | null
-    description: string
-    entry_type: string | null
-    reference: string | null
-    is_posted: boolean | null
-    is_void: boolean | null
-  } | null
 }
 
 export default async function AccountDetailPage({ params }: AccountPageProps) {
@@ -120,36 +103,8 @@ export default async function AccountDetailPage({ params }: AccountPageProps) {
   const fundsBalance = account.funds_balance || 0
   const scoutName = `${account.scouts?.first_name} ${account.scouts?.last_name}`
 
-  // Use service client to fetch transactions - access already verified above
-  const serviceClient = await createServiceClient()
-  const { data: transactionsData } = await serviceClient
-    .from('journal_lines')
-    .select(`
-      id,
-      debit,
-      credit,
-      memo,
-      journal_entries (
-        id,
-        entry_date,
-        created_at,
-        description,
-        entry_type,
-        reference,
-        is_posted,
-        is_void
-      )
-    `)
-    .eq('scout_account_id', id)
-
-  // Sort by created_at descending (most recent first), fallback to entry_date
-  const transactions = ((transactionsData as JournalLine[]) || []).sort((a, b) => {
-    const dateA = a.journal_entries?.created_at || a.journal_entries?.entry_date || ''
-    const dateB = b.journal_entries?.created_at || b.journal_entries?.entry_date || ''
-    return dateB.localeCompare(dateA)
-  })
-
   // Get Square configuration for payments
+  const serviceClient = await createServiceClient()
   const squareApplicationId = process.env.SQUARE_APPLICATION_ID || ''
   const squareEnvironment = (process.env.SQUARE_ENVIRONMENT || 'sandbox') as 'sandbox' | 'production'
   let squareLocationId: string | null = null
@@ -245,10 +200,14 @@ export default async function AccountDetailPage({ params }: AccountPageProps) {
         </div>
       </div>
 
-      <FinanceSubnav showFinancialTabs={canTakeActions} />
+      <FinanceSubnav />
 
-      {/* Transaction History with Filters */}
-      <AccountTransactions transactions={transactions} />
+      {/* Transaction History with Pagination */}
+      <PaginatedTransactionHistory
+        scoutAccountId={account.id}
+        title="Transaction History"
+        description="All transactions on this account"
+      />
     </div>
   )
 }
