@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { BillingForm } from '@/components/billing/billing-form'
 import { QuickPaymentForm } from '@/components/payments/quick-payment-form'
 import { BulkReminderWrapper } from './bulk-reminder-wrapper'
+import { SendPaymentRequestModal } from '@/components/accounts/send-payment-request-modal'
 import { Receipt, Upload } from 'lucide-react'
 
 interface Scout {
@@ -214,12 +215,14 @@ export function UnifiedAccountsView({
 
       {/* Individual Reminder Dialog */}
       {actionScout && (
-        <BulkReminderWrapper
+        <SendPaymentRequestModal
           open={isIndividualReminderOpen}
           onOpenChange={setIsIndividualReminderOpen}
-          selectedAccountIds={[actionScout.id]}
-          unitId={unitId}
-          unitName={unitName}
+          scoutAccountId={actionScout.id}
+          scoutId={actionScout.scoutId}
+          scoutName={actionScout.scoutName}
+          balance={actionScout.billingBalance}
+          hideTrigger
           onSuccess={handleActionSuccess}
         />
       )}

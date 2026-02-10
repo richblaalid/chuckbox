@@ -28,6 +28,14 @@ interface SendPaymentRequestModalProps {
   scoutId: string
   scoutName: string
   balance: number // Current balance (negative = owes money)
+  /** Optional: Control modal externally (for inline actions) */
+  open?: boolean
+  /** Optional: Callback when modal open state changes */
+  onOpenChange?: (open: boolean) => void
+  /** Optional: Hide the trigger button (when controlled externally) */
+  hideTrigger?: boolean
+  /** Optional: Callback on successful send */
+  onSuccess?: () => void
 }
 
 export function SendPaymentRequestModal({
@@ -35,8 +43,23 @@ export function SendPaymentRequestModal({
   scoutId,
   scoutName,
   balance,
+  open: controlledOpen,
+  onOpenChange,
+  hideTrigger = false,
+  onSuccess,
 }: SendPaymentRequestModalProps) {
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+
+  // Use controlled or internal state
+  const isControlled = controlledOpen !== undefined
+  const open = isControlled ? controlledOpen : internalOpen
+  const setOpen = (value: boolean) => {
+    if (isControlled) {
+      onOpenChange?.(value)
+    } else {
+      setInternalOpen(value)
+    }
+  }
   const [guardians, setGuardians] = useState<Guardian[]>([])
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
@@ -138,7 +161,7 @@ export function SendPaymentRequestModal({
       }
 
       const selectedGuardian = guardians.find((g) => g.id === selectedGuardianId)
-      setSuccess(`Payment request sent to ${selectedGuardian?.email || 'guardian'}`)
+      setSuccess(`Reminder sent to ${selectedGuardian?.email || 'guardian'}`)
 
       // Reset form after short delay
       setTimeout(() => {
@@ -146,6 +169,7 @@ export function SendPaymentRequestModal({
         setSelectedGuardianId('')
         setCustomMessage('')
         setSuccess(null)
+        onSuccess?.()
       }, 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send payment request')
@@ -156,23 +180,25 @@ export function SendPaymentRequestModal({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          className="gap-2"
-          disabled={!owesAmount}
-          title={owesAmount ? 'Send reminder email' : 'No balance owed'}
-        >
-          <Bell className="h-4 w-4" />
-          Send Reminder
-        </Button>
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild>
+          <Button
+            variant="outline"
+            className="gap-2"
+            disabled={!owesAmount}
+            title={owesAmount ? 'Send reminder email' : 'No balance owed'}
+          >
+            <Bell className="h-4 w-4" />
+            Send Reminder
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Send Payment Request</DialogTitle>
+          <DialogTitle>Send Reminder</DialogTitle>
           <DialogDescription>
-            Email a payment link to {scoutName}&apos;s guardian. They&apos;ll receive a ledger
-            summary and a secure link to pay online.
+            Send a payment reminder to {scoutName}&apos;s guardian with their current balance
+            and a secure link to pay online.
           </DialogDescription>
         </DialogHeader>
 
@@ -259,7 +285,7 @@ export function SendPaymentRequestModal({
                 Cancel
               </Button>
               <Button type="submit" disabled={sending || !selectedGuardianId}>
-                {sending ? 'Sending...' : 'Send Payment Request'}
+                {sending ? 'Sending...' : 'Send Reminder'}
               </Button>
             </DialogFooter>
           </form>
