@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ResponsiveTable, tableStyles } from '@/components/ui/responsive-table'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { formatCurrency, cn } from '@/lib/utils'
-import { Search } from 'lucide-react'
+import { Search, CreditCard, Receipt, Bell } from 'lucide-react'
 
 export interface ScoutAccountRow {
   id: string
@@ -18,9 +19,10 @@ export interface ScoutAccountRow {
   fundsBalance: number
   lastActivity: string | null
   isActive: boolean
+  daysOverdue?: number
 }
 
-type BalanceFilter = 'all' | 'owes' | 'has-funds' | 'zero'
+type BalanceFilter = 'all' | 'owes' | 'overdue' | 'has-funds' | 'zero'
 
 interface UnifiedScoutAccountsTableProps {
   scouts: ScoutAccountRow[]
@@ -28,6 +30,9 @@ interface UnifiedScoutAccountsTableProps {
   selectedIds: string[]
   onScoutSelect: (scout: ScoutAccountRow) => void
   onSelectionChange: (ids: string[]) => void
+  onRecordPayment?: (scout: ScoutAccountRow) => void
+  onCreateBilling?: (scout: ScoutAccountRow) => void
+  onSendReminder?: (scout: ScoutAccountRow) => void
 }
 
 export function UnifiedScoutAccountsTable({
@@ -36,6 +41,9 @@ export function UnifiedScoutAccountsTable({
   selectedIds,
   onScoutSelect,
   onSelectionChange,
+  onRecordPayment,
+  onCreateBilling,
+  onSendReminder,
 }: UnifiedScoutAccountsTableProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [patrolFilter, setPatrolFilter] = useState<string>('all')
@@ -59,6 +67,12 @@ export function UnifiedScoutAccountsTable({
       // Balance filter
       if (balanceFilter === 'owes' && scout.billingBalance >= 0) {
         return false
+      }
+      if (balanceFilter === 'overdue') {
+        // Filter for scouts with charges 30+ days old
+        if (!scout.daysOverdue || scout.daysOverdue < 30) {
+          return false
+        }
       }
       if (balanceFilter === 'has-funds' && scout.fundsBalance <= 0) {
         return false
@@ -91,8 +105,9 @@ export function UnifiedScoutAccountsTable({
   }
 
   const handleRowClick = (scout: ScoutAccountRow, e: React.MouseEvent) => {
-    // Don't trigger row click if clicking checkbox
-    if ((e.target as HTMLElement).closest('[role="checkbox"]')) {
+    // Don't trigger row click if clicking checkbox or action buttons
+    if ((e.target as HTMLElement).closest('[role="checkbox"]') ||
+        (e.target as HTMLElement).closest('[data-action-button]')) {
       return
     }
     onScoutSelect(scout)
@@ -142,6 +157,13 @@ export function UnifiedScoutAccountsTable({
             Owes Money
           </Button>
           <Button
+            variant={balanceFilter === 'overdue' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setBalanceFilter('overdue')}
+          >
+            Overdue (30+)
+          </Button>
+          <Button
             variant={balanceFilter === 'has-funds' ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => setBalanceFilter('has-funds')}
@@ -159,7 +181,7 @@ export function UnifiedScoutAccountsTable({
       </div>
 
       {/* Table */}
-      <ResponsiveTable className="border rounded-lg">
+      <ResponsiveTable className="border rounded-lg bg-white dark:bg-stone-900">
         <table className={tableStyles.table}>
           <thead className={tableStyles.thead}>
             <tr>
@@ -175,6 +197,7 @@ export function UnifiedScoutAccountsTable({
               <th className={cn(tableStyles.th, tableStyles.textRight)}>Amount Owed</th>
               <th className={cn(tableStyles.th, tableStyles.textRight, tableStyles.hiddenMd)}>Funds Balance</th>
               <th className={cn(tableStyles.th, tableStyles.hiddenLg)}>Last Activity</th>
+              <th className={cn(tableStyles.th, 'text-right pr-4')}>Actions</th>
             </tr>
           </thead>
           <tbody className={tableStyles.tbody}>
@@ -214,11 +237,68 @@ export function UnifiedScoutAccountsTable({
                       })
                     : '—'}
                 </td>
+                <td className={cn(tableStyles.td, 'text-right pr-4')}>
+                  <div className="flex items-center justify-end gap-1">
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            data-action-button
+                            onClick={() => onRecordPayment?.(scout)}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-stone-500 hover:bg-stone-100 hover:text-stone-700 dark:hover:bg-stone-800 dark:hover:text-stone-300"
+                            aria-label={`Record payment for ${scout.scoutName}`}
+                          >
+                            <CreditCard className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Record Payment</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            data-action-button
+                            onClick={() => onCreateBilling?.(scout)}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-stone-500 hover:bg-stone-100 hover:text-stone-700 dark:hover:bg-stone-800 dark:hover:text-stone-300"
+                            aria-label={`Create billing for ${scout.scoutName}`}
+                          >
+                            <Receipt className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Create Billing</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            data-action-button
+                            onClick={() => onSendReminder?.(scout)}
+                            disabled={scout.billingBalance >= 0}
+                            className={cn(
+                              "inline-flex h-7 w-7 items-center justify-center rounded-md",
+                              scout.billingBalance >= 0
+                                ? "text-stone-300 cursor-not-allowed dark:text-stone-600"
+                                : "text-stone-500 hover:bg-stone-100 hover:text-stone-700 dark:hover:bg-stone-800 dark:hover:text-stone-300"
+                            )}
+                            aria-label={`Send reminder for ${scout.scoutName}`}
+                          >
+                            <Bell className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {scout.billingBalance >= 0 ? "No balance owed" : "Send Reminder"}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </td>
               </tr>
             ))}
             {filteredScouts.length === 0 && (
               <tr>
-                <td colSpan={6} className="h-24 text-center text-muted-foreground">
+                <td colSpan={7} className="h-24 text-center text-muted-foreground">
                   No scouts found.
                 </td>
               </tr>
