@@ -191,7 +191,10 @@ export function UnifiedScoutAccountsTable({
         />
 
         <Select value={patrolFilter} onValueChange={setPatrolFilter}>
-          <SelectTrigger className="w-[150px]">
+          <SelectTrigger className={cn(
+            "w-[150px] border-stone-300 bg-white dark:border-stone-600 dark:bg-stone-800",
+            patrolFilter !== 'all' && "border-forest-300 bg-forest-50 text-forest-700 dark:border-forest-600 dark:bg-forest-950 dark:text-forest-400"
+          )}>
             <SelectValue placeholder="All Patrols" />
           </SelectTrigger>
           <SelectContent>
