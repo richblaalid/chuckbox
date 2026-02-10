@@ -6,7 +6,7 @@ import { formatCurrency } from '@/lib/utils'
 import { canAccessPage, isFinancialRole } from '@/lib/roles'
 import { isFeatureEnabled, FeatureFlag } from '@/lib/feature-flags'
 import { FinanceSubnav } from '@/components/finances/finance-subnav'
-import { Button } from '@/components/ui/button'
+import { QuickActionsCard } from '@/components/finances/quick-actions-card'
 import { Receipt, CreditCard, TrendingDown, Wallet, PiggyBank, AlertTriangle } from 'lucide-react'
 import { BankWidget } from '@/components/plaid/bank-widget'
 
@@ -108,6 +108,7 @@ export default async function FinancesOverviewPage() {
     .select(`
       id,
       amount,
+      scout_account_id,
       billing_records!inner (
         billing_date,
         description,
@@ -121,6 +122,7 @@ export default async function FinancesOverviewPage() {
   interface UnpaidCharge {
     id: string
     amount: number
+    scout_account_id: string
     billing_records: {
       billing_date: string
       description: string
@@ -194,17 +196,17 @@ export default async function FinancesOverviewPage() {
 
   const scoutsOwing = accounts.filter((a) => (a.billing_balance || 0) < 0)
 
-  // Calculate overdue amount (31+ days)
+  // Calculate overdue amount and account count (31+ days)
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const overdueAmount = unpaidCharges
-    .filter(charge => {
-      const billingDate = new Date(charge.billing_records.billing_date)
-      billingDate.setHours(0, 0, 0, 0)
-      const daysOld = Math.floor((today.getTime() - billingDate.getTime()) / (1000 * 60 * 60 * 24))
-      return daysOld >= 31
-    })
-    .reduce((sum, charge) => sum + charge.amount, 0)
+  const overdueCharges = unpaidCharges.filter(charge => {
+    const billingDate = new Date(charge.billing_records.billing_date)
+    billingDate.setHours(0, 0, 0, 0)
+    const daysOld = Math.floor((today.getTime() - billingDate.getTime()) / (1000 * 60 * 60 * 24))
+    return daysOld >= 31
+  })
+  const overdueAmount = overdueCharges.reduce((sum, charge) => sum + charge.amount, 0)
+  const overdueAccountCount = new Set(overdueCharges.map(c => c.scout_account_id)).size
 
   // Calculate this month's collections
   const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
@@ -241,6 +243,22 @@ export default async function FinancesOverviewPage() {
     })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10)
 
+  // Transform accounts into scouts format for QuickActionsCard
+  const scoutsForActions = accounts
+    .filter((acc) => acc.scouts)
+    .map((acc) => ({
+      id: acc.scouts!.id,
+      first_name: acc.scouts!.first_name,
+      last_name: acc.scouts!.last_name,
+      is_active: acc.scouts!.is_active,
+      scout_accounts: {
+        id: acc.id,
+        billing_balance: acc.billing_balance,
+        funds_balance: acc.funds_balance,
+      },
+      patrols: acc.scouts!.patrols,
+    }))
+
   return (
     <div className="space-y-6">
       <div>
@@ -250,7 +268,7 @@ export default async function FinancesOverviewPage() {
         </p>
       </div>
 
-      <FinanceSubnav showFinancialTabs={canTakeActions} />
+      <FinanceSubnav />
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -283,7 +301,9 @@ export default async function FinancesOverviewPage() {
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              {overdueAmount > 0 ? 'Needs follow-up' : 'All current'}
+              {overdueAccountCount > 0
+                ? `${overdueAccountCount} scout${overdueAccountCount !== 1 ? 's' : ''} need follow-up`
+                : 'All current'}
             </p>
           </CardContent>
         </Card>
@@ -325,27 +345,11 @@ export default async function FinancesOverviewPage() {
 
       {/* Quick Actions (for admin/treasurer only) */}
       {canTakeActions && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <Button asChild className="gap-2">
-                <Link href="/finances/payments?action=record">
-                  <CreditCard className="h-4 w-4" />
-                  Record Payment
-                </Link>
-              </Button>
-              <Button asChild variant="accent" className="gap-2">
-                <Link href="/finances/billing?action=create">
-                  <Receipt className="h-4 w-4" />
-                  Create Billing
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <QuickActionsCard
+          unitId={membership.unit_id}
+          unitName={membership.units?.name || 'your unit'}
+          scouts={scoutsForActions}
+        />
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
