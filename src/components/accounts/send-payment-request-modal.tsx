@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { formatCurrency } from '@/lib/utils'
-import { Mail } from 'lucide-react'
+import { Bell } from 'lucide-react'
 
 interface Guardian {
   id: string
@@ -161,10 +161,10 @@ export function SendPaymentRequestModal({
           variant="outline"
           className="gap-2"
           disabled={!owesAmount}
-          title={owesAmount ? 'Send payment request email' : 'No balance owed'}
+          title={owesAmount ? 'Send reminder email' : 'No balance owed'}
         >
-          <Mail className="h-4 w-4" />
-          Send Payment Request
+          <Bell className="h-4 w-4" />
+          Send Reminder
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">

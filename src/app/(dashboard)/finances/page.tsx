@@ -7,8 +7,9 @@ import { canAccessPage, isFinancialRole } from '@/lib/roles'
 import { isFeatureEnabled, FeatureFlag } from '@/lib/feature-flags'
 import { FinanceSubnav } from '@/components/finances/finance-subnav'
 import { QuickActionsCard } from '@/components/finances/quick-actions-card'
-import { Receipt, CreditCard, TrendingDown, Wallet, PiggyBank, AlertTriangle } from 'lucide-react'
+import { Receipt, CreditCard, TrendingDown, PiggyBank, AlertTriangle } from 'lucide-react'
 import { BankWidget } from '@/components/plaid/bank-widget'
+import { BankBalanceCard } from '@/components/plaid/bank-balance-card'
 
 interface ScoutAccount {
   id: string
@@ -208,19 +209,6 @@ export default async function FinancesOverviewPage() {
   const overdueAmount = overdueCharges.reduce((sum, charge) => sum + charge.amount, 0)
   const overdueAccountCount = new Set(overdueCharges.map(c => c.scout_account_id)).size
 
-  // Calculate this month's collections
-  const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1)
-  const { data: monthPaymentsData } = await supabase
-    .from('payments')
-    .select('amount')
-    .eq('unit_id', membership.unit_id)
-    .eq('status', 'completed')
-    .is('voided_at', null)
-    .gte('created_at', thisMonthStart.toISOString())
-
-  const collectedThisMonth = (monthPaymentsData || [])
-    .reduce((sum, p) => sum + (p.amount || 0), 0)
-
   // Build recent activity list (combined payments and billing)
   const recentActivity: RecentActivity[] = [
     ...recentPayments.map(p => ({
@@ -325,22 +313,11 @@ export default async function FinancesOverviewPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Wallet className="h-4 w-4" />
-              Collected This Month
-            </CardDescription>
-            <CardTitle className={`text-2xl ${collectedThisMonth > 0 ? 'text-success' : 'text-stone-400'}`}>
-              {collectedThisMonth > 0 ? formatCurrency(collectedThisMonth) : '—'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">
-              {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </p>
-          </CardContent>
-        </Card>
+        <BankBalanceCard
+          fallbackValue={totalOwed - totalFunds}
+          fallbackLabel="Net to Collect"
+          fallbackDescription="After applying scout credits"
+        />
       </div>
 
       {/* Quick Actions (for admin/treasurer only) */}

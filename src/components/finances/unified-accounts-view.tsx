@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { BillingForm } from '@/components/billing/billing-form'
 import { QuickPaymentForm } from '@/components/payments/quick-payment-form'
 import { BulkReminderWrapper } from './bulk-reminder-wrapper'
-import { Plus, Upload } from 'lucide-react'
+import { Receipt, Upload } from 'lucide-react'
 
 interface Scout {
   id: string
@@ -125,8 +125,8 @@ export function UnifiedAccountsView({
           <div className="flex items-center gap-2">
             <Dialog open={isBillingOpen} onOpenChange={setIsBillingOpen}>
               <DialogTrigger asChild>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
+                <Button variant="accent">
+                  <Receipt className="mr-2 h-4 w-4" />
                   Create Billing
                 </Button>
               </DialogTrigger>
