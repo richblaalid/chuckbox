@@ -343,7 +343,7 @@ export function UnifiedScoutAccountsTable({
                               "inline-flex h-7 w-7 items-center justify-center rounded-md",
                               scout.billingBalance >= 0
                                 ? "text-stone-300 cursor-not-allowed dark:text-stone-600"
-                                : "text-stone-500 hover:bg-stone-100 hover:text-stone-700 dark:hover:bg-stone-800 dark:hover:text-stone-300"
+                                : "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-500 dark:hover:bg-emerald-950 dark:hover:text-emerald-400"
                             )}
                             aria-label={`Record payment for ${scout.scoutName}`}
                           >
@@ -361,7 +361,7 @@ export function UnifiedScoutAccountsTable({
                           <button
                             data-action-button
                             onClick={() => onCreateBilling?.(scout)}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-stone-500 hover:bg-stone-100 hover:text-stone-700 dark:hover:bg-stone-800 dark:hover:text-stone-300"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:text-amber-500 dark:hover:bg-amber-950 dark:hover:text-amber-400"
                             aria-label={`Create billing for ${scout.scoutName}`}
                           >
                             <Receipt className="h-4 w-4" />
@@ -381,7 +381,7 @@ export function UnifiedScoutAccountsTable({
                               "inline-flex h-7 w-7 items-center justify-center rounded-md",
                               scout.billingBalance >= 0
                                 ? "text-stone-300 cursor-not-allowed dark:text-stone-600"
-                                : "text-stone-500 hover:bg-stone-100 hover:text-stone-700 dark:hover:bg-stone-800 dark:hover:text-stone-300"
+                                : "text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:text-blue-500 dark:hover:bg-blue-950 dark:hover:text-blue-400"
                             )}
                             aria-label={`Send reminder for ${scout.scoutName}`}
                           >
