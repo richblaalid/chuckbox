@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { QuickPaymentForm } from '@/components/payments/quick-payment-form'
 import { BillingForm } from '@/components/billing/billing-form'
+import { ReminderSelectionDialog } from './reminder-selection-dialog'
 import { BulkReminderWrapper } from './bulk-reminder-wrapper'
 import { CreditCard, Receipt, Bell } from 'lucide-react'
 
@@ -34,7 +35,9 @@ export function QuickActionsCard({ unitId, unitName, scouts, squareConfig }: Qui
   const router = useRouter()
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
   const [isBillingOpen, setIsBillingOpen] = useState(false)
+  const [isSelectionOpen, setIsSelectionOpen] = useState(false)
   const [isReminderOpen, setIsReminderOpen] = useState(false)
+  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([])
 
   const handlePaymentSuccess = () => {
     setTimeout(() => {
@@ -48,8 +51,15 @@ export function QuickActionsCard({ unitId, unitName, scouts, squareConfig }: Qui
     router.refresh()
   }
 
+  const handleSelectionConfirm = (accountIds: string[]) => {
+    setSelectedAccountIds(accountIds)
+    setIsSelectionOpen(false)
+    setIsReminderOpen(true)
+  }
+
   const handleReminderSuccess = () => {
     setIsReminderOpen(false)
+    setSelectedAccountIds([])
     router.refresh()
   }
 
@@ -91,7 +101,7 @@ export function QuickActionsCard({ unitId, unitName, scouts, squareConfig }: Qui
             <Button
               variant="outline"
               className="gap-2"
-              onClick={() => setIsReminderOpen(true)}
+              onClick={() => setIsSelectionOpen(true)}
               disabled={accountsOwingMoney.length === 0}
             >
               <Bell className="h-4 w-4" />
@@ -132,11 +142,19 @@ export function QuickActionsCard({ unitId, unitName, scouts, squareConfig }: Qui
         </DialogContent>
       </Dialog>
 
+      {/* Reminder Selection Dialog */}
+      <ReminderSelectionDialog
+        open={isSelectionOpen}
+        onOpenChange={setIsSelectionOpen}
+        scouts={scouts}
+        onConfirm={handleSelectionConfirm}
+      />
+
       {/* Send Reminders Dialog */}
       <BulkReminderWrapper
         open={isReminderOpen}
         onOpenChange={setIsReminderOpen}
-        selectedAccountIds={accountsOwingMoney}
+        selectedAccountIds={selectedAccountIds}
         unitId={unitId}
         unitName={unitName}
         onSuccess={handleReminderSuccess}
