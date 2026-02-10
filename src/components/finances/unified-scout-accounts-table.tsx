@@ -1,14 +1,16 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ResponsiveTable, tableStyles } from '@/components/ui/responsive-table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { SearchInput } from '@/components/ui/search-input'
+import { ToggleButtonGroup, type ToggleOption } from '@/components/ui/toggle-button-group'
+import { SortIcon, type SortDirection } from '@/components/ui/sort-icon'
 import { formatCurrency, cn } from '@/lib/utils'
-import { Search, CreditCard, Receipt, Bell } from 'lucide-react'
+import { CreditCard, Receipt, Bell } from 'lucide-react'
 
 export interface ScoutAccountRow {
   id: string
@@ -23,6 +25,16 @@ export interface ScoutAccountRow {
 }
 
 type BalanceFilter = 'all' | 'owes' | 'overdue' | 'has-funds' | 'zero'
+
+const BALANCE_OPTIONS: ToggleOption<BalanceFilter>[] = [
+  { value: 'all', label: 'All' },
+  { value: 'owes', label: 'Owes Money' },
+  { value: 'overdue', label: 'Overdue (30+)' },
+  { value: 'has-funds', label: 'Has Funds' },
+  { value: 'zero', label: 'Zero Balance' },
+]
+
+type SortColumn = 'name' | 'patrol' | 'amountOwed' | 'fundsBalance' | 'lastActivity'
 
 interface UnifiedScoutAccountsTableProps {
   scouts: ScoutAccountRow[]
@@ -48,9 +60,25 @@ export function UnifiedScoutAccountsTable({
   const [searchTerm, setSearchTerm] = useState('')
   const [patrolFilter, setPatrolFilter] = useState<string>('all')
   const [balanceFilter, setBalanceFilter] = useState<BalanceFilter>('all')
+  const [sortColumn, setSortColumn] = useState<SortColumn>('name')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+
+  const getAriaSort = (column: SortColumn): 'ascending' | 'descending' | 'none' => {
+    if (sortColumn !== column) return 'none'
+    return sortDirection === 'asc' ? 'ascending' : 'descending'
+  }
 
   const filteredScouts = useMemo(() => {
-    return scouts.filter((scout) => {
+    let filtered = scouts.filter((scout) => {
       // Search filter
       if (searchTerm) {
         const search = searchTerm.toLowerCase()
@@ -83,10 +111,47 @@ export function UnifiedScoutAccountsTable({
 
       return true
     })
-  }, [scouts, searchTerm, patrolFilter, balanceFilter])
+
+    // Sort
+    return [...filtered].sort((a, b) => {
+      let comparison = 0
+
+      switch (sortColumn) {
+        case 'name':
+          comparison = a.scoutName.localeCompare(b.scoutName)
+          break
+        case 'patrol':
+          comparison = (a.patrolName || '').localeCompare(b.patrolName || '')
+          break
+        case 'amountOwed':
+          comparison = a.billingBalance - b.billingBalance
+          break
+        case 'fundsBalance':
+          comparison = a.fundsBalance - b.fundsBalance
+          break
+        case 'lastActivity':
+          // Sort nulls last
+          if (!a.lastActivity && !b.lastActivity) comparison = 0
+          else if (!a.lastActivity) comparison = 1
+          else if (!b.lastActivity) comparison = -1
+          else comparison = a.lastActivity.localeCompare(b.lastActivity)
+          break
+      }
+
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+  }, [scouts, searchTerm, patrolFilter, balanceFilter, sortColumn, sortDirection])
 
   const allSelected = filteredScouts.length > 0 && filteredScouts.every((s) => selectedIds.includes(s.id))
   const someSelected = filteredScouts.some((s) => selectedIds.includes(s.id))
+
+  const hasActiveFilters = patrolFilter !== 'all' || balanceFilter !== 'all'
+
+  const clearAllFilters = () => {
+    setSearchTerm('')
+    setPatrolFilter('all')
+    setBalanceFilter('all')
+  }
 
   const handleSelectAll = () => {
     if (allSelected) {
@@ -117,15 +182,13 @@ export function UnifiedScoutAccountsTable({
     <div className="space-y-4">
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search scouts..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+        <SearchInput
+          value={searchTerm}
+          onChange={setSearchTerm}
+          placeholder="Search scouts..."
+          ariaLabel="Search scouts by name"
+          className="w-64"
+        />
 
         <Select value={patrolFilter} onValueChange={setPatrolFilter}>
           <SelectTrigger className="w-[150px]">
@@ -141,63 +204,93 @@ export function UnifiedScoutAccountsTable({
           </SelectContent>
         </Select>
 
-        <div className="flex gap-1">
-          <Button
-            variant={balanceFilter === 'all' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setBalanceFilter('all')}
-          >
-            All
+        <ToggleButtonGroup
+          options={BALANCE_OPTIONS}
+          value={balanceFilter}
+          onChange={setBalanceFilter}
+          size="sm"
+          aria-label="Balance filter"
+        />
+
+        {(hasActiveFilters || searchTerm) && (
+          <Button variant="ghost" size="sm" onClick={clearAllFilters}>
+            Clear all
           </Button>
-          <Button
-            variant={balanceFilter === 'owes' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setBalanceFilter('owes')}
-          >
-            Owes Money
-          </Button>
-          <Button
-            variant={balanceFilter === 'overdue' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setBalanceFilter('overdue')}
-          >
-            Overdue (30+)
-          </Button>
-          <Button
-            variant={balanceFilter === 'has-funds' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setBalanceFilter('has-funds')}
-          >
-            Has Funds
-          </Button>
-          <Button
-            variant={balanceFilter === 'zero' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setBalanceFilter('zero')}
-          >
-            Zero Balance
-          </Button>
-        </div>
+        )}
       </div>
+
+      {/* Results count */}
+      {(searchTerm || hasActiveFilters) && (
+        <p className="text-sm text-stone-500">
+          {filteredScouts.length === 0
+            ? 'No scouts found'
+            : `Showing ${filteredScouts.length} of ${scouts.length} scout${scouts.length !== 1 ? 's' : ''}`}
+        </p>
+      )}
 
       {/* Table */}
       <ResponsiveTable className="border rounded-lg bg-white dark:bg-stone-900">
         <table className={tableStyles.table}>
           <thead className={tableStyles.thead}>
-            <tr>
-              <th className="w-[50px] pb-3 pl-4">
+            <tr className="bg-stone-50 dark:bg-stone-800/50 border-b border-stone-200 dark:border-stone-700">
+              <th className="w-[50px] py-3 pl-4">
                 <Checkbox
                   checked={allSelected}
                   onCheckedChange={handleSelectAll}
                   aria-label="Select all"
                 />
               </th>
-              <th className={tableStyles.th}>Scout Name</th>
-              <th className={cn(tableStyles.th, tableStyles.hiddenSm)}>Patrol</th>
-              <th className={cn(tableStyles.th, tableStyles.textRight)}>Amount Owed</th>
-              <th className={cn(tableStyles.th, tableStyles.textRight, tableStyles.hiddenMd)}>Funds Balance</th>
-              <th className={cn(tableStyles.th, tableStyles.hiddenLg)}>Last Activity</th>
-              <th className={cn(tableStyles.th, 'text-right pr-4')}>Actions</th>
+              <th className="py-3 pr-4" aria-sort={getAriaSort('name')}>
+                <button
+                  type="button"
+                  onClick={() => handleSort('name')}
+                  className="inline-flex items-center gap-1 font-medium cursor-pointer select-none hover:text-stone-700 dark:hover:text-stone-300 transition-colors"
+                >
+                  Scout Name
+                  <SortIcon direction={sortDirection} active={sortColumn === 'name'} />
+                </button>
+              </th>
+              <th className={cn("py-3 pr-4", tableStyles.hiddenSm)} aria-sort={getAriaSort('patrol')}>
+                <button
+                  type="button"
+                  onClick={() => handleSort('patrol')}
+                  className="inline-flex items-center gap-1 font-medium cursor-pointer select-none hover:text-stone-700 dark:hover:text-stone-300 transition-colors"
+                >
+                  Patrol
+                  <SortIcon direction={sortDirection} active={sortColumn === 'patrol'} />
+                </button>
+              </th>
+              <th className={cn("py-3 pr-4", tableStyles.textRight)} aria-sort={getAriaSort('amountOwed')}>
+                <button
+                  type="button"
+                  onClick={() => handleSort('amountOwed')}
+                  className="inline-flex items-center gap-1 font-medium cursor-pointer select-none hover:text-stone-700 dark:hover:text-stone-300 transition-colors justify-end w-full"
+                >
+                  Amount Owed
+                  <SortIcon direction={sortDirection} active={sortColumn === 'amountOwed'} />
+                </button>
+              </th>
+              <th className={cn("py-3 pr-4", tableStyles.textRight, tableStyles.hiddenMd)} aria-sort={getAriaSort('fundsBalance')}>
+                <button
+                  type="button"
+                  onClick={() => handleSort('fundsBalance')}
+                  className="inline-flex items-center gap-1 font-medium cursor-pointer select-none hover:text-stone-700 dark:hover:text-stone-300 transition-colors justify-end w-full"
+                >
+                  Funds Balance
+                  <SortIcon direction={sortDirection} active={sortColumn === 'fundsBalance'} />
+                </button>
+              </th>
+              <th className={cn("py-3 pr-4", tableStyles.hiddenLg)} aria-sort={getAriaSort('lastActivity')}>
+                <button
+                  type="button"
+                  onClick={() => handleSort('lastActivity')}
+                  className="inline-flex items-center gap-1 font-medium cursor-pointer select-none hover:text-stone-700 dark:hover:text-stone-300 transition-colors"
+                >
+                  Last Activity
+                  <SortIcon direction={sortDirection} active={sortColumn === 'lastActivity'} />
+                </button>
+              </th>
+              <th className="py-3 pr-4 font-medium text-right">Actions</th>
             </tr>
           </thead>
           <tbody className={tableStyles.tbody}>
