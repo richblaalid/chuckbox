@@ -181,7 +181,7 @@ export function UnifiedScoutAccountsTable({
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <SearchInput
           value={searchTerm}
           onChange={setSearchTerm}
@@ -190,36 +190,38 @@ export function UnifiedScoutAccountsTable({
           className="w-64"
         />
 
-        <Select value={patrolFilter} onValueChange={setPatrolFilter}>
-          <SelectTrigger className={cn(
-            "w-[150px] border-stone-300 bg-white dark:border-stone-600 dark:bg-stone-800",
-            patrolFilter !== 'all' && "border-forest-300 bg-forest-50 text-forest-700 dark:border-forest-600 dark:bg-forest-950 dark:text-forest-400"
-          )}>
-            <SelectValue placeholder="All Patrols" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Patrols</SelectItem>
-            {patrols.map((patrol) => (
-              <SelectItem key={patrol} value={patrol}>
-                {patrol}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={patrolFilter} onValueChange={setPatrolFilter}>
+            <SelectTrigger className={cn(
+              "w-[150px] border-stone-300 bg-white dark:border-stone-600 dark:bg-stone-800",
+              patrolFilter !== 'all' && "border-forest-300 bg-forest-50 text-forest-700 dark:border-forest-600 dark:bg-forest-950 dark:text-forest-400"
+            )}>
+              <SelectValue placeholder="All Patrols" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Patrols</SelectItem>
+              {patrols.map((patrol) => (
+                <SelectItem key={patrol} value={patrol}>
+                  {patrol}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <ToggleButtonGroup
-          options={BALANCE_OPTIONS}
-          value={balanceFilter}
-          onChange={setBalanceFilter}
-          size="sm"
-          aria-label="Balance filter"
-        />
+          <ToggleButtonGroup
+            options={BALANCE_OPTIONS}
+            value={balanceFilter}
+            onChange={setBalanceFilter}
+            size="sm"
+            aria-label="Balance filter"
+          />
 
-        {(hasActiveFilters || searchTerm) && (
-          <Button variant="ghost" size="sm" onClick={clearAllFilters}>
-            Clear all
-          </Button>
-        )}
+          {(hasActiveFilters || searchTerm) && (
+            <Button variant="ghost" size="sm" onClick={clearAllFilters}>
+              Clear all
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Results count */}
