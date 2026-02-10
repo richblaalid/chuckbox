@@ -59,7 +59,7 @@ export function QuickPaymentDialog({ unitId, scouts, squareConfig, preselectedSc
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="accent" className="gap-2">
+        <Button className="gap-2">
           <DollarSign className="h-4 w-4" />
           Record Payment
         </Button>

@@ -127,63 +127,27 @@ export default async function ScoutPage({ params }: ScoutPageProps) {
 
   const scout = scoutData as Scout
 
-  // Group 2: Parallel fetch of transactions and guardians (both depend only on scout id)
-  const [transactionsResult, guardiansResult] = await Promise.all([
-    supabase
-      .from('journal_lines')
-      .select(`
+  // Fetch guardians for this scout
+  const { data: guardiansData } = await supabase
+    .from('scout_guardians')
+    .select(`
+      id,
+      relationship,
+      is_primary,
+      profile_id,
+      profiles (
         id,
-        debit,
-        credit,
-        memo,
-        journal_entries (
-          id,
-          entry_date,
-          description,
-          entry_type,
-          is_posted
-        )
-      `)
-      .eq('scout_account_id', scout.scout_accounts?.id || '')
-      .order('id', { ascending: false })
-      .limit(10),
-    supabase
-      .from('scout_guardians')
-      .select(`
-        id,
-        relationship,
-        is_primary,
-        profile_id,
-        profiles (
-          id,
-          first_name,
-          last_name,
-          full_name,
-          email,
-          member_type,
-          position,
-          user_id
-        )
-      `)
-      .eq('scout_id', id)
-      .order('is_primary', { ascending: false }),
-  ])
-
-  interface Transaction {
-    id: string
-    debit: number | null
-    credit: number | null
-    memo: string | null
-    journal_entries: {
-      id: string
-      entry_date: string
-      description: string
-      entry_type: string | null
-      is_posted: boolean | null
-    } | null
-  }
-
-  const transactions = (transactionsResult.data as Transaction[]) || []
+        first_name,
+        last_name,
+        full_name,
+        email,
+        member_type,
+        position,
+        user_id
+      )
+    `)
+    .eq('scout_id', id)
+    .order('is_primary', { ascending: false })
 
   interface Guardian {
     id: string
@@ -202,7 +166,7 @@ export default async function ScoutPage({ params }: ScoutPageProps) {
     }
   }
 
-  const guardians = ((guardiansResult.data || []) as Guardian[]).filter(g => g.profiles !== null)
+  const guardians = ((guardiansData || []) as Guardian[]).filter(g => g.profiles !== null)
 
   // Group 3: Parallel fetch of unit members (for available profiles) and advancement data
   const advancementEnabled = isFeatureEnabled(FeatureFlag.ADVANCEMENT_TRACKING)
@@ -367,7 +331,6 @@ export default async function ScoutPage({ params }: ScoutPageProps) {
           patrols: scout.patrols,
         }}
         guardians={guardians}
-        transactions={transactions}
         availableProfiles={availableProfiles}
         advancementData={advancementData}
         advancementEnabled={advancementEnabled}

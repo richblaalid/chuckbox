@@ -25,16 +25,22 @@ interface Scout {
 interface BillingFormProps {
   unitId: string
   scouts: Scout[]
+  /** Pre-select specific scouts by ID */
+  preselectedScoutIds?: string[]
+  /** Callback when billing is successfully created */
+  onSuccess?: () => void
 }
 
 type BillingType = 'split' | 'fixed'
 
-export function BillingForm({ unitId, scouts }: BillingFormProps) {
+export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: BillingFormProps) {
   const router = useRouter()
   const { addToast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [selectedScouts, setSelectedScouts] = useState<Set<string>>(new Set())
+  const [selectedScouts, setSelectedScouts] = useState<Set<string>>(
+    () => new Set(preselectedScoutIds || [])
+  )
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
   const [billingType, setBillingType] = useState<BillingType>('fixed')
@@ -190,10 +196,17 @@ export function BillingForm({ unitId, scouts }: BillingFormProps) {
       setSelectedScouts(new Set())
       setSendNotifications(false)
 
-      // Refresh server components to show new record
-      setTimeout(() => {
-        router.refresh()
-      }, 1500)
+      // Call onSuccess callback or refresh
+      if (onSuccess) {
+        setTimeout(() => {
+          onSuccess()
+        }, 1500)
+      } else {
+        // Refresh server components to show new record
+        setTimeout(() => {
+          router.refresh()
+        }, 1500)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {

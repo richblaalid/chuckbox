@@ -1,13 +1,11 @@
-import Link from 'next/link'
-import { Upload } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { formatCurrency } from '@/lib/utils'
 import { hasFilteredView, isFinancialRole } from '@/lib/roles'
-import { AccountsList } from '@/components/accounts/accounts-list'
 import { FinanceSubnav } from '@/components/finances/finance-subnav'
 import { ImportUndoBanner } from '@/components/finances/import-undo-banner'
+import { UnifiedAccountsView } from '@/components/finances/unified-accounts-view'
+import type { ScoutAccountRow } from '@/components/finances/unified-scout-accounts-table'
 
 interface ScoutAccount {
   id: string
@@ -47,12 +45,12 @@ export default async function AccountsPage() {
   // Get user's unit membership
   const { data: membershipData } = await supabase
     .from('unit_memberships')
-    .select('unit_id, role')
+    .select('unit_id, role, units:units!unit_memberships_unit_id_fkey(name)')
     .eq('profile_id', profile.id)
     .eq('status', 'active')
     .single()
 
-  const membership = membershipData as { unit_id: string; role: string } | null
+  const membership = membershipData as { unit_id: string; role: string; units: { name: string } | null } | null
 
   if (!membership) {
     return (
@@ -123,7 +121,143 @@ export default async function AccountsPage() {
   }
 
   const { data: accountsData } = await accountsQuery
-  const accounts = (accountsData as ScoutAccount[]) || []
+  const rawAccounts = (accountsData as ScoutAccount[]) || []
+
+  // Get oldest unpaid billing date for each account (for overdue calculation)
+  const accountIds = rawAccounts.map((a) => a.id)
+  const oldestChargesByAccount: Record<string, string> = {}
+
+  if (accountIds.length > 0) {
+    const { data: unpaidChargesData } = await supabase
+      .from('billing_charges')
+      .select(`
+        scout_account_id,
+        billing_records!inner (
+          billing_date
+        )
+      `)
+      .in('scout_account_id', accountIds)
+      .eq('is_paid', false)
+      .or('is_void.is.null,is_void.eq.false')
+      .order('billing_records(billing_date)', { ascending: true })
+
+    interface UnpaidCharge {
+      scout_account_id: string
+      billing_records: { billing_date: string }
+    }
+
+    for (const charge of (unpaidChargesData as UnpaidCharge[]) || []) {
+      // Only keep the oldest (first) date per account
+      if (!oldestChargesByAccount[charge.scout_account_id]) {
+        oldestChargesByAccount[charge.scout_account_id] = charge.billing_records.billing_date
+      }
+    }
+  }
+
+  // Get most recent activity date for each account from journal lines
+  const lastActivityByAccount: Record<string, string> = {}
+
+  if (accountIds.length > 0) {
+    const { data: recentActivityData } = await supabase
+      .from('journal_lines')
+      .select(`
+        scout_account_id,
+        journal_entries!inner (
+          created_at
+        )
+      `)
+      .in('scout_account_id', accountIds)
+      .order('journal_entries(created_at)', { ascending: false })
+
+    interface JournalLineWithEntry {
+      scout_account_id: string
+      journal_entries: { created_at: string }
+    }
+
+    for (const line of (recentActivityData as JournalLineWithEntry[]) || []) {
+      // Only keep the most recent (first) date per account
+      if (!lastActivityByAccount[line.scout_account_id]) {
+        lastActivityByAccount[line.scout_account_id] = line.journal_entries.created_at
+      }
+    }
+  }
+
+  // Calculate days overdue for each account
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  // Transform accounts for the unified table
+  const accounts: ScoutAccountRow[] = rawAccounts.map((acc) => {
+    const oldestDate = oldestChargesByAccount[acc.id]
+    let daysOverdue = 0
+
+    if (oldestDate) {
+      const chargeDate = new Date(oldestDate)
+      chargeDate.setHours(0, 0, 0, 0)
+      daysOverdue = Math.floor((today.getTime() - chargeDate.getTime()) / (1000 * 60 * 60 * 24))
+    }
+
+    return {
+      id: acc.id,
+      scoutId: acc.scout_id,
+      scoutName: acc.scouts ? `${acc.scouts.last_name}, ${acc.scouts.first_name}` : 'Unknown',
+      patrolName: acc.scouts?.patrols?.name || null,
+      billingBalance: acc.billing_balance || 0,
+      fundsBalance: acc.funds_balance || 0,
+      lastActivity: lastActivityByAccount[acc.id] || null,
+      isActive: acc.scouts?.is_active ?? true,
+      daysOverdue,
+    }
+  })
+
+  // Extract unique patrols
+  const patrols = [...new Set(accounts.map((a) => a.patrolName).filter(Boolean))] as string[]
+
+  // Transform scouts for billing form
+  const scoutsForBilling = rawAccounts
+    .filter((acc) => acc.scouts)
+    .map((acc) => ({
+      id: acc.scouts!.id,
+      first_name: acc.scouts!.first_name,
+      last_name: acc.scouts!.last_name,
+      is_active: acc.scouts!.is_active,
+      scout_accounts: { id: acc.id },
+      patrols: acc.scouts!.patrols,
+    }))
+
+  // Transform scouts for payment form (needs billing_balance and funds_balance)
+  const scoutsForPayment = rawAccounts
+    .filter((acc) => acc.scouts)
+    .map((acc) => ({
+      id: acc.scouts!.id,
+      first_name: acc.scouts!.first_name,
+      last_name: acc.scouts!.last_name,
+      scout_accounts: {
+        id: acc.id,
+        billing_balance: acc.billing_balance,
+        funds_balance: acc.funds_balance,
+      },
+    }))
+
+  // Get Square configuration for payments
+  let squareConfig: { applicationId: string; locationId: string; environment: 'sandbox' | 'production' } | undefined
+
+  if (canTakeActions) {
+    const { data: credentials } = await supabase
+      .from('unit_square_credentials')
+      .select('location_id')
+      .eq('unit_id', membership.unit_id)
+      .eq('is_active', true)
+      .single()
+
+    if (credentials?.location_id) {
+      squareConfig = {
+        applicationId: process.env.SQUARE_APPLICATION_ID || '',
+        locationId: credentials.location_id,
+        environment: (process.env.SQUARE_ENVIRONMENT || 'sandbox') as 'sandbox' | 'production',
+      }
+    }
+  }
 
   // Get most recent active import batch for undo banner
   let latestBatch: { id: string; created_at: string; row_count: number } | null = null
@@ -160,42 +294,32 @@ export default async function AccountsPage() {
   }
 
   // Calculate totals - now using separate billing and funds balances
-  const totalOwed = accounts
+  const totalOwed = rawAccounts
     .filter((a) => (a.billing_balance || 0) < 0)
     .reduce((sum, a) => sum + Math.abs(a.billing_balance || 0), 0)
 
-  const totalFunds = accounts
+  const totalFunds = rawAccounts
     .reduce((sum, a) => sum + (a.funds_balance || 0), 0)
 
-  const scoutsWithDebt = accounts.filter((a) => (a.billing_balance || 0) < 0).length
-  const scoutsWithFunds = accounts.filter((a) => (a.funds_balance || 0) > 0).length
+  const scoutsWithDebt = rawAccounts.filter((a) => (a.billing_balance || 0) < 0).length
+  const scoutsWithFunds = rawAccounts.filter((a) => (a.funds_balance || 0) > 0).length
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-stone-900">
-            {isScout ? 'My Account' : isParent ? 'Family Accounts' : 'Scout Accounts'}
-          </h1>
-          <p className="mt-1 text-stone-600">
-            {isScout
-              ? 'View your account balance and transactions'
-              : isParent
-                ? 'View your scouts\' account balances'
-                : 'View and manage scout financial accounts'}
-          </p>
-        </div>
-        {isFinancialRole(role) && (
-          <Link href="/settings/import/balances">
-            <Button variant="outline">
-              <Upload className="mr-2 h-4 w-4" />
-              Import Balances
-            </Button>
-          </Link>
-        )}
+      <div>
+        <h1 className="text-3xl font-bold text-stone-900">
+          {isScout ? 'My Account' : isParent ? 'Family Accounts' : 'Scout Accounts'}
+        </h1>
+        <p className="mt-1 text-stone-600">
+          {isScout
+            ? 'View your account balance and transactions'
+            : isParent
+              ? 'View your scouts\' account balances'
+              : 'View and manage scout financial accounts'}
+        </p>
       </div>
 
-      <FinanceSubnav showFinancialTabs={canTakeActions} />
+      <FinanceSubnav />
 
       {/* Undo Banner for recent imports */}
       {isFinancialRole(role) && latestBatch && canUndo && (
@@ -253,20 +377,17 @@ export default async function AccountsPage() {
         </div>
       )}
 
-      {/* Accounts List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {isScout ? 'Account Details' : isParent ? 'Your Scouts' : 'All Scout Accounts'}
-          </CardTitle>
-          <CardDescription>
-            {accounts.length} account{accounts.length !== 1 ? 's' : ''}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <AccountsList accounts={accounts} showPatrolFilter={!hasFilteredView(role)} />
-        </CardContent>
-      </Card>
+      {/* Unified Accounts View with table, bulk actions, and action dialogs */}
+      <UnifiedAccountsView
+        unitId={membership.unit_id}
+        unitName={membership.units?.name}
+        scouts={accounts}
+        patrols={patrols}
+        scoutsForBilling={scoutsForBilling}
+        scoutsForPayment={scoutsForPayment}
+        canTakeActions={canTakeActions}
+        squareConfig={squareConfig}
+      />
     </div>
   )
 }

@@ -12,6 +12,7 @@ const mockScouts = [
     fundsBalance: 45.0,
     lastActivity: '2026-01-15',
     isActive: true,
+    daysOverdue: 45, // 45 days overdue
   },
   {
     id: 'acc-2',
@@ -22,6 +23,18 @@ const mockScouts = [
     fundsBalance: 200.0,
     lastActivity: '2026-02-01',
     isActive: true,
+    daysOverdue: 0, // Not overdue
+  },
+  {
+    id: 'acc-3',
+    scoutId: 'scout-3',
+    scoutName: 'Williams, Mike',
+    patrolName: 'Eagle',
+    billingBalance: -50.0,
+    fundsBalance: 0,
+    lastActivity: '2026-02-05',
+    isActive: true,
+    daysOverdue: 15, // 15 days - not overdue (< 30)
   },
 ]
 
@@ -49,15 +62,16 @@ describe('UnifiedScoutAccountsTable', () => {
   it('renders checkboxes for each row', () => {
     render(<UnifiedScoutAccountsTable {...defaultProps} />)
     const checkboxes = screen.getAllByRole('checkbox')
-    // Header checkbox + 2 row checkboxes
-    expect(checkboxes.length).toBe(3)
+    // Header checkbox + 3 row checkboxes
+    expect(checkboxes.length).toBe(4)
   })
 
   it('calls onSelectionChange when checkbox clicked', () => {
     render(<UnifiedScoutAccountsTable {...defaultProps} />)
     const checkboxes = screen.getAllByRole('checkbox')
-    fireEvent.click(checkboxes[1]) // First row checkbox
-    expect(defaultProps.onSelectionChange).toHaveBeenCalledWith(['acc-1'])
+    // Note: Sorted by name ascending, so order is: Jones (acc-2), Smith (acc-1), Williams (acc-3)
+    fireEvent.click(checkboxes[1]) // First row checkbox (Jones)
+    expect(defaultProps.onSelectionChange).toHaveBeenCalledWith(['acc-2'])
   })
 
   it('calls onScoutSelect when row clicked', () => {
@@ -76,15 +90,34 @@ describe('UnifiedScoutAccountsTable', () => {
 
   it('filters by balance state', () => {
     render(<UnifiedScoutAccountsTable {...defaultProps} />)
-    const filterButton = screen.getByRole('button', { name: /owes money/i })
+    const filterButton = screen.getByRole('radio', { name: /owes money/i })
     fireEvent.click(filterButton)
     expect(screen.getByText('Smith, John')).toBeInTheDocument()
     expect(screen.queryByText('Jones, Sarah')).not.toBeInTheDocument()
   })
 
   it('shows selected state on rows', () => {
+    // Note: Sorted by name ascending, so order is: Jones (acc-2), Smith (acc-1), Williams (acc-3)
+    // acc-1 (Smith) is at index 2 (header is 0, Jones is 1, Smith is 2)
     render(<UnifiedScoutAccountsTable {...defaultProps} selectedIds={['acc-1']} />)
     const checkboxes = screen.getAllByRole('checkbox')
-    expect(checkboxes[1]).toBeChecked()
+    expect(checkboxes[2]).toBeChecked() // Smith is 2nd row (index 2 after header)
+  })
+
+  it('filters by overdue status (30+ days)', () => {
+    render(<UnifiedScoutAccountsTable {...defaultProps} />)
+    const filterButton = screen.getByRole('radio', { name: /overdue/i })
+    fireEvent.click(filterButton)
+    // Smith has 45 days overdue (should show)
+    expect(screen.getByText('Smith, John')).toBeInTheDocument()
+    // Williams has 15 days overdue (should NOT show - under 30)
+    expect(screen.queryByText('Williams, Mike')).not.toBeInTheDocument()
+    // Jones has 0 days (should NOT show)
+    expect(screen.queryByText('Jones, Sarah')).not.toBeInTheDocument()
+  })
+
+  it('renders overdue filter option', () => {
+    render(<UnifiedScoutAccountsTable {...defaultProps} />)
+    expect(screen.getByRole('radio', { name: /overdue/i })).toBeInTheDocument()
   })
 })
