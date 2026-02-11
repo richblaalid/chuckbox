@@ -22,6 +22,7 @@ interface RequirementCompletionDialogProps {
   requirementDescription: string
   currentUserName: string
   onComplete: (completedAt: string, notes: string) => Promise<void>
+  isParentSubmission?: boolean // True when parent is submitting for leader approval
 }
 
 export function RequirementCompletionDialog({
@@ -31,6 +32,7 @@ export function RequirementCompletionDialog({
   requirementDescription,
   currentUserName,
   onComplete,
+  isParentSubmission = false,
 }: RequirementCompletionDialogProps) {
   const [completedDate, setCompletedDate] = useState(
     new Date().toISOString().split('T')[0]
@@ -73,10 +75,17 @@ export function RequirementCompletionDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Check className="h-5 w-5 text-emerald-600" />
-            Complete Requirement {requirementNumber}
+            <Check className={isParentSubmission ? "h-5 w-5 text-amber-600" : "h-5 w-5 text-emerald-600"} />
+            {isParentSubmission
+              ? `Submit Requirement ${requirementNumber} for Approval`
+              : `Complete Requirement ${requirementNumber}`}
           </DialogTitle>
           <DialogDescription className="text-sm">
+            {isParentSubmission && (
+              <span className="block mb-2 text-amber-600">
+                This will be sent to a leader for approval.
+              </span>
+            )}
             {truncatedDescription}
           </DialogDescription>
         </DialogHeader>
@@ -86,7 +95,7 @@ export function RequirementCompletionDialog({
           <div className="space-y-2">
             <Label htmlFor="completion-date" className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-stone-500" />
-              Completion Date
+              {isParentSubmission ? 'Date Completed' : 'Completion Date'}
             </Label>
             <Input
               id="completion-date"
@@ -97,7 +106,9 @@ export function RequirementCompletionDialog({
               className="w-full"
             />
             <p className="text-xs text-stone-500">
-              Defaults to today. You can backdate if needed.
+              {isParentSubmission
+                ? 'When was this requirement completed?'
+                : 'Defaults to today. You can backdate if needed.'}
             </p>
           </div>
 
@@ -105,7 +116,7 @@ export function RequirementCompletionDialog({
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <User className="h-4 w-4 text-stone-500" />
-              Signed By
+              {isParentSubmission ? 'Submitted By' : 'Signed By'}
             </Label>
             <div className="flex h-10 items-center rounded-md border border-stone-200 bg-stone-50 px-3 text-sm text-stone-600">
               {currentUserName}
@@ -114,15 +125,24 @@ export function RequirementCompletionDialog({
 
           {/* Notes */}
           <div className="space-y-2">
-            <Label htmlFor="completion-notes">Notes (optional)</Label>
+            <Label htmlFor="completion-notes">
+              {isParentSubmission ? 'Notes for Leader' : 'Notes (optional)'}
+            </Label>
             <Textarea
               id="completion-notes"
-              placeholder="Add any notes about this completion..."
+              placeholder={isParentSubmission
+                ? "How was this requirement completed? (e.g., at summer camp, troop meeting...)"
+                : "Add any notes about this completion..."}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               className="resize-none"
             />
+            {isParentSubmission && (
+              <p className="text-xs text-stone-500">
+                Help the leader understand how this was accomplished.
+              </p>
+            )}
           </div>
         </div>
 
@@ -137,17 +157,19 @@ export function RequirementCompletionDialog({
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+            className={isParentSubmission
+              ? "gap-2 bg-amber-600 hover:bg-amber-700"
+              : "gap-2 bg-emerald-600 hover:bg-emerald-700"}
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Completing...
+                {isParentSubmission ? 'Submitting...' : 'Completing...'}
               </>
             ) : (
               <>
                 <Check className="h-4 w-4" />
-                Complete
+                {isParentSubmission ? 'Submit for Approval' : 'Complete'}
               </>
             )}
           </Button>

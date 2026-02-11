@@ -1,22 +1,22 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import Link from 'next/link'
 import {
   CheckCircle2,
   TrendingUp,
   AlertCircle,
-  Clock,
   ChevronDown,
   ChevronRight,
   Award,
   PartyPopper,
+  ClipboardCheck,
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { PendingSignoffsList } from '@/components/dashboard/pending-signoffs-list'
+import type { PendingSignoff } from '@/types/advancement'
 
 interface RankProgress {
   id: string
@@ -39,36 +39,10 @@ interface Scout {
   patrols: { name: string } | null
 }
 
-interface PendingApproval {
-  id: string
-  status: string
-  approval_status: string | null
-  submission_notes: string | null
-  submitted_at: string | null
-  scout_rank_progress: {
-    id: string
-    scout_id: string
-    scouts: { id: string; first_name: string; last_name: string } | null
-    bsa_ranks: { name: string } | null
-  } | null
-  bsa_rank_requirements: { requirement_number: string; description: string } | null
-}
-
-interface PendingBadgeApproval {
-  id: string
-  status: string
-  completed_at: string | null
-  scout_id: string
-  scouts: { id: string; first_name: string; last_name: string } | null
-  bsa_merit_badges: { id: string; name: string; is_eagle_required: boolean | null } | null
-}
-
 interface AdvancementSummaryViewProps {
   scouts: Scout[]
   rankProgress: RankProgress[]
-  pendingApprovals: PendingApproval[]
-  pendingBadgeApprovals: PendingBadgeApproval[]
-  onPendingApprovalsClick?: () => void
+  pendingSignoffs: PendingSignoff[]
   canEdit: boolean
 }
 
@@ -218,9 +192,7 @@ function getNeedsAttention(
 export function AdvancementSummaryView({
   scouts,
   rankProgress,
-  pendingApprovals,
-  pendingBadgeApprovals,
-  onPendingApprovalsClick,
+  pendingSignoffs,
   canEdit,
 }: AdvancementSummaryViewProps) {
   const [borExpanded, setBorExpanded] = useState(true)
@@ -238,9 +210,6 @@ export function AdvancementSummaryView({
     [scouts, rankProgress]
   )
 
-  // Total pending approvals (rank requirements + merit badges)
-  const totalPendingCount = pendingApprovals.length + pendingBadgeApprovals.length
-
   // Show limits
   const BOR_SHOW_LIMIT = 10
   const CLOSE_SHOW_LIMIT = 10
@@ -248,40 +217,24 @@ export function AdvancementSummaryView({
 
   return (
     <div className="space-y-4">
-      {/* Pending Approvals Card - Most prominent */}
+      {/* Pending Sign-offs - Inline actionable list */}
       {canEdit && (
-        <Card
-          className={cn(
-            'border-rose-200 bg-gradient-to-br from-rose-50 to-red-50 transition-all',
-            totalPendingCount > 0 && 'cursor-pointer hover:border-rose-300 hover:shadow-md'
-          )}
-          onClick={totalPendingCount > 0 ? onPendingApprovalsClick : undefined}
-        >
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center justify-between text-base">
-              <span className="flex items-center gap-2 text-rose-800">
-                <Clock className="h-5 w-5" />
-                Pending Approvals
-              </span>
-              <Badge
-                variant={totalPendingCount > 0 ? 'destructive' : 'secondary'}
-                className="text-sm"
-              >
-                {totalPendingCount}
-              </Badge>
-            </CardTitle>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <div className="flex items-center gap-2">
+              <ClipboardCheck className="h-5 w-5 text-forest-600" />
+              <div>
+                <CardTitle className="text-lg">Pending Sign-offs</CardTitle>
+                <CardDescription>
+                  {pendingSignoffs.length > 0
+                    ? `${pendingSignoffs.length} requirement${pendingSignoffs.length !== 1 ? 's' : ''} awaiting approval`
+                    : 'All caught up!'}
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent className="pt-0">
-            {totalPendingCount > 0 ? (
-              <p className="text-sm text-rose-700">
-                {pendingApprovals.length > 0 && `${pendingApprovals.length} requirement${pendingApprovals.length !== 1 ? 's' : ''}`}
-                {pendingApprovals.length > 0 && pendingBadgeApprovals.length > 0 && ' and '}
-                {pendingBadgeApprovals.length > 0 && `${pendingBadgeApprovals.length} merit badge${pendingBadgeApprovals.length !== 1 ? 's' : ''}`}
-                {' '}waiting for approval. Click to review.
-              </p>
-            ) : (
-              <p className="text-sm text-rose-600/70">No pending approvals - all caught up!</p>
-            )}
+          <CardContent>
+            <PendingSignoffsList items={pendingSignoffs} />
           </CardContent>
         </Card>
       )}

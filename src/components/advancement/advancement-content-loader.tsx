@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { UnitAdvancementContent } from './unit-advancement-content'
-import { getUnitAdvancementSummary } from '@/app/actions/advancement'
+import { getUnitAdvancementSummary, getPendingSignoffs } from '@/app/actions/advancement'
 
 /**
  * PERFORMANCE OPTIMIZATION:
@@ -49,59 +49,9 @@ export async function AdvancementContentLoader({
     ? summaryResult.data?.scouts.map(s => s.id) || []
     : []
 
-  // Pending rank approvals query (doesn't need scout IDs - filters by approval_status)
-  const pendingApprovalsPromise = supabase
-    .from('scout_rank_requirement_progress')
-    .select(`
-      id,
-      status,
-      approval_status,
-      submission_notes,
-      submitted_at,
-      scout_rank_progress (
-        id,
-        scout_id,
-        scouts (
-          id,
-          first_name,
-          last_name
-        ),
-        bsa_ranks (
-          name
-        )
-      ),
-      bsa_rank_requirements (
-        requirement_number,
-        description
-      )
-    `)
-    .eq('approval_status', 'pending_approval')
-    .order('submitted_at', { ascending: false })
-
-  // Pending badge approvals - uses scout IDs from summary (no extra query)
-  const pendingBadgeApprovalsPromise = scoutIds.length > 0
-    ? supabase
-        .from('scout_merit_badge_progress')
-        .select(`
-          id,
-          status,
-          completed_at,
-          scout_id,
-          scouts (
-            id,
-            first_name,
-            last_name
-          ),
-          bsa_merit_badges (
-            id,
-            name,
-            is_eagle_required
-          )
-        `)
-        .eq('status', 'completed')
-        .in('scout_id', scoutIds)
-        .order('completed_at', { ascending: false })
-    : Promise.resolve({ data: [] as unknown[] })
+  // Get pending signoffs using the unified function (reuses batched query logic)
+  // Limit to 20 for the summary view
+  const pendingSignoffsPromise = getPendingSignoffs(unitId, 20)
 
   // SLOW query - ONLY load if summary tab is initial
   // Uses scout IDs from summary (no extra query)
@@ -130,12 +80,10 @@ export async function AdvancementContentLoader({
 
   // Fetch remaining queries in parallel
   const [
-    pendingApprovalsResult,
-    pendingBadgeApprovalsResult,
+    pendingSignoffs,
     rankProgressResult,
   ] = await Promise.all([
-    pendingApprovalsPromise,
-    pendingBadgeApprovalsPromise,
+    pendingSignoffsPromise,
     rankProgressPromise,
   ])
 
@@ -164,34 +112,6 @@ export async function AdvancementContentLoader({
     patrols: s.patrol_name ? { name: s.patrol_name } : null,
   }))
 
-  // Type definitions for pending approvals
-  interface PendingApproval {
-    id: string
-    status: string
-    approval_status: string | null
-    submission_notes: string | null
-    submitted_at: string | null
-    scout_rank_progress: {
-      id: string
-      scout_id: string
-      scouts: { id: string; first_name: string; last_name: string } | null
-      bsa_ranks: { name: string } | null
-    } | null
-    bsa_rank_requirements: { requirement_number: string; description: string } | null
-  }
-
-  interface PendingBadgeApproval {
-    id: string
-    status: string
-    completed_at: string | null
-    scout_id: string
-    scouts: { id: string; first_name: string; last_name: string } | null
-    bsa_merit_badges: { id: string; name: string; is_eagle_required: boolean | null } | null
-  }
-
-  const pendingApprovals = (pendingApprovalsResult.data || []) as PendingApproval[]
-  const pendingBadgeApprovals = (pendingBadgeApprovalsResult.data || []) as PendingBadgeApproval[]
-
   // NOTE: prefetchedRankData is undefined - LazyRankBrowser will fetch on demand
   // This is the key optimization that makes initial page load fast
 
@@ -199,8 +119,7 @@ export async function AdvancementContentLoader({
     <UnitAdvancementContent
       scouts={scouts}
       rankProgress={rankProgress}
-      pendingApprovals={pendingApprovals}
-      pendingBadgeApprovals={pendingBadgeApprovals}
+      pendingSignoffs={pendingSignoffs}
       stats={{
         rankProgressPercent: summary?.rankStats.avgProgressPercent || 0,
         scoutsWorkingOnRanks: summary?.rankStats.scoutsWorkingOnRanks || 0,

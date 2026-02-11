@@ -9,7 +9,6 @@ interface UnitAdvancementStatsProps {
   meritBadgesInProgress: number
   meritBadgesEarned: number
   pendingApprovalsCount: number
-  onPendingApprovalsClick?: () => void
 }
 
 export function UnitAdvancementStats({
@@ -18,7 +17,6 @@ export function UnitAdvancementStats({
   meritBadgesInProgress,
   meritBadgesEarned,
   pendingApprovalsCount,
-  onPendingApprovalsClick,
 }: UnitAdvancementStatsProps) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -57,15 +55,12 @@ export function UnitAdvancementStats({
         </div>
       </div>
 
-      {/* Pending Approvals - Clickable */}
-      <button
-        onClick={onPendingApprovalsClick}
+      {/* Pending Approvals - Display only (approvals handled inline in Summary) */}
+      <div
         className={cn(
-          'flex items-center gap-3 rounded-lg border bg-gradient-to-br from-rose-50 to-red-50 p-3 text-left transition-all',
-          pendingApprovalsCount > 0 && 'cursor-pointer hover:border-rose-300 hover:shadow-sm',
-          pendingApprovalsCount === 0 && 'cursor-default opacity-75'
+          'flex items-center gap-3 rounded-lg border bg-gradient-to-br from-rose-50 to-red-50 p-3',
+          pendingApprovalsCount === 0 && 'opacity-75'
         )}
-        disabled={pendingApprovalsCount === 0}
       >
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-100">
           <Clock className="h-5 w-5 text-rose-600" />
@@ -74,7 +69,7 @@ export function UnitAdvancementStats({
           <p className="text-xl font-bold text-rose-900">{pendingApprovalsCount}</p>
           <p className="text-xs text-rose-700">Pending Approvals</p>
         </div>
-      </button>
+      </div>
     </div>
   )
 }

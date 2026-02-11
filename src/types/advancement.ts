@@ -213,6 +213,28 @@ export interface WhatsNextItem {
 }
 
 // ==========================================
+// PENDING SIGNOFF TYPES (Dashboard)
+// ==========================================
+
+export type PendingSignoffType = 'rank' | 'merit_badge'
+
+export interface PendingSignoff {
+  id: string
+  type: PendingSignoffType
+  scoutId: string
+  scoutName: string
+  requirementNumber: string
+  requirementDescription: string
+  /** For ranks: rank name. For badges: merit badge name. */
+  advancementName: string
+  submittedAt: string
+  submittedByName: string
+  submissionNotes: string | null
+  /** Relative time display, e.g., "5 days ago" */
+  submittedAgo: string
+}
+
+// ==========================================
 // CSV IMPORT TYPES
 // ==========================================
 

@@ -34,3 +34,6 @@ export * from './leadership'
 
 // Export query functions
 export * from './queries'
+
+// Export sign-off actions (dashboard pending approvals)
+export * from './signoff-actions'
