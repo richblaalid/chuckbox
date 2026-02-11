@@ -24,7 +24,7 @@ import { verifyLeaderRole } from './utils'
 // ==========================================
 
 /**
- * Get the current user's profile info for display in UI
+ * Get the current user's profile info for display in UI (for leaders)
  */
 export async function getCurrentUserInfo(unitId: string): Promise<ActionResult<{
   profileId: string
@@ -40,6 +40,44 @@ export async function getCurrentUserInfo(unitId: string): Promise<ActionResult<{
       profileId: auth.profileId,
       fullName: auth.fullName,
       role: auth.role,
+    },
+  }
+}
+
+/**
+ * Get the current user's profile info for display in UI (for any authenticated user)
+ * Used by parents to show their name in submission dialogs
+ */
+export async function getCurrentUserProfile(): Promise<ActionResult<{
+  profileId: string
+  fullName: string
+}>> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, first_name, last_name, full_name')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!profile) {
+    return { success: false, error: 'Profile not found' }
+  }
+
+  const fullName = profile.full_name ||
+    [profile.first_name, profile.last_name].filter(Boolean).join(' ') ||
+    'Unknown'
+
+  return {
+    success: true,
+    data: {
+      profileId: profile.id,
+      fullName,
     },
   }
 }
@@ -235,6 +273,247 @@ export async function getPendingSubmissions(unitId: string) {
   }
 
   return data
+}
+
+/**
+ * Get all pending sign-offs for a unit (combined rank + merit badge requirements)
+ * Used by the dashboard pending sign-offs card.
+ *
+ * Returns items in FIFO order (oldest submissions first).
+ *
+ * Note: Uses a three-step query approach for performance:
+ * 1. Get scout IDs for the unit
+ * 2. Get progress IDs for those scouts (efficient indexed lookup)
+ * 3. Get pending requirements using progress IDs directly (avoids nested filtering)
+ */
+export async function getPendingSignoffs(unitId: string, limit: number = 5) {
+  // Use admin client to bypass RLS - authorization handled by caller (dashboard checks role)
+  const supabase = createAdminClient()
+
+  // Step 1: Get scout IDs for this unit (fast indexed query)
+  const { data: scouts, error: scoutsError } = await supabase
+    .from('scouts')
+    .select('id')
+    .eq('unit_id', unitId)
+    .eq('is_active', true)
+
+  if (scoutsError || !scouts || scouts.length === 0) {
+    if (scoutsError) {
+      console.error('Error fetching scouts for pending signoffs:', scoutsError)
+    }
+    return []
+  }
+
+  const scoutIds = scouts.map(s => s.id)
+
+  // Step 2: Get progress IDs for these scouts (parallel, indexed lookups)
+  const [rankProgressResult, mbProgressResult] = await Promise.all([
+    supabase
+      .from('scout_rank_progress')
+      .select('id')
+      .in('scout_id', scoutIds),
+    supabase
+      .from('scout_merit_badge_progress')
+      .select('id')
+      .in('scout_id', scoutIds),
+  ])
+
+  const rankProgressIds = rankProgressResult.data?.map(rp => rp.id) || []
+  const mbProgressIds = mbProgressResult.data?.map(mp => mp.id) || []
+
+  // Early exit if no progress records
+  if (rankProgressIds.length === 0 && mbProgressIds.length === 0) {
+    return []
+  }
+
+  // Step 3: Query pending items using progress IDs directly (avoids nested filtering)
+  // NOTE: PostgREST has a URL length limit, so we batch large ID arrays
+  const BATCH_SIZE = 100  // UUIDs are 36 chars each, 100 keeps us well under limits
+
+  // Query rank requirements (usually smaller, likely doesn't need batching)
+  const rankResult = rankProgressIds.length > 0
+    ? await supabase
+        .from('scout_rank_requirement_progress')
+        .select(`
+          id,
+          submitted_at,
+          submission_notes,
+          bsa_rank_requirements (
+            requirement_number,
+            description
+          ),
+          scout_rank_progress (
+            scout_id,
+            scouts (
+              id,
+              first_name,
+              last_name
+            ),
+            bsa_ranks (
+              name
+            )
+          ),
+          profiles:submitted_by (
+            first_name,
+            last_name
+          )
+        `)
+        .eq('approval_status', 'pending_approval')
+        .in('scout_rank_progress_id', rankProgressIds.slice(0, BATCH_SIZE * 5))  // 500 max
+        .order('submitted_at', { ascending: true })
+        .limit(limit)
+    : { data: [], error: null }
+
+  // Query merit badge requirements - batch if needed due to large number of progress IDs
+  let badgeData: unknown[] = []
+  let badgeError: { message: string } | null = null
+
+  if (mbProgressIds.length > 0) {
+    // For pending approvals, we only need a few results, so batch until we have enough
+    const batchCount = Math.ceil(mbProgressIds.length / BATCH_SIZE)
+
+    for (let i = 0; i < batchCount && badgeData.length < limit; i++) {
+      const batchIds = mbProgressIds.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE)
+      const batchResult = await supabase
+        .from('scout_merit_badge_requirement_progress')
+        .select(`
+          id,
+          submitted_at,
+          submission_notes,
+          submitted_by,
+          bsa_merit_badge_requirements (
+            requirement_number,
+            description
+          ),
+          scout_merit_badge_progress (
+            scout_id,
+            scouts (
+              id,
+              first_name,
+              last_name
+            ),
+            bsa_merit_badges (
+              name
+            )
+          )
+        `)
+        .eq('approval_status', 'pending_approval')
+        .in('scout_merit_badge_progress_id', batchIds)
+        .order('submitted_at', { ascending: true })
+        .limit(limit - badgeData.length)
+
+      if (batchResult.error) {
+        badgeError = batchResult.error
+        console.warn(`Error in MB batch ${i + 1}/${batchCount}:`, batchResult.error)
+        break
+      }
+
+      if (batchResult.data) {
+        badgeData = [...badgeData, ...batchResult.data]
+      }
+    }
+  }
+
+  const badgeResult = { data: badgeData, error: badgeError }
+
+  // Use data if available, otherwise use empty array
+  // Don't fail on errors - just use empty data for that type
+  const rankData = Array.isArray(rankResult.data) ? rankResult.data : []
+  // badgeData is already an array from the batching loop above
+
+  // Log any errors for debugging but don't fail the request
+  if (rankResult.error) {
+    console.warn('Error fetching pending rank signoffs (using empty data):', rankResult.error)
+  }
+  if (badgeError) {
+    console.warn('Error fetching pending merit badge signoffs:', badgeError)
+  }
+
+  // Helper to calculate relative time
+  const getRelativeTime = (dateStr: string): string => {
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+    if (diffDays === 0) return 'today'
+    if (diffDays === 1) return 'yesterday'
+    if (diffDays < 7) return `${diffDays} days ago`
+    if (diffDays < 14) return '1 week ago'
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`
+    if (diffDays < 60) return '1 month ago'
+    return `${Math.floor(diffDays / 30)} months ago`
+  }
+
+  // Transform rank requirements
+  type RankRow = {
+    id: string
+    submitted_at: string | null
+    submission_notes: string | null
+    bsa_rank_requirements: { requirement_number: string; description: string } | null
+    scout_rank_progress: {
+      scout_id: string
+      scouts: { id: string; first_name: string; last_name: string } | null
+      bsa_ranks: { name: string } | null
+    } | null
+    profiles: { first_name: string | null; last_name: string | null } | null
+  }
+
+  const rankItems = (rankData as unknown as RankRow[])
+    .filter(r => r.submitted_at && r.scout_rank_progress?.scouts)
+    .map(r => ({
+      id: r.id,
+      type: 'rank' as const,
+      scoutId: r.scout_rank_progress!.scouts!.id,
+      scoutName: `${r.scout_rank_progress!.scouts!.first_name} ${r.scout_rank_progress!.scouts!.last_name}`,
+      requirementNumber: r.bsa_rank_requirements?.requirement_number || '',
+      requirementDescription: r.bsa_rank_requirements?.description || '',
+      advancementName: r.scout_rank_progress!.bsa_ranks?.name || '',
+      submittedAt: r.submitted_at!,
+      submittedByName: r.profiles
+        ? `${r.profiles.first_name || ''} ${r.profiles.last_name || ''}`.trim()
+        : 'Unknown',
+      submissionNotes: r.submission_notes,
+      submittedAgo: getRelativeTime(r.submitted_at!),
+    }))
+
+  // Transform merit badge requirements
+  // Note: We don't join profiles for MB - would need separate lookup or RPC for submitter names
+  type BadgeRow = {
+    id: string
+    submitted_at: string | null
+    submission_notes: string | null
+    submitted_by: string | null  // UUID, not joined profile
+    bsa_merit_badge_requirements: { requirement_number: string; description: string } | null
+    scout_merit_badge_progress: {
+      scout_id: string
+      scouts: { id: string; first_name: string; last_name: string } | null
+      bsa_merit_badges: { name: string } | null
+    } | null
+  }
+
+  const badgeItems = (badgeData as unknown as BadgeRow[])
+    .filter(r => r.submitted_at && r.scout_merit_badge_progress?.scouts)
+    .map(r => ({
+      id: r.id,
+      type: 'merit_badge' as const,
+      scoutId: r.scout_merit_badge_progress!.scouts!.id,
+      scoutName: `${r.scout_merit_badge_progress!.scouts!.first_name} ${r.scout_merit_badge_progress!.scouts!.last_name}`,
+      requirementNumber: r.bsa_merit_badge_requirements?.requirement_number || '',
+      requirementDescription: r.bsa_merit_badge_requirements?.description || '',
+      advancementName: r.scout_merit_badge_progress!.bsa_merit_badges?.name || '',
+      submittedAt: r.submitted_at!,
+      submittedByName: 'Parent',  // Can't easily join profiles for MB due to ALTER TABLE FK
+      submissionNotes: r.submission_notes,
+      submittedAgo: getRelativeTime(r.submitted_at!),
+    }))
+
+  // Combine and sort by submitted_at (oldest first = FIFO)
+  const combined = [...rankItems, ...badgeItems]
+    .sort((a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime())
+    .slice(0, limit)
+
+  return combined
 }
 
 /**

@@ -31,6 +31,8 @@ interface HierarchicalRequirementsListProps {
   requirements: Requirement[]
   unitId: string
   canEdit: boolean
+  canSubmit?: boolean // Parents can submit requirements for approval
+  scoutId?: string // Scout ID for parent submission
   showSectionHeaders?: boolean
   defaultCollapseCompleted?: boolean
   // Current user name for completion dialogs
@@ -413,6 +415,8 @@ const RequirementNodeView = memo(function RequirementNodeView({
   node,
   unitId,
   canEdit,
+  canSubmit,
+  scoutId,
   currentUserName,
   initData,
   isMeritBadge,
@@ -427,6 +431,8 @@ const RequirementNodeView = memo(function RequirementNodeView({
   node: RequirementNode
   unitId: string
   canEdit: boolean
+  canSubmit?: boolean
+  scoutId?: string
   currentUserName?: string
   initData?: { scoutId: string; rankId: string }
   isMeritBadge?: boolean
@@ -471,6 +477,8 @@ const RequirementNodeView = memo(function RequirementNodeView({
         approvalStatus={req.approvalStatus}
         unitId={unitId}
         canEdit={canEdit}
+        canSubmit={canSubmit}
+        scoutId={scoutId}
         currentUserName={currentUserName}
         initData={initData}
         isMeritBadge={isMeritBadge}
@@ -662,6 +670,8 @@ const RequirementNodeView = memo(function RequirementNodeView({
                     node={child}
                     unitId={unitId}
                     canEdit={canEdit}
+                    canSubmit={canSubmit}
+                    scoutId={scoutId}
                     currentUserName={currentUserName}
                     initData={initData}
                     isMeritBadge={isMeritBadge}
@@ -710,6 +720,8 @@ export function HierarchicalRequirementsList({
   requirements,
   unitId,
   canEdit,
+  canSubmit = false,
+  scoutId,
   defaultCollapseCompleted = false,
   currentUserName,
   initData,
@@ -786,6 +798,8 @@ export function HierarchicalRequirementsList({
           node={node}
           unitId={unitId}
           canEdit={canEdit}
+          canSubmit={canSubmit}
+          scoutId={scoutId}
           currentUserName={currentUserName}
           initData={initData}
           isMeritBadge={isMeritBadge}

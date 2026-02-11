@@ -5,6 +5,7 @@ import { AdvancementSummaryView } from './advancement-summary-view'
 import { getSummaryTabData } from '@/app/actions/advancement'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import type { PendingSignoff } from '@/types/advancement'
 
 interface Scout {
   id: string
@@ -23,37 +24,11 @@ interface RankProgress {
   scout_rank_requirement_progress: Array<{ id: string; status: string; completed_at: string | null }>
 }
 
-interface PendingApproval {
-  id: string
-  status: string
-  approval_status: string | null
-  submission_notes: string | null
-  submitted_at: string | null
-  scout_rank_progress: {
-    id: string
-    scout_id: string
-    scouts: { id: string; first_name: string; last_name: string } | null
-    bsa_ranks: { name: string } | null
-  } | null
-  bsa_rank_requirements: { requirement_number: string; description: string } | null
-}
-
-interface PendingBadgeApproval {
-  id: string
-  status: string
-  completed_at: string | null
-  scout_id: string
-  scouts: { id: string; first_name: string; last_name: string } | null
-  bsa_merit_badges: { id: string; name: string; is_eagle_required: boolean | null } | null
-}
-
 interface LazySummaryViewProps {
   scouts: Scout[]
   // If rankProgress is provided (prefetched), use it; otherwise lazy-load
   rankProgress?: RankProgress[]
-  pendingApprovals: PendingApproval[]
-  pendingBadgeApprovals: PendingBadgeApproval[]
-  onPendingApprovalsClick?: () => void
+  pendingSignoffs: PendingSignoff[]
   canEdit: boolean
   unitId: string
 }
@@ -116,9 +91,7 @@ function SummarySkeleton() {
 export function LazySummaryView({
   scouts,
   rankProgress: prefetchedRankProgress,
-  pendingApprovals,
-  pendingBadgeApprovals,
-  onPendingApprovalsClick,
+  pendingSignoffs,
   canEdit,
   unitId,
 }: LazySummaryViewProps) {
@@ -178,9 +151,7 @@ export function LazySummaryView({
     <AdvancementSummaryView
       scouts={scouts}
       rankProgress={rankProgress || []}
-      pendingApprovals={pendingApprovals}
-      pendingBadgeApprovals={pendingBadgeApprovals}
-      onPendingApprovalsClick={onPendingApprovalsClick}
+      pendingSignoffs={pendingSignoffs}
       canEdit={canEdit}
     />
   )

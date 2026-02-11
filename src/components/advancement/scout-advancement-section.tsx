@@ -9,7 +9,7 @@ import { RankTrailVisualization } from './rank-trail-visualization'
 import { ScoutRankPanel } from './scout-rank-panel'
 import { MeritBadgeSashView } from './merit-badge-sash-view'
 import { ScoutMeritBadgePanel } from './scout-merit-badge-panel'
-import { getRankRequirements, getCurrentUserInfo } from '@/app/actions/advancement'
+import { getRankRequirements, getCurrentUserInfo, getCurrentUserProfile } from '@/app/actions/advancement'
 import {
   Award,
   Medal,
@@ -78,6 +78,7 @@ interface MeritBadgeProgress {
     completed_at: string | null
     completed_by?: string | null
     notes?: string | null
+    approval_status?: string | null
     requirement_id?: string
     bsa_merit_badge_requirements?: {
       id: string
@@ -131,6 +132,7 @@ interface ScoutAdvancementSectionProps {
   activityEntries: ActivityEntry[]
   activityTotals: ActivityTotals
   canEdit: boolean
+  canSubmit?: boolean // Parents can submit requirements for approval
 }
 
 // Compute the "next" rank based on current rank or progress
@@ -184,6 +186,7 @@ export function ScoutAdvancementSection({
   activityEntries,
   activityTotals,
   canEdit,
+  canSubmit = false,
 }: ScoutAdvancementSectionProps) {
   const [activeTab, setActiveTab] = useState('rank')
 
@@ -215,18 +218,26 @@ export function ScoutAdvancementSection({
   const fetchRequestRef = useRef<string | null>(null)
 
   // State for current user info (for completion dialogs)
-  const [currentUserName, setCurrentUserName] = useState<string>('Leader')
+  const [currentUserName, setCurrentUserName] = useState<string>('')
 
-  // Fetch current user info on mount
+  // Fetch current user info on mount (for leaders and parents)
   useEffect(() => {
     if (canEdit) {
+      // Leaders: use getCurrentUserInfo which verifies role
       getCurrentUserInfo(unitId).then(result => {
         if (result.success && result.data) {
           setCurrentUserName(result.data.fullName)
         }
       })
+    } else if (canSubmit) {
+      // Parents: use getCurrentUserProfile which just gets profile info
+      getCurrentUserProfile().then(result => {
+        if (result.success && result.data) {
+          setCurrentUserName(result.data.fullName)
+        }
+      })
     }
-  }, [unitId, canEdit])
+  }, [unitId, canEdit, canSubmit])
 
   // Calculate progress statistics
   const earnedBadges = meritBadgeProgress.filter((b) => b.status === 'awarded')
@@ -403,6 +414,7 @@ export function ScoutAdvancementSection({
                   scoutId={scoutId}
                   unitId={unitId}
                   canEdit={canEdit}
+                  canSubmit={canSubmit}
                   rankName={selectedRank.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                   currentUserName={currentUserName}
                   rankRequirementsData={fetchedRequirements}
@@ -419,6 +431,7 @@ export function ScoutAdvancementSection({
                   scoutId={scoutId}
                   unitId={unitId}
                   canEdit={canEdit}
+                  canSubmit={canSubmit}
                   onBack={() => setSelectedBadgeId(null)}
                   currentUserName={currentUserName}
                 />

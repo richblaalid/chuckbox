@@ -9,6 +9,8 @@ import Link from 'next/link'
 import { RefreshCw, Mail, CalendarCheck, Award } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { QuickPaymentDialog } from '@/components/payments/quick-payment-dialog'
+import { PendingSignoffsCard } from '@/components/dashboard/pending-signoffs-card'
+import { isFeatureEnabled, FeatureFlag } from '@/lib/feature-flags'
 
 interface ScoutAccount {
   id: string
@@ -476,8 +478,14 @@ export default async function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Recent Activity */}
+      {/* Pending Sign-offs + Recent Transactions side by side */}
       <div className="grid gap-4 lg:grid-cols-2">
+        {/* Pending Sign-offs (for advancement tracking) */}
+        {isFeatureEnabled(FeatureFlag.ADVANCEMENT_TRACKING) && (
+          <PendingSignoffsCard unitId={membership.unit_id} />
+        )}
+
+        {/* Recent Transactions */}
         {isFinancialRole(role) && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -521,56 +529,6 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
         )}
-
-        <Card className={!isFinancialRole(role) ? 'lg:col-span-2' : ''}>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Scout Account Summary</CardTitle>
-              <CardDescription>Current balances</CardDescription>
-            </div>
-            <Link
-              href="/finances/accounts"
-              className="text-sm text-forest-600 hover:text-forest-800 hover:underline"
-            >
-              View all →
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {scoutAccounts && scoutAccounts.length > 0 ? (
-              <div className="space-y-2">
-                {scoutAccounts.slice(0, 5).map((account) => (
-                  <div
-                    key={account.id}
-                    className="flex items-center justify-between border-b pb-2"
-                  >
-                    <div>
-                      <p className="font-medium">
-                        {account.scouts?.first_name} {account.scouts?.last_name}
-                      </p>
-                      {account.scouts?.patrols?.name && (
-                        <p className="text-xs text-stone-500">{account.scouts.patrols?.name}</p>
-                      )}
-                    </div>
-                    <span
-                      className={`font-medium ${
-                        (account.billing_balance || 0) < 0 ? 'text-error' : 'text-success'
-                      }`}
-                    >
-                      {formatCurrency(account.billing_balance || 0)}
-                    </span>
-                  </div>
-                ))}
-                {scoutAccounts.length > 5 && (
-                  <p className="text-center text-sm text-stone-500">
-                    +{scoutAccounts.length - 5} more scouts
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="text-stone-500">No scout accounts yet</p>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </div>
   )

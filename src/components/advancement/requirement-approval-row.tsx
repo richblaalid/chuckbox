@@ -23,7 +23,7 @@ import {
   User,
   History,
 } from 'lucide-react'
-import { markRequirementComplete, updateRequirementNotes, markRequirementCompleteWithInit, undoRequirementCompletion, undoMeritBadgeRequirementCompletion, markMeritBadgeRequirement, addRankRequirementNoteWithInit, updateMeritBadgeRequirementNotes, addMeritBadgeRequirementNoteWithInit } from '@/app/actions/advancement'
+import { markRequirementComplete, updateRequirementNotes, markRequirementCompleteWithInit, undoRequirementCompletion, undoMeritBadgeRequirementCompletion, markMeritBadgeRequirement, addRankRequirementNoteWithInit, updateMeritBadgeRequirementNotes, addMeritBadgeRequirementNoteWithInit, submitRequirementForApproval, submitMeritBadgeRequirementForApproval, retractRequirementSubmission, retractMeritBadgeRequirementSubmission } from '@/app/actions/advancement'
 import { RequirementCompletionDialog } from './requirement-completion-dialog'
 import { RequirementUndoDialog } from './requirement-undo-dialog'
 import { parseNotes, formatNoteTimestamp, getNoteTypeLabel, type RequirementNote } from '@/lib/notes-utils'
@@ -43,6 +43,8 @@ interface RequirementApprovalRowProps {
   approvalStatus: string | null
   unitId: string
   canEdit: boolean
+  canSubmit?: boolean // Parents can submit requirements for approval
+  scoutId?: string // Scout ID for parent submission
   // Multi-select mode props
   isMultiSelectMode?: boolean
   isSelected?: boolean
@@ -76,10 +78,12 @@ export const RequirementApprovalRow = memo(function RequirementApprovalRow({
   approvalStatus,
   unitId,
   canEdit,
+  canSubmit = false,
+  scoutId,
   isMultiSelectMode = false,
   isSelected = false,
   onSelectionChange,
-  currentUserName = 'Leader',
+  currentUserName = 'Parent',
   initData,
   isMeritBadge = false,
   meritBadgeInitData,
@@ -93,6 +97,7 @@ export const RequirementApprovalRow = memo(function RequirementApprovalRow({
   // Dialog states
   const [completionDialogOpen, setCompletionDialogOpen] = useState(false)
   const [undoDialogOpen, setUndoDialogOpen] = useState(false)
+  const [submissionDialogOpen, setSubmissionDialogOpen] = useState(false)
 
   const isComplete = ['completed', 'approved', 'awarded'].includes(status)
   const isPending = approvalStatus === 'pending_approval'
@@ -101,10 +106,53 @@ export const RequirementApprovalRow = memo(function RequirementApprovalRow({
   const canApprove = canEdit && !isComplete && !isPending && (requirementProgressId || initData || meritBadgeInitData)
   // Can undo completed or approved requirements (not awarded) - works for both ranks and merit badges
   const canUndo = canEdit && ['completed', 'approved'].includes(status) && requirementProgressId
+  // Parents can submit incomplete requirements for approval
+  const canSubmitReq = canSubmit && !canEdit && !isComplete && !isPending && requirementProgressId && scoutId
+  // Parents can retract their pending submissions
+  const canRetract = canSubmit && !canEdit && isPending && requirementProgressId && scoutId
 
   // Parse notes from JSON or legacy format
   const parsedNotes = useMemo(() => parseNotes(notes), [notes])
   const hasNotes = parsedNotes.length > 0
+
+  // Parent submission handler
+  const handleSubmitForApproval = async (completedAt: string, noteText: string) => {
+    if (!requirementProgressId || !scoutId) return
+
+    setIsLoading(true)
+    try {
+      const result = isMeritBadge
+        ? await submitMeritBadgeRequirementForApproval(requirementProgressId, scoutId, completedAt, noteText)
+        : await submitRequirementForApproval(requirementProgressId, scoutId, completedAt, noteText)
+      if (result?.success) {
+        setShowSuccess(true)
+        setTimeout(() => setShowSuccess(false), 2000)
+      }
+    } catch (error) {
+      console.error('Error submitting requirement for approval:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Parent retraction handler
+  const handleRetractSubmission = async () => {
+    if (!requirementProgressId || !scoutId) return
+
+    setIsLoading(true)
+    try {
+      const result = isMeritBadge
+        ? await retractMeritBadgeRequirementSubmission(requirementProgressId, scoutId)
+        : await retractRequirementSubmission(requirementProgressId, scoutId)
+      if (!result.success) {
+        console.error('Error retracting submission:', result.error)
+      }
+    } catch (error) {
+      console.error('Error retracting submission:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleComplete = async (completedAt: string, noteText: string) => {
     setIsLoading(true)
@@ -211,12 +259,15 @@ export const RequirementApprovalRow = memo(function RequirementApprovalRow({
       // In multi-select mode, toggle selection
       onSelectionChange()
     } else if (canEdit && checked) {
-      // Normal mode: open completion dialog (only if canEdit)
+      // Leader mode: open completion dialog
       setCompletionDialogOpen(true)
+    } else if (canSubmitReq && checked) {
+      // Parent mode: open submission dialog
+      setSubmissionDialogOpen(true)
     }
   }
 
-  // Handle row click - makes entire card clickable for selection
+  // Handle row click - only for multi-select mode, not for opening dialogs
   const handleRowClick = (e: React.MouseEvent) => {
     // Don't trigger if clicking on interactive elements
     const target = e.target as HTMLElement
@@ -231,15 +282,13 @@ export const RequirementApprovalRow = memo(function RequirementApprovalRow({
       return
     }
 
-    // Don't trigger if already complete or loading
-    if (isComplete || isLoading) return
+    // Don't trigger if already complete, pending, or loading
+    if (isComplete || isPending || isLoading) return
 
-    // In multi-select mode (always on when canEdit), toggle selection
+    // Only handle multi-select mode - clicking row toggles selection
+    // Dialogs are opened only via checkbox click, not row click
     if (isMultiSelectMode && onSelectionChange) {
       onSelectionChange()
-    } else if (canApprove) {
-      // Fallback: open completion dialog if can approve
-      setCompletionDialogOpen(true)
     }
   }
 
@@ -259,23 +308,25 @@ export const RequirementApprovalRow = memo(function RequirementApprovalRow({
           // Default: white background with pine green border
           !isComplete && !isPending && !isDenied && !isSelected && 'border-forest-800 bg-white hover:bg-stone-50',
           isSelected && 'border-blue-400 bg-blue-50 ring-1 ring-blue-200',
-          // Clickable cursor when row can be interacted with
-          !isComplete && !isLoading && (isMultiSelectMode || canApprove) && 'cursor-pointer'
+          // Clickable cursor only in multi-select mode (for row selection)
+          !isComplete && !isPending && !isLoading && isMultiSelectMode && 'cursor-pointer'
         )}
       >
         {/* Selection/Completion Checkbox */}
         <div className="flex h-6 items-center">
-          {(canEdit || isMultiSelectMode) ? (
+          {(canEdit || isMultiSelectMode || canSubmitReq) ? (
             <Checkbox
-              checked={isComplete || showSuccess || (isMultiSelectMode && isSelected)}
-              disabled={isLoading || isComplete}
+              checked={isComplete || showSuccess || isPending || (isMultiSelectMode && isSelected)}
+              disabled={isLoading || isComplete || isPending}
               onCheckedChange={(checked) => handleCheckboxChange(checked as boolean)}
               className={cn(
                 'transition-all',
-                // Completed requirements: amber-600 for UI actions
-                (isComplete || showSuccess) && 'border-amber-600 bg-amber-600 text-white data-[state=checked]:bg-amber-600',
+                // Leader-approved completed requirements: amber-600
+                (isComplete || showSuccess) && !isPending && 'border-amber-600 bg-amber-600 text-white data-[state=checked]:bg-amber-600',
+                // Parent-submitted pending requirements: amber-500 with different styling
+                isPending && 'border-amber-400 bg-amber-100 text-amber-600 data-[state=checked]:bg-amber-100 data-[state=checked]:border-amber-400',
                 // Multi-select mode: blue selection styling for incomplete requirements
-                isMultiSelectMode && isSelected && !isComplete && 'border-blue-500 bg-blue-500 text-white data-[state=checked]:bg-blue-500'
+                isMultiSelectMode && isSelected && !isComplete && !isPending && 'border-blue-500 bg-blue-500 text-white data-[state=checked]:bg-blue-500'
               )}
             />
           ) : (
@@ -285,7 +336,9 @@ export const RequirementApprovalRow = memo(function RequirementApprovalRow({
                   <Check className="h-3 w-3 text-white" />
                 </div>
               ) : isPending ? (
-                <Clock className="h-5 w-5 text-amber-500" />
+                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 border border-amber-400">
+                  <Clock className="h-3 w-3 text-amber-600" />
+                </div>
               ) : isDenied ? (
                 <AlertCircle className="h-5 w-5 text-red-500" />
               ) : (
@@ -352,7 +405,7 @@ export const RequirementApprovalRow = memo(function RequirementApprovalRow({
                 {isPending && (
                   <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
                     <Clock className="mr-1 h-3 w-3" />
-                    Pending Approval
+                    Parent Submitted
                   </Badge>
                 )}
                 {isDenied && (
@@ -435,7 +488,7 @@ export const RequirementApprovalRow = memo(function RequirementApprovalRow({
                   </Popover>
                 )}
 
-                {/* Undo Button - for completed requirements */}
+                {/* Undo Button - for completed requirements (leaders) */}
                 {canUndo && (
                   <Button
                     variant="ghost"
@@ -452,7 +505,30 @@ export const RequirementApprovalRow = memo(function RequirementApprovalRow({
                   </Button>
                 )}
 
-                {/* Complete Button - icon only on mobile */}
+                {/* Retract Button - for pending submissions (parents) */}
+                {canRetract && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      'h-7 w-7 p-0 sm:h-8 sm:w-auto sm:px-2',
+                      'text-amber-600 hover:bg-amber-50 hover:text-amber-700'
+                    )}
+                    onClick={handleRetractSubmission}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Undo2 className="h-3.5 w-3.5 sm:mr-1 sm:h-4 sm:w-4" />
+                        <span className="hidden sm:inline">Undo</span>
+                      </>
+                    )}
+                  </Button>
+                )}
+
+                {/* Complete Button - icon only on mobile (for leaders) */}
                 {canApprove && (
                   <Button
                     variant="ghost"
@@ -475,6 +551,7 @@ export const RequirementApprovalRow = memo(function RequirementApprovalRow({
                     )}
                   </Button>
                 )}
+
               </div>
             </div>
           </div>
@@ -508,6 +585,17 @@ export const RequirementApprovalRow = memo(function RequirementApprovalRow({
         requirementNumber={requirementNumber}
         requirementDescription={description}
         onUndo={handleUndo}
+      />
+
+      {/* Parent Submission Dialog */}
+      <RequirementCompletionDialog
+        open={submissionDialogOpen}
+        onOpenChange={setSubmissionDialogOpen}
+        requirementNumber={requirementNumber}
+        requirementDescription={description}
+        currentUserName={currentUserName}
+        onComplete={handleSubmitForApproval}
+        isParentSubmission={true}
       />
     </>
   )
