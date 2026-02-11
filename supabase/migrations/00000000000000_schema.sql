@@ -2401,3 +2401,1737 @@ CREATE POLICY "Authenticated users can delete unit logos" ON storage.objects FOR
 -- ============================================
 -- END OF SCHEMA
 -- ============================================
+
+-- ============================================
+-- ADDITIONAL MIGRATIONS (CONSOLIDATED)
+-- ============================================
+
+
+-- ============================================
+-- FROM: 20260118000000_unit_provisioning.sql
+-- ============================================
+
+-- Migration: Unit Self-Service Provisioning
+-- Enables self-service unit signup with BSA roster CSV upload
+
+-- 1. Unique constraint to prevent duplicate units
+-- Uses functional index on lowercase council to handle case variations
+CREATE UNIQUE INDEX idx_units_unique_council_type_number
+ON units(LOWER(COALESCE(council, '')), unit_type, unit_number)
+WHERE parent_unit_id IS NULL AND is_section = false;
+
+COMMENT ON INDEX idx_units_unique_council_type_number IS 'Prevents duplicate primary units (same council, type, number)';
+
+-- 2. Add provisioning status for tracking signup flow
+ALTER TABLE units ADD COLUMN IF NOT EXISTS provisioning_status VARCHAR(20)
+  DEFAULT 'active'
+  CHECK (provisioning_status IN ('pending', 'active', 'suspended'));
+
+COMMENT ON COLUMN units.provisioning_status IS 'Unit provisioning status: pending (awaiting verification), active, or suspended';
+
+-- 3. Provisioning tokens for email verification during signup
+CREATE TABLE unit_provisioning_tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    unit_id UUID NOT NULL REFERENCES units(id) ON DELETE CASCADE,
+    profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    token_hash VARCHAR(64) NOT NULL UNIQUE,
+    email VARCHAR(255) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    verified_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_provisioning_tokens_hash ON unit_provisioning_tokens(token_hash);
+CREATE INDEX idx_provisioning_tokens_expires ON unit_provisioning_tokens(expires_at) WHERE verified_at IS NULL;
+
+COMMENT ON TABLE unit_provisioning_tokens IS 'Verification tokens for unit self-service signup flow';
+
+ALTER TABLE unit_provisioning_tokens ENABLE ROW LEVEL SECURITY;
+
+-- No public access to tokens - service role only during provisioning
+CREATE POLICY "Service role only for provisioning tokens"
+    ON unit_provisioning_tokens
+    FOR ALL
+    USING (false)
+    WITH CHECK (false);
+
+-- 4. Rate limiting for signup spam prevention
+CREATE TABLE signup_rate_limits (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ip_address VARCHAR(45) NOT NULL,
+    email VARCHAR(255),
+    attempts INTEGER DEFAULT 1,
+    first_attempt_at TIMESTAMPTZ DEFAULT NOW(),
+    last_attempt_at TIMESTAMPTZ DEFAULT NOW(),
+    blocked_until TIMESTAMPTZ
+);
+
+CREATE INDEX idx_rate_limits_ip ON signup_rate_limits(ip_address);
+CREATE INDEX idx_rate_limits_email ON signup_rate_limits(email) WHERE email IS NOT NULL;
+
+COMMENT ON TABLE signup_rate_limits IS 'Rate limiting for signup attempts to prevent abuse';
+
+ALTER TABLE signup_rate_limits ENABLE ROW LEVEL SECURITY;
+
+-- No public access - service role only
+CREATE POLICY "Service role only for rate limits"
+    ON signup_rate_limits
+    FOR ALL
+    USING (false)
+    WITH CHECK (false);
+
+-- 5. Staged roster imports (holds parsed CSV until email verification)
+CREATE TABLE staged_roster_imports (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    provisioning_token_id UUID NOT NULL REFERENCES unit_provisioning_tokens(id) ON DELETE CASCADE,
+    parsed_adults JSONB NOT NULL,
+    parsed_scouts JSONB NOT NULL,
+    unit_metadata JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+COMMENT ON TABLE staged_roster_imports IS 'Temporary storage for parsed roster data during signup verification';
+
+ALTER TABLE staged_roster_imports ENABLE ROW LEVEL SECURITY;
+
+-- No public access - only via service role during provisioning
+CREATE POLICY "Service role only for staged imports"
+    ON staged_roster_imports
+    FOR ALL
+    USING (false)
+    WITH CHECK (false);
+
+-- 6. Add setup_completed_at field to track first-time setup completion
+ALTER TABLE units ADD COLUMN IF NOT EXISTS setup_completed_at TIMESTAMPTZ;
+
+COMMENT ON COLUMN units.setup_completed_at IS 'Timestamp when unit completed first-time setup wizard';
+
+-- 7. Function to clean up expired provisioning tokens (run via cron)
+CREATE OR REPLACE FUNCTION cleanup_expired_provisioning_tokens()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    -- Delete expired, unverified tokens older than 48 hours
+    DELETE FROM unit_provisioning_tokens
+    WHERE verified_at IS NULL
+      AND expires_at < NOW() - INTERVAL '48 hours';
+
+    -- Also clean up any pending units without verified tokens (orphaned)
+    DELETE FROM units
+    WHERE provisioning_status = 'pending'
+      AND created_at < NOW() - INTERVAL '48 hours'
+      AND id NOT IN (
+          SELECT DISTINCT unit_id
+          FROM unit_provisioning_tokens
+          WHERE verified_at IS NOT NULL
+      );
+
+    -- Clean up old rate limit records (older than 24 hours)
+    DELETE FROM signup_rate_limits
+    WHERE last_attempt_at < NOW() - INTERVAL '24 hours';
+END;
+$$;
+
+COMMENT ON FUNCTION cleanup_expired_provisioning_tokens IS 'Cleanup function for expired provisioning tokens and orphaned pending units';
+
+
+-- ============================================
+-- FROM: 20260119000000_advancement_tracking.sql
+-- ============================================
+
+-- ============================================
+-- ADVANCEMENT TRACKING SCHEMA
+-- Comprehensive tracking for Scouts BSA rank progress,
+-- merit badges, leadership positions, and activities
+-- ============================================
+
+-- ============================================
+-- SECTION 1: ENUMS
+-- ============================================
+
+-- Advancement status workflow
+CREATE TYPE advancement_status AS ENUM (
+    'not_started',
+    'in_progress',
+    'completed',
+    'pending_approval',
+    'approved',
+    'awarded'
+);
+
+-- Activity types for detailed logging
+CREATE TYPE activity_type AS ENUM (
+    'camping',
+    'hiking',
+    'service',
+    'conservation'
+);
+
+-- ============================================
+-- SECTION 2: BSA REFERENCE TABLES
+-- Platform-level tables for BSA official requirements
+-- ============================================
+
+-- 7 Scouts BSA ranks
+CREATE TABLE bsa_ranks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    display_order INTEGER NOT NULL,
+    is_eagle_required BOOLEAN DEFAULT true,
+    description TEXT,
+    image_url TEXT,
+    requirement_version_year INTEGER,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Index for display ordering
+CREATE INDEX idx_bsa_ranks_display_order ON bsa_ranks(display_order);
+
+-- Comments for bsa_ranks
+COMMENT ON COLUMN bsa_ranks.requirement_version_year IS
+  'Year the BSA last updated requirements for this rank (e.g., 2022, 2016)';
+COMMENT ON COLUMN bsa_ranks.image_url IS 'URL to rank badge image';
+
+-- Rank requirements with nested sub-requirements
+CREATE TABLE bsa_rank_requirements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    version_year INTEGER NOT NULL,
+    rank_id UUID NOT NULL REFERENCES bsa_ranks(id) ON DELETE CASCADE,
+    requirement_number TEXT NOT NULL,
+    parent_requirement_id UUID REFERENCES bsa_rank_requirements(id) ON DELETE CASCADE,
+    sub_requirement_letter TEXT,
+    description TEXT NOT NULL,
+    is_alternative BOOLEAN DEFAULT false,
+    alternatives_group TEXT,
+    display_order INTEGER NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(version_year, rank_id, requirement_number, sub_requirement_letter)
+);
+
+-- Indexes for requirement lookup
+CREATE INDEX idx_rank_requirements_rank_version ON bsa_rank_requirements(rank_id, version_year);
+CREATE INDEX idx_bsa_rank_requirements_parent ON bsa_rank_requirements(parent_requirement_id);
+
+-- Comments for bsa_rank_requirements
+COMMENT ON COLUMN bsa_rank_requirements.version_year IS
+  'BSA version year for these requirements (e.g., 2022, 2016). Query by joining to bsa_ranks.requirement_version_year for current requirements.';
+
+-- 141+ merit badges
+CREATE TABLE bsa_merit_badges (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    is_eagle_required BOOLEAN DEFAULT false,
+    category TEXT,
+    description TEXT,
+    image_url TEXT,
+    pamphlet_url TEXT,
+    requirement_version_year INTEGER,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Index for filtering
+CREATE INDEX idx_bsa_merit_badges_eagle ON bsa_merit_badges(is_eagle_required) WHERE is_active = true;
+CREATE INDEX idx_bsa_merit_badges_category ON bsa_merit_badges(category) WHERE is_active = true;
+
+-- Comments for bsa_merit_badges
+COMMENT ON COLUMN bsa_merit_badges.pamphlet_url IS 'URL to the official BSA merit badge pamphlet PDF on filestore.scouting.org';
+COMMENT ON COLUMN bsa_merit_badges.requirement_version_year IS
+  'Year the BSA last updated requirements for this merit badge';
+
+-- Merit badge requirements (versioned by year)
+CREATE TABLE bsa_merit_badge_requirements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    version_year INTEGER NOT NULL,
+    merit_badge_id UUID NOT NULL REFERENCES bsa_merit_badges(id) ON DELETE CASCADE,
+    requirement_number TEXT NOT NULL,
+    parent_requirement_id UUID REFERENCES bsa_merit_badge_requirements(id) ON DELETE CASCADE,
+    sub_requirement_letter TEXT,
+    description TEXT NOT NULL,
+    display_order INTEGER NOT NULL,
+    is_alternative BOOLEAN DEFAULT false,
+    alternatives_group TEXT,
+    nesting_depth INTEGER DEFAULT 0,
+    original_scoutbook_id TEXT,
+    required_count INTEGER,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Unique index with COALESCE (can't use COALESCE in table UNIQUE constraint)
+CREATE UNIQUE INDEX idx_mb_requirements_unique
+ON bsa_merit_badge_requirements(version_year, merit_badge_id, requirement_number, COALESCE(sub_requirement_letter, ''));
+
+-- Indexes for requirement lookup
+CREATE INDEX idx_mb_requirements_badge_version ON bsa_merit_badge_requirements(merit_badge_id, version_year);
+CREATE INDEX idx_bsa_mb_requirements_parent ON bsa_merit_badge_requirements(parent_requirement_id);
+CREATE INDEX idx_bsa_mb_requirements_scoutbook_id ON bsa_merit_badge_requirements(original_scoutbook_id) WHERE original_scoutbook_id IS NOT NULL;
+CREATE INDEX idx_bsa_mb_requirements_alternatives_group ON bsa_merit_badge_requirements(merit_badge_id, alternatives_group) WHERE alternatives_group IS NOT NULL;
+
+-- Comments for bsa_merit_badge_requirements
+COMMENT ON COLUMN bsa_merit_badge_requirements.version_year IS
+  'BSA version year for these requirements. Query by joining to bsa_merit_badges.requirement_version_year for current requirements.';
+COMMENT ON COLUMN bsa_merit_badge_requirements.is_alternative IS 'True if this is one option in an OR group (e.g., "Do ONE of the following")';
+COMMENT ON COLUMN bsa_merit_badge_requirements.alternatives_group IS 'Groups related alternatives together (e.g., "5_options" for all choices under requirement 5)';
+COMMENT ON COLUMN bsa_merit_badge_requirements.nesting_depth IS 'Depth level in the hierarchy (0=top, 1=sub-requirement, 2=sub-sub, etc.)';
+COMMENT ON COLUMN bsa_merit_badge_requirements.original_scoutbook_id IS 'Original requirement ID from Scoutbook exports (e.g., "6A(a)(1)") for import matching';
+COMMENT ON COLUMN bsa_merit_badge_requirements.required_count IS 'Number of alternatives that must be completed (e.g., 1 for "Do ONE", 2 for "Do TWO")';
+
+-- Valid leadership positions for rank advancement
+CREATE TABLE bsa_leadership_positions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    qualifies_for_star BOOLEAN DEFAULT false,
+    qualifies_for_life BOOLEAN DEFAULT false,
+    qualifies_for_eagle BOOLEAN DEFAULT false,
+    min_tenure_months INTEGER DEFAULT 4,
+    is_patrol_level BOOLEAN DEFAULT false,
+    is_troop_level BOOLEAN DEFAULT true,
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================
+-- SECTION 3: SCOUT PROGRESS TABLES
+-- Per-scout tracking of advancement progress
+-- ============================================
+
+-- Scout rank progress (enhanced tracking)
+CREATE TABLE scout_rank_progress (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scout_id UUID NOT NULL REFERENCES scouts(id) ON DELETE CASCADE,
+    rank_id UUID NOT NULL REFERENCES bsa_ranks(id) ON DELETE RESTRICT,
+    status advancement_status NOT NULL DEFAULT 'not_started',
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    approved_at TIMESTAMPTZ,
+    approved_by UUID REFERENCES profiles(id),
+    awarded_at TIMESTAMPTZ,
+    awarded_by UUID REFERENCES profiles(id),
+    -- Scoutbook sync fields
+    external_status TEXT,
+    synced_at TIMESTAMPTZ,
+    sync_session_id UUID REFERENCES sync_sessions(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(scout_id, rank_id)
+);
+
+-- Indexes for progress lookup
+CREATE INDEX idx_scout_rank_progress_scout ON scout_rank_progress(scout_id);
+CREATE INDEX idx_scout_rank_progress_status ON scout_rank_progress(status) WHERE status != 'awarded';
+
+-- Individual requirement completion with parent submission workflow
+CREATE TABLE scout_rank_requirement_progress (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scout_rank_progress_id UUID NOT NULL REFERENCES scout_rank_progress(id) ON DELETE CASCADE,
+    requirement_id UUID NOT NULL REFERENCES bsa_rank_requirements(id) ON DELETE RESTRICT,
+    status advancement_status NOT NULL DEFAULT 'not_started',
+    completed_at TIMESTAMPTZ,
+    completed_by UUID REFERENCES profiles(id),
+    notes TEXT,
+    -- Parent submission workflow
+    submitted_by UUID REFERENCES profiles(id),
+    submitted_at TIMESTAMPTZ,
+    submission_notes TEXT,
+    approval_status TEXT CHECK (approval_status IN ('pending_approval', 'approved', 'denied')),
+    denial_reason TEXT,
+    reviewed_by UUID REFERENCES profiles(id),
+    reviewed_at TIMESTAMPTZ,
+    -- Sync fields
+    synced_at TIMESTAMPTZ,
+    sync_session_id UUID REFERENCES sync_sessions(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(scout_rank_progress_id, requirement_id)
+);
+
+-- Indexes for requirement progress lookup
+CREATE INDEX idx_scout_rank_req_progress_rank ON scout_rank_requirement_progress(scout_rank_progress_id);
+CREATE INDEX idx_scout_rank_req_progress_pending ON scout_rank_requirement_progress(approval_status)
+    WHERE approval_status = 'pending_approval';
+
+-- Merit badge tracking
+CREATE TABLE scout_merit_badge_progress (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scout_id UUID NOT NULL REFERENCES scouts(id) ON DELETE CASCADE,
+    merit_badge_id UUID NOT NULL REFERENCES bsa_merit_badges(id) ON DELETE RESTRICT,
+    status advancement_status NOT NULL DEFAULT 'not_started',
+    -- Counselor info (can be unit adult or external)
+    counselor_name TEXT,
+    counselor_profile_id UUID REFERENCES profiles(id),
+    counselor_bsa_id TEXT,
+    counselor_signed_at TIMESTAMPTZ,
+    -- Progress dates
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    approved_at TIMESTAMPTZ,
+    approved_by UUID REFERENCES profiles(id),
+    awarded_at TIMESTAMPTZ,
+    -- Sync fields
+    synced_at TIMESTAMPTZ,
+    sync_session_id UUID REFERENCES sync_sessions(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(scout_id, merit_badge_id)
+);
+
+-- Indexes for merit badge progress
+CREATE INDEX idx_scout_mb_progress_scout ON scout_merit_badge_progress(scout_id);
+CREATE INDEX idx_scout_mb_progress_status ON scout_merit_badge_progress(status) WHERE status != 'awarded';
+CREATE INDEX idx_scout_mb_progress_badge ON scout_merit_badge_progress(merit_badge_id);
+
+-- Merit badge requirement completion
+CREATE TABLE scout_merit_badge_requirement_progress (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scout_merit_badge_progress_id UUID NOT NULL REFERENCES scout_merit_badge_progress(id) ON DELETE CASCADE,
+    requirement_id UUID NOT NULL REFERENCES bsa_merit_badge_requirements(id) ON DELETE RESTRICT,
+    status advancement_status NOT NULL DEFAULT 'not_started',
+    completed_at TIMESTAMPTZ,
+    completed_by UUID REFERENCES profiles(id),
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(scout_merit_badge_progress_id, requirement_id)
+);
+
+-- Index for requirement lookup
+CREATE INDEX idx_scout_mb_req_progress_badge ON scout_merit_badge_requirement_progress(scout_merit_badge_progress_id);
+
+-- Leadership history with proper start/end dates
+CREATE TABLE scout_leadership_history (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scout_id UUID NOT NULL REFERENCES scouts(id) ON DELETE CASCADE,
+    position_id UUID NOT NULL REFERENCES bsa_leadership_positions(id) ON DELETE RESTRICT,
+    unit_id UUID NOT NULL REFERENCES units(id) ON DELETE CASCADE,
+    start_date DATE NOT NULL,
+    end_date DATE,
+    notes TEXT,
+    -- Sync fields
+    synced_at TIMESTAMPTZ,
+    sync_session_id UUID REFERENCES sync_sessions(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Helper function to check if a leadership position is current
+CREATE OR REPLACE FUNCTION is_leadership_position_current(p_end_date DATE)
+RETURNS BOOLEAN AS $$
+BEGIN
+    RETURN p_end_date IS NULL OR p_end_date > CURRENT_DATE;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+-- Helper function to calculate days served
+CREATE OR REPLACE FUNCTION calculate_days_served(p_start_date DATE, p_end_date DATE)
+RETURNS INTEGER AS $$
+BEGIN
+    IF p_end_date IS NOT NULL THEN
+        RETURN p_end_date - p_start_date;
+    ELSE
+        RETURN CURRENT_DATE - p_start_date;
+    END IF;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+-- Indexes for leadership lookup
+CREATE INDEX idx_scout_leadership_history_scout ON scout_leadership_history(scout_id);
+CREATE INDEX idx_scout_leadership_history_current ON scout_leadership_history(scout_id) WHERE end_date IS NULL;
+CREATE INDEX idx_scout_leadership_history_unit ON scout_leadership_history(unit_id);
+
+-- Detailed activity entries (granular logging)
+CREATE TABLE scout_activity_entries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    scout_id UUID NOT NULL REFERENCES scouts(id) ON DELETE CASCADE,
+    activity_type activity_type NOT NULL,
+    activity_date DATE NOT NULL,
+    value DECIMAL(10, 2) NOT NULL,
+    event_id UUID REFERENCES events(id) ON DELETE SET NULL,
+    description TEXT,
+    location TEXT,
+    verified_by UUID REFERENCES profiles(id),
+    verified_at TIMESTAMPTZ,
+    -- Sync fields
+    synced_at TIMESTAMPTZ,
+    sync_session_id UUID REFERENCES sync_sessions(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for activity lookup
+CREATE INDEX idx_scout_activity_entries_scout ON scout_activity_entries(scout_id);
+CREATE INDEX idx_scout_activity_entries_type_date ON scout_activity_entries(scout_id, activity_type, activity_date);
+CREATE INDEX idx_scout_activity_entries_event ON scout_activity_entries(event_id) WHERE event_id IS NOT NULL;
+
+-- ============================================
+-- SECTION 4: MERIT BADGE COUNSELORS
+-- ============================================
+
+-- Add counselor flag to unit_memberships
+ALTER TABLE unit_memberships ADD COLUMN IF NOT EXISTS is_merit_badge_counselor BOOLEAN DEFAULT false;
+
+-- Track which adults can counsel which merit badges
+CREATE TABLE merit_badge_counselors (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    unit_id UUID NOT NULL REFERENCES units(id) ON DELETE CASCADE,
+    merit_badge_id UUID NOT NULL REFERENCES bsa_merit_badges(id) ON DELETE CASCADE,
+    approved_at TIMESTAMPTZ DEFAULT NOW(),
+    expires_at TIMESTAMPTZ,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(profile_id, unit_id, merit_badge_id)
+);
+
+-- Indexes for counselor lookup
+CREATE INDEX idx_merit_badge_counselors_unit ON merit_badge_counselors(unit_id);
+CREATE INDEX idx_merit_badge_counselors_badge ON merit_badge_counselors(merit_badge_id);
+CREATE INDEX idx_merit_badge_counselors_profile ON merit_badge_counselors(profile_id);
+
+-- ============================================
+-- SECTION 5: SYNC STAGING
+-- ============================================
+
+-- Advancement staging for Scoutbook sync preview
+CREATE TABLE sync_staged_advancement (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID NOT NULL REFERENCES sync_sessions(id) ON DELETE CASCADE,
+    scout_id UUID NOT NULL REFERENCES scouts(id) ON DELETE CASCADE,
+    data_type TEXT NOT NULL CHECK (data_type IN ('rank_progress', 'rank_requirement', 'merit_badge', 'leadership', 'activity')),
+    change_type TEXT NOT NULL CHECK (change_type IN ('new', 'update', 'delete')),
+    existing_record_id UUID,
+    staged_data JSONB NOT NULL,
+    changes JSONB,
+    conflict_detected BOOLEAN DEFAULT false,
+    conflict_details TEXT,
+    is_selected BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for sync staging
+CREATE INDEX idx_sync_staged_advancement_session ON sync_staged_advancement(session_id);
+CREATE INDEX idx_sync_staged_advancement_scout ON sync_staged_advancement(scout_id);
+
+-- ============================================
+-- SECTION 6: HELPER FUNCTIONS
+-- ============================================
+
+-- Function to calculate rank progress percentage
+CREATE OR REPLACE FUNCTION calculate_rank_progress_percentage(p_scout_rank_progress_id UUID)
+RETURNS INTEGER AS $$
+DECLARE
+    total_requirements INTEGER;
+    completed_requirements INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO total_requirements
+    FROM scout_rank_requirement_progress
+    WHERE scout_rank_progress_id = p_scout_rank_progress_id;
+
+    SELECT COUNT(*) INTO completed_requirements
+    FROM scout_rank_requirement_progress
+    WHERE scout_rank_progress_id = p_scout_rank_progress_id
+    AND status IN ('completed', 'approved', 'awarded');
+
+    IF total_requirements = 0 THEN
+        RETURN 0;
+    END IF;
+
+    RETURN ROUND((completed_requirements::DECIMAL / total_requirements) * 100);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to initialize rank progress for a scout
+-- Creates progress record and requirement progress for all requirements matching the rank's version year
+CREATE OR REPLACE FUNCTION initialize_scout_rank_progress(
+    p_scout_id UUID,
+    p_rank_id UUID
+)
+RETURNS UUID AS $$
+DECLARE
+    v_progress_id UUID;
+    v_version_year INTEGER;
+BEGIN
+    -- Get the version year from the rank
+    SELECT requirement_version_year INTO v_version_year
+    FROM bsa_ranks WHERE id = p_rank_id;
+
+    -- Create rank progress record
+    INSERT INTO scout_rank_progress (scout_id, rank_id, status, started_at)
+    VALUES (p_scout_id, p_rank_id, 'in_progress', NOW())
+    ON CONFLICT (scout_id, rank_id) DO UPDATE SET updated_at = NOW()
+    RETURNING id INTO v_progress_id;
+
+    -- Create requirement progress records for all requirements
+    INSERT INTO scout_rank_requirement_progress (scout_rank_progress_id, requirement_id)
+    SELECT v_progress_id, brr.id
+    FROM bsa_rank_requirements brr
+    WHERE brr.version_year = v_version_year
+    AND brr.rank_id = p_rank_id
+    AND brr.parent_requirement_id IS NULL  -- Only top-level requirements
+    ON CONFLICT (scout_rank_progress_id, requirement_id) DO NOTHING;
+
+    RETURN v_progress_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ============================================
+-- SECTION 7: ROW LEVEL SECURITY
+-- ============================================
+
+-- Enable RLS on all new tables
+ALTER TABLE bsa_ranks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bsa_rank_requirements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bsa_merit_badges ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bsa_merit_badge_requirements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bsa_leadership_positions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scout_rank_progress ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scout_rank_requirement_progress ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scout_merit_badge_progress ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scout_merit_badge_requirement_progress ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scout_leadership_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scout_activity_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE merit_badge_counselors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sync_staged_advancement ENABLE ROW LEVEL SECURITY;
+
+-- BSA Reference tables: Read-only for authenticated users
+CREATE POLICY "BSA ranks viewable by authenticated users"
+    ON bsa_ranks FOR SELECT
+    TO authenticated
+    USING (true);
+
+CREATE POLICY "BSA rank requirements viewable by authenticated users"
+    ON bsa_rank_requirements FOR SELECT
+    TO authenticated
+    USING (true);
+
+CREATE POLICY "BSA merit badges viewable by authenticated users"
+    ON bsa_merit_badges FOR SELECT
+    TO authenticated
+    USING (true);
+
+CREATE POLICY "BSA merit badge requirements viewable by authenticated users"
+    ON bsa_merit_badge_requirements FOR SELECT
+    TO authenticated
+    USING (true);
+
+CREATE POLICY "BSA leadership positions viewable by authenticated users"
+    ON bsa_leadership_positions FOR SELECT
+    TO authenticated
+    USING (true);
+
+-- Scout rank progress: Leaders can view/edit all, parents/scouts can view their own
+CREATE POLICY "Leaders can view all scout rank progress in unit"
+    ON scout_rank_progress FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scouts s
+            JOIN unit_memberships um ON um.unit_id = s.unit_id
+            WHERE s.id = scout_rank_progress.scout_id
+            AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+            AND um.status = 'active'
+            AND um.role IN ('admin', 'treasurer', 'leader')
+        )
+    );
+
+CREATE POLICY "Parents can view their linked scouts rank progress"
+    ON scout_rank_progress FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scout_guardians sg
+            JOIN profiles p ON p.id = sg.profile_id
+            WHERE sg.scout_id = scout_rank_progress.scout_id
+            AND p.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Scouts can view their own rank progress"
+    ON scout_rank_progress FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scouts s
+            JOIN profiles p ON p.id = s.profile_id
+            WHERE s.id = scout_rank_progress.scout_id
+            AND p.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Leaders can insert scout rank progress"
+    ON scout_rank_progress FOR INSERT
+    TO authenticated
+    WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM scouts s
+            JOIN unit_memberships um ON um.unit_id = s.unit_id
+            WHERE s.id = scout_rank_progress.scout_id
+            AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+            AND um.status = 'active'
+            AND um.role IN ('admin', 'treasurer', 'leader')
+        )
+    );
+
+CREATE POLICY "Leaders can update scout rank progress"
+    ON scout_rank_progress FOR UPDATE
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scouts s
+            JOIN unit_memberships um ON um.unit_id = s.unit_id
+            WHERE s.id = scout_rank_progress.scout_id
+            AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+            AND um.status = 'active'
+            AND um.role IN ('admin', 'treasurer', 'leader')
+        )
+    );
+
+-- Scout rank requirement progress: Similar policies with parent submission support
+CREATE POLICY "Leaders can view all scout rank requirement progress"
+    ON scout_rank_requirement_progress FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scout_rank_progress srp
+            JOIN scouts s ON s.id = srp.scout_id
+            JOIN unit_memberships um ON um.unit_id = s.unit_id
+            WHERE srp.id = scout_rank_requirement_progress.scout_rank_progress_id
+            AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+            AND um.status = 'active'
+            AND um.role IN ('admin', 'treasurer', 'leader')
+        )
+    );
+
+CREATE POLICY "Parents can view their linked scouts requirement progress"
+    ON scout_rank_requirement_progress FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scout_rank_progress srp
+            JOIN scout_guardians sg ON sg.scout_id = srp.scout_id
+            JOIN profiles p ON p.id = sg.profile_id
+            WHERE srp.id = scout_rank_requirement_progress.scout_rank_progress_id
+            AND p.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Scouts can view their own requirement progress"
+    ON scout_rank_requirement_progress FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scout_rank_progress srp
+            JOIN scouts s ON s.id = srp.scout_id
+            JOIN profiles p ON p.id = s.profile_id
+            WHERE srp.id = scout_rank_requirement_progress.scout_rank_progress_id
+            AND p.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Leaders can insert scout rank requirement progress"
+    ON scout_rank_requirement_progress FOR INSERT
+    TO authenticated
+    WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM scout_rank_progress srp
+            JOIN scouts s ON s.id = srp.scout_id
+            JOIN unit_memberships um ON um.unit_id = s.unit_id
+            WHERE srp.id = scout_rank_requirement_progress.scout_rank_progress_id
+            AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+            AND um.status = 'active'
+            AND um.role IN ('admin', 'treasurer', 'leader')
+        )
+    );
+
+CREATE POLICY "Leaders can update scout rank requirement progress"
+    ON scout_rank_requirement_progress FOR UPDATE
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scout_rank_progress srp
+            JOIN scouts s ON s.id = srp.scout_id
+            JOIN unit_memberships um ON um.unit_id = s.unit_id
+            WHERE srp.id = scout_rank_requirement_progress.scout_rank_progress_id
+            AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+            AND um.status = 'active'
+            AND um.role IN ('admin', 'treasurer', 'leader')
+        )
+    );
+
+-- Parents can submit completions (update with submission fields only)
+CREATE POLICY "Parents can submit completions for their scouts"
+    ON scout_rank_requirement_progress FOR UPDATE
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scout_rank_progress srp
+            JOIN scout_guardians sg ON sg.scout_id = srp.scout_id
+            JOIN profiles p ON p.id = sg.profile_id
+            WHERE srp.id = scout_rank_requirement_progress.scout_rank_progress_id
+            AND p.user_id = auth.uid()
+        )
+    )
+    WITH CHECK (
+        -- Can only update submission-related fields
+        submitted_by = (SELECT id FROM profiles WHERE user_id = auth.uid())
+    );
+
+-- Merit badge progress: Similar pattern
+CREATE POLICY "Leaders can view all merit badge progress in unit"
+    ON scout_merit_badge_progress FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scouts s
+            JOIN unit_memberships um ON um.unit_id = s.unit_id
+            WHERE s.id = scout_merit_badge_progress.scout_id
+            AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+            AND um.status = 'active'
+            AND um.role IN ('admin', 'treasurer', 'leader')
+        )
+    );
+
+CREATE POLICY "Parents can view their scouts merit badge progress"
+    ON scout_merit_badge_progress FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scout_guardians sg
+            JOIN profiles p ON p.id = sg.profile_id
+            WHERE sg.scout_id = scout_merit_badge_progress.scout_id
+            AND p.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Scouts can view their own merit badge progress"
+    ON scout_merit_badge_progress FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scouts s
+            JOIN profiles p ON p.id = s.profile_id
+            WHERE s.id = scout_merit_badge_progress.scout_id
+            AND p.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Leaders can manage merit badge progress"
+    ON scout_merit_badge_progress FOR ALL
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scouts s
+            JOIN unit_memberships um ON um.unit_id = s.unit_id
+            WHERE s.id = scout_merit_badge_progress.scout_id
+            AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+            AND um.status = 'active'
+            AND um.role IN ('admin', 'treasurer', 'leader')
+        )
+    );
+
+-- Merit badge requirement progress
+CREATE POLICY "Leaders can view all merit badge requirement progress"
+    ON scout_merit_badge_requirement_progress FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scout_merit_badge_progress smbp
+            JOIN scouts s ON s.id = smbp.scout_id
+            JOIN unit_memberships um ON um.unit_id = s.unit_id
+            WHERE smbp.id = scout_merit_badge_requirement_progress.scout_merit_badge_progress_id
+            AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+            AND um.status = 'active'
+            AND um.role IN ('admin', 'treasurer', 'leader')
+        )
+    );
+
+CREATE POLICY "Parents can view their scouts MB requirement progress"
+    ON scout_merit_badge_requirement_progress FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scout_merit_badge_progress smbp
+            JOIN scout_guardians sg ON sg.scout_id = smbp.scout_id
+            JOIN profiles p ON p.id = sg.profile_id
+            WHERE smbp.id = scout_merit_badge_requirement_progress.scout_merit_badge_progress_id
+            AND p.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Scouts can view their own MB requirement progress"
+    ON scout_merit_badge_requirement_progress FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scout_merit_badge_progress smbp
+            JOIN scouts s ON s.id = smbp.scout_id
+            JOIN profiles p ON p.id = s.profile_id
+            WHERE smbp.id = scout_merit_badge_requirement_progress.scout_merit_badge_progress_id
+            AND p.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Leaders can manage MB requirement progress"
+    ON scout_merit_badge_requirement_progress FOR ALL
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scout_merit_badge_progress smbp
+            JOIN scouts s ON s.id = smbp.scout_id
+            JOIN unit_memberships um ON um.unit_id = s.unit_id
+            WHERE smbp.id = scout_merit_badge_requirement_progress.scout_merit_badge_progress_id
+            AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+            AND um.status = 'active'
+            AND um.role IN ('admin', 'treasurer', 'leader')
+        )
+    );
+
+-- Leadership history
+CREATE POLICY "Leaders can view all leadership history in unit"
+    ON scout_leadership_history FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM unit_memberships um
+            WHERE um.unit_id = scout_leadership_history.unit_id
+            AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+            AND um.status = 'active'
+            AND um.role IN ('admin', 'treasurer', 'leader')
+        )
+    );
+
+CREATE POLICY "Parents can view their scouts leadership history"
+    ON scout_leadership_history FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scout_guardians sg
+            JOIN profiles p ON p.id = sg.profile_id
+            WHERE sg.scout_id = scout_leadership_history.scout_id
+            AND p.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Scouts can view their own leadership history"
+    ON scout_leadership_history FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scouts s
+            JOIN profiles p ON p.id = s.profile_id
+            WHERE s.id = scout_leadership_history.scout_id
+            AND p.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Leaders can manage leadership history"
+    ON scout_leadership_history FOR ALL
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM unit_memberships um
+            WHERE um.unit_id = scout_leadership_history.unit_id
+            AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+            AND um.status = 'active'
+            AND um.role IN ('admin', 'treasurer', 'leader')
+        )
+    );
+
+-- Activity entries
+CREATE POLICY "Leaders can view all activity entries in unit"
+    ON scout_activity_entries FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scouts s
+            JOIN unit_memberships um ON um.unit_id = s.unit_id
+            WHERE s.id = scout_activity_entries.scout_id
+            AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+            AND um.status = 'active'
+            AND um.role IN ('admin', 'treasurer', 'leader')
+        )
+    );
+
+CREATE POLICY "Parents can view their scouts activity entries"
+    ON scout_activity_entries FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scout_guardians sg
+            JOIN profiles p ON p.id = sg.profile_id
+            WHERE sg.scout_id = scout_activity_entries.scout_id
+            AND p.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Scouts can view their own activity entries"
+    ON scout_activity_entries FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scouts s
+            JOIN profiles p ON p.id = s.profile_id
+            WHERE s.id = scout_activity_entries.scout_id
+            AND p.user_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Leaders can manage activity entries"
+    ON scout_activity_entries FOR ALL
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scouts s
+            JOIN unit_memberships um ON um.unit_id = s.unit_id
+            WHERE s.id = scout_activity_entries.scout_id
+            AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+            AND um.status = 'active'
+            AND um.role IN ('admin', 'treasurer', 'leader')
+        )
+    );
+
+-- Merit badge counselors
+CREATE POLICY "Unit members can view counselors in their unit"
+    ON merit_badge_counselors FOR SELECT
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM unit_memberships um
+            WHERE um.unit_id = merit_badge_counselors.unit_id
+            AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+            AND um.status = 'active'
+        )
+    );
+
+CREATE POLICY "Leaders can manage counselors in their unit"
+    ON merit_badge_counselors FOR ALL
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM unit_memberships um
+            WHERE um.unit_id = merit_badge_counselors.unit_id
+            AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+            AND um.status = 'active'
+            AND um.role IN ('admin', 'treasurer', 'leader')
+        )
+    );
+
+-- Sync staged advancement
+CREATE POLICY "Leaders can view and manage staged advancement for their unit"
+    ON sync_staged_advancement FOR ALL
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scouts s
+            JOIN unit_memberships um ON um.unit_id = s.unit_id
+            WHERE s.id = sync_staged_advancement.scout_id
+            AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+            AND um.status = 'active'
+            AND um.role IN ('admin', 'treasurer', 'leader')
+        )
+    );
+
+-- ============================================
+-- SECTION 8: TRIGGERS
+-- ============================================
+
+-- Update timestamp trigger function (if not exists)
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Apply triggers to new tables
+CREATE TRIGGER update_bsa_merit_badges_updated_at
+    BEFORE UPDATE ON bsa_merit_badges
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_scout_rank_progress_updated_at
+    BEFORE UPDATE ON scout_rank_progress
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_scout_rank_requirement_progress_updated_at
+    BEFORE UPDATE ON scout_rank_requirement_progress
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_scout_merit_badge_progress_updated_at
+    BEFORE UPDATE ON scout_merit_badge_progress
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_scout_merit_badge_requirement_progress_updated_at
+    BEFORE UPDATE ON scout_merit_badge_requirement_progress
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_scout_leadership_history_updated_at
+    BEFORE UPDATE ON scout_leadership_history
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- SECTION 9: COMMENTS
+-- ============================================
+
+COMMENT ON TABLE bsa_ranks IS 'The 7 Scouts BSA ranks from Scout to Eagle';
+COMMENT ON TABLE bsa_rank_requirements IS 'Individual requirements for each rank, versioned annually';
+COMMENT ON TABLE bsa_merit_badges IS 'All 141+ BSA merit badges';
+COMMENT ON TABLE bsa_merit_badge_requirements IS 'Requirements for each merit badge, versioned annually';
+COMMENT ON TABLE bsa_leadership_positions IS 'Valid leadership positions for rank advancement';
+COMMENT ON TABLE scout_rank_progress IS 'Scout progress toward each rank';
+COMMENT ON TABLE scout_rank_requirement_progress IS 'Individual requirement completion with parent submission workflow';
+COMMENT ON TABLE scout_merit_badge_progress IS 'Scout progress on merit badges with counselor tracking';
+COMMENT ON TABLE scout_merit_badge_requirement_progress IS 'Individual merit badge requirement completion';
+COMMENT ON TABLE scout_leadership_history IS 'Leadership positions held by scouts with date tracking';
+COMMENT ON TABLE scout_activity_entries IS 'Detailed activity log (camping, hiking, service hours)';
+COMMENT ON TABLE merit_badge_counselors IS 'Adults approved to counsel specific merit badges';
+COMMENT ON TABLE sync_staged_advancement IS 'Staging table for Scoutbook sync advancement data';
+
+
+-- ============================================
+-- FROM: 20260123000000_multi_version_requirements.sql
+-- ============================================
+
+-- ============================================
+-- MULTI-VERSION MERIT BADGE REQUIREMENTS
+-- Phase 0: Foundation Schema Updates
+-- ============================================
+
+-- ============================================
+-- 0.1.1: Add requirement_version_year to scout_merit_badge_progress
+-- Track which version of requirements each scout is working on
+-- ============================================
+
+ALTER TABLE scout_merit_badge_progress
+ADD COLUMN IF NOT EXISTS requirement_version_year INTEGER;
+
+COMMENT ON COLUMN scout_merit_badge_progress.requirement_version_year IS
+  'Year of requirements the scout is working on (e.g., 2025, 2026). NULL means use badge default.';
+
+-- Backfill from badge's current version
+UPDATE scout_merit_badge_progress smbp
+SET requirement_version_year = mb.requirement_version_year
+FROM bsa_merit_badges mb
+WHERE smbp.merit_badge_id = mb.id
+AND smbp.requirement_version_year IS NULL;
+
+-- ============================================
+-- 0.1.2: Add scoutbook_requirement_number to requirements
+-- Store canonical Scoutbook format (e.g., "6A(a)(1)")
+-- ============================================
+
+ALTER TABLE bsa_merit_badge_requirements
+ADD COLUMN IF NOT EXISTS scoutbook_requirement_number TEXT;
+
+COMMENT ON COLUMN bsa_merit_badge_requirements.scoutbook_requirement_number IS
+  'Scoutbook canonical format (e.g., "6A(a)(1)"). Used for import matching and sync.';
+
+-- Index for efficient import lookups by Scoutbook format
+CREATE INDEX IF NOT EXISTS idx_mb_req_scoutbook_num
+ON bsa_merit_badge_requirements(merit_badge_id, version_year, scoutbook_requirement_number)
+WHERE scoutbook_requirement_number IS NOT NULL;
+
+-- ============================================
+-- 0.1.3: Create bsa_merit_badge_versions tracking table
+-- Track available versions per badge with metadata
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS bsa_merit_badge_versions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  merit_badge_id UUID NOT NULL REFERENCES bsa_merit_badges(id) ON DELETE CASCADE,
+  version_year INTEGER NOT NULL,
+  effective_date DATE,
+  scraped_at TIMESTAMPTZ,
+  source TEXT CHECK (source IN ('scoutbook', 'usscouts', 'manual', 'pdf')),
+  is_current BOOLEAN DEFAULT false,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(merit_badge_id, version_year)
+);
+
+-- Index for finding current version of a badge
+CREATE INDEX idx_mb_versions_current
+ON bsa_merit_badge_versions(merit_badge_id)
+WHERE is_current = true;
+
+-- Index for listing versions of a badge
+CREATE INDEX idx_mb_versions_badge
+ON bsa_merit_badge_versions(merit_badge_id, version_year DESC);
+
+-- Comments
+COMMENT ON TABLE bsa_merit_badge_versions IS
+  'Tracks available requirement versions per merit badge with metadata about source and currency.';
+COMMENT ON COLUMN bsa_merit_badge_versions.effective_date IS
+  'Date this version became effective (typically January 1 of the version year).';
+COMMENT ON COLUMN bsa_merit_badge_versions.scraped_at IS
+  'When requirements were scraped from source (NULL if manually entered).';
+COMMENT ON COLUMN bsa_merit_badge_versions.source IS
+  'Where requirements came from: scoutbook, usscouts (archives), manual entry, or pdf.';
+COMMENT ON COLUMN bsa_merit_badge_versions.is_current IS
+  'Whether this is the currently active version for new scouts starting the badge.';
+
+-- ============================================
+-- ROW LEVEL SECURITY
+-- ============================================
+
+ALTER TABLE bsa_merit_badge_versions ENABLE ROW LEVEL SECURITY;
+
+-- BSA reference data is read-only for authenticated users
+CREATE POLICY "BSA merit badge versions viewable by authenticated users"
+    ON bsa_merit_badge_versions FOR SELECT
+    TO authenticated
+    USING (true);
+
+-- ============================================
+-- TRIGGERS
+-- ============================================
+
+CREATE TRIGGER update_bsa_merit_badge_versions_updated_at
+    BEFORE UPDATE ON bsa_merit_badge_versions
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- Ensure only one current version per badge
+-- ============================================
+
+CREATE OR REPLACE FUNCTION ensure_single_current_version()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- If setting this version as current, unset all others for this badge
+  IF NEW.is_current = true THEN
+    UPDATE bsa_merit_badge_versions
+    SET is_current = false
+    WHERE merit_badge_id = NEW.merit_badge_id
+    AND id != NEW.id
+    AND is_current = true;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER ensure_single_current_mb_version
+    BEFORE INSERT OR UPDATE OF is_current ON bsa_merit_badge_versions
+    FOR EACH ROW
+    WHEN (NEW.is_current = true)
+    EXECUTE FUNCTION ensure_single_current_version();
+
+
+-- ============================================
+-- FROM: 20260124000000_bsa_tables_service_role_grants.sql
+-- ============================================
+
+-- ============================================
+-- FIX: Grant service_role full access to BSA and advancement tables
+--
+-- The service_role needs explicit GRANT permissions for INSERT/UPDATE/DELETE
+-- on these tables to seed reference data. RLS bypass only skips row policies,
+-- not database-level permissions.
+-- ============================================
+
+-- Grant full access to BSA reference tables for service_role
+GRANT ALL ON TABLE bsa_ranks TO service_role;
+GRANT ALL ON TABLE bsa_rank_requirements TO service_role;
+GRANT ALL ON TABLE bsa_merit_badges TO service_role;
+GRANT ALL ON TABLE bsa_merit_badge_requirements TO service_role;
+GRANT ALL ON TABLE bsa_leadership_positions TO service_role;
+
+-- Also grant to postgres for admin access
+GRANT ALL ON TABLE bsa_ranks TO postgres;
+GRANT ALL ON TABLE bsa_rank_requirements TO postgres;
+GRANT ALL ON TABLE bsa_merit_badges TO postgres;
+GRANT ALL ON TABLE bsa_merit_badge_requirements TO postgres;
+GRANT ALL ON TABLE bsa_leadership_positions TO postgres;
+
+-- Grant full access to scout progress tables for service_role
+GRANT ALL ON TABLE scout_rank_progress TO service_role;
+GRANT ALL ON TABLE scout_rank_requirement_progress TO service_role;
+GRANT ALL ON TABLE scout_merit_badge_progress TO service_role;
+GRANT ALL ON TABLE scout_merit_badge_requirement_progress TO service_role;
+GRANT ALL ON TABLE scout_leadership_history TO service_role;
+GRANT ALL ON TABLE scout_activity_entries TO service_role;
+GRANT ALL ON TABLE merit_badge_counselors TO service_role;
+
+-- Grant to postgres as well
+GRANT ALL ON TABLE scout_rank_progress TO postgres;
+GRANT ALL ON TABLE scout_rank_requirement_progress TO postgres;
+GRANT ALL ON TABLE scout_merit_badge_progress TO postgres;
+GRANT ALL ON TABLE scout_merit_badge_requirement_progress TO postgres;
+GRANT ALL ON TABLE scout_leadership_history TO postgres;
+GRANT ALL ON TABLE scout_activity_entries TO postgres;
+GRANT ALL ON TABLE merit_badge_counselors TO postgres;
+
+-- Grant access to version tables if they exist
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'bsa_merit_badge_versions') THEN
+        GRANT ALL ON TABLE bsa_merit_badge_versions TO service_role;
+        GRANT ALL ON TABLE bsa_merit_badge_versions TO postgres;
+    END IF;
+END $$;
+
+
+-- ============================================
+-- FROM: 20260124000001_scout_progress_grants.sql
+-- ============================================
+
+-- ============================================
+-- FIX: Grant service_role full access to scout progress tables
+--
+-- The service_role needs explicit GRANT permissions for INSERT/UPDATE/DELETE
+-- on these tables to seed advancement data.
+-- ============================================
+
+-- Grant full access to scout progress tables for service_role
+GRANT ALL ON TABLE scout_rank_progress TO service_role;
+GRANT ALL ON TABLE scout_rank_requirement_progress TO service_role;
+GRANT ALL ON TABLE scout_merit_badge_progress TO service_role;
+GRANT ALL ON TABLE scout_merit_badge_requirement_progress TO service_role;
+GRANT ALL ON TABLE scout_leadership_history TO service_role;
+GRANT ALL ON TABLE scout_activity_entries TO service_role;
+GRANT ALL ON TABLE merit_badge_counselors TO service_role;
+
+-- Grant to postgres as well
+GRANT ALL ON TABLE scout_rank_progress TO postgres;
+GRANT ALL ON TABLE scout_rank_requirement_progress TO postgres;
+GRANT ALL ON TABLE scout_merit_badge_progress TO postgres;
+GRANT ALL ON TABLE scout_merit_badge_requirement_progress TO postgres;
+GRANT ALL ON TABLE scout_leadership_history TO postgres;
+GRANT ALL ON TABLE scout_activity_entries TO postgres;
+GRANT ALL ON TABLE merit_badge_counselors TO postgres;
+
+-- Also grant to sync staging if it exists
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'sync_staged_advancement') THEN
+        GRANT ALL ON TABLE sync_staged_advancement TO service_role;
+        GRANT ALL ON TABLE sync_staged_advancement TO postgres;
+    END IF;
+END $$;
+
+
+-- ============================================
+-- FROM: 20260128000001_add_is_header_column.sql
+-- ============================================
+
+-- ============================================
+-- Add is_header column to bsa_merit_badge_requirements
+-- ============================================
+--
+-- Parent requirements that have children are typically description-only
+-- headers like "Do the following:" - they don't have checkboxes in Scoutbook
+-- and shouldn't be tracked as approvable requirements.
+--
+-- This column allows us to mark these requirements so the UI can:
+-- 1. Skip them in progress tracking
+-- 2. Display them differently (as section headers)
+-- 3. Not show checkboxes for sign-off
+
+ALTER TABLE bsa_merit_badge_requirements
+ADD COLUMN IF NOT EXISTS is_header BOOLEAN DEFAULT false;
+
+COMMENT ON COLUMN bsa_merit_badge_requirements.is_header IS
+  'True if this requirement is a header/description only (has children but no checkbox in Scoutbook). These should not be tracked as approvable requirements.';
+
+-- Create index for efficient filtering
+CREATE INDEX IF NOT EXISTS idx_bsa_mb_req_is_header
+ON bsa_merit_badge_requirements(is_header)
+WHERE is_header = true;
+
+
+-- ============================================
+-- FROM: 20260129000001_import_jobs.sql
+-- ============================================
+
+-- ============================================
+-- Import Jobs Table
+-- ============================================
+-- Tracks background import jobs to prevent timeouts
+-- and provide progress feedback for large imports
+
+CREATE TABLE import_jobs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  unit_id UUID NOT NULL REFERENCES units(id) ON DELETE CASCADE,
+  created_by UUID NOT NULL REFERENCES profiles(id),
+  type TEXT NOT NULL, -- 'troop_advancement', 'scout_history'
+  status TEXT NOT NULL DEFAULT 'pending', -- 'pending', 'processing', 'completed', 'failed'
+
+  -- Progress tracking
+  total_scouts INTEGER DEFAULT 0,
+  processed_scouts INTEGER DEFAULT 0,
+  total_items INTEGER DEFAULT 0,
+  processed_items INTEGER DEFAULT 0,
+  current_phase TEXT, -- 'ranks', 'rank_requirements', 'badges', 'badge_requirements'
+
+  -- Results (populated on completion)
+  result JSONB,
+  error_message TEXT,
+
+  -- Timestamps
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+
+  -- Store staged data for processing (can be large)
+  staged_data JSONB NOT NULL,
+  selected_scout_ids JSONB NOT NULL DEFAULT '[]'
+);
+
+-- Index for querying active jobs
+CREATE INDEX idx_import_jobs_unit_status ON import_jobs(unit_id, status);
+CREATE INDEX idx_import_jobs_created_by ON import_jobs(created_by);
+
+-- RLS
+ALTER TABLE import_jobs ENABLE ROW LEVEL SECURITY;
+
+-- Leaders can view and create jobs for their unit
+CREATE POLICY "Leaders can view unit import jobs"
+  ON import_jobs FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM unit_memberships um
+      WHERE um.unit_id = import_jobs.unit_id
+      AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+      AND um.status = 'active'
+      AND um.role IN ('admin', 'treasurer', 'leader')
+    )
+  );
+
+CREATE POLICY "Leaders can create import jobs"
+  ON import_jobs FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM unit_memberships um
+      WHERE um.unit_id = import_jobs.unit_id
+      AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+      AND um.status = 'active'
+      AND um.role IN ('admin', 'treasurer', 'leader')
+    )
+  );
+
+-- Service role can update jobs (for background processing)
+GRANT ALL ON import_jobs TO service_role;
+
+COMMENT ON TABLE import_jobs IS 'Tracks background import jobs for large data imports';
+COMMENT ON COLUMN import_jobs.staged_data IS 'Staged import data (StagedTroopAdvancement JSON)';
+COMMENT ON COLUMN import_jobs.result IS 'Import result (TroopAdvancementImportResult JSON)';
+
+
+-- ============================================
+-- FROM: 20260207000001_balance_import_schema.sql
+-- ============================================
+
+-- ============================================
+-- Balance Import Schema
+-- ============================================
+-- Supports CSV import of scout account balances with undo functionality.
+-- Creates tracking table for import batches and extends journal_entries
+-- to link entries back to their import batch.
+
+-- Add new journal entry types for balance imports
+ALTER TYPE journal_entry_type ADD VALUE IF NOT EXISTS 'beginning_balance';
+ALTER TYPE journal_entry_type ADD VALUE IF NOT EXISTS 'balance_import_reversal';
+
+-- Create balance_import_batches table to track import operations
+CREATE TABLE balance_import_batches (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    unit_id UUID NOT NULL REFERENCES units(id) ON DELETE RESTRICT,
+    imported_by UUID NOT NULL REFERENCES profiles(id),
+    mode TEXT NOT NULL CHECK (mode IN ('set', 'adjust')),
+    row_count INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'undone')),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    undone_at TIMESTAMPTZ,
+    undone_by UUID REFERENCES profiles(id)
+);
+
+-- Add balance_import_batch_id column to journal_entries for batch tracking
+ALTER TABLE journal_entries
+ADD COLUMN balance_import_batch_id UUID REFERENCES balance_import_batches(id);
+
+-- Index for efficient batch lookup on journal entries
+CREATE INDEX idx_journal_entries_balance_import_batch
+ON journal_entries(balance_import_batch_id)
+WHERE balance_import_batch_id IS NOT NULL;
+
+-- Index for querying batches by unit
+CREATE INDEX idx_balance_import_batches_unit ON balance_import_batches(unit_id);
+
+-- Enable RLS
+ALTER TABLE balance_import_batches ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies for balance_import_batches
+
+-- Leaders can view their unit's import batches
+CREATE POLICY "Leaders can view unit import batches"
+  ON balance_import_batches FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM unit_memberships um
+      WHERE um.unit_id = balance_import_batches.unit_id
+      AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+      AND um.status = 'active'
+      AND um.role IN ('admin', 'treasurer', 'leader')
+    )
+  );
+
+-- Admin and treasurer can insert import batches
+CREATE POLICY "Treasurers can create import batches"
+  ON balance_import_batches FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM unit_memberships um
+      WHERE um.unit_id = balance_import_batches.unit_id
+      AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+      AND um.status = 'active'
+      AND um.role IN ('admin', 'treasurer')
+    )
+  );
+
+-- Admin and treasurer can update import batches (for undo operations)
+CREATE POLICY "Treasurers can update import batches"
+  ON balance_import_batches FOR UPDATE
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM unit_memberships um
+      WHERE um.unit_id = balance_import_batches.unit_id
+      AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+      AND um.status = 'active'
+      AND um.role IN ('admin', 'treasurer')
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM unit_memberships um
+      WHERE um.unit_id = balance_import_batches.unit_id
+      AND um.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+      AND um.status = 'active'
+      AND um.role IN ('admin', 'treasurer')
+    )
+  );
+
+-- Service role grant for any background operations
+GRANT ALL ON balance_import_batches TO service_role;
+
+COMMENT ON TABLE balance_import_batches IS 'Tracks balance import operations for undo functionality';
+COMMENT ON COLUMN balance_import_batches.mode IS 'Import mode: set (replace balance) or adjust (add to balance)';
+COMMENT ON COLUMN balance_import_batches.row_count IS 'Number of scouts affected by this import';
+COMMENT ON COLUMN balance_import_batches.status IS 'active = in effect, undone = reversed';
+COMMENT ON COLUMN journal_entries.balance_import_batch_id IS 'Links journal entry to its import batch for undo operations';
+
+
+-- ============================================
+-- FROM: 20260207100001_plaid_connections.sql
+-- ============================================
+
+-- Migration: 20260207000001_plaid_connections.sql
+-- Purpose: Store Plaid bank connections for units
+
+-- Store Plaid connections (access tokens encrypted in application layer)
+CREATE TABLE plaid_connections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  unit_id UUID NOT NULL REFERENCES units(id) ON DELETE CASCADE,
+
+  -- Plaid identifiers
+  item_id TEXT NOT NULL,
+  access_token TEXT NOT NULL, -- Encrypted in application layer before storage
+
+  -- Connection metadata
+  institution_id TEXT,
+  institution_name TEXT,
+
+  -- Account info (cached from Plaid)
+  accounts JSONB DEFAULT '[]'::jsonb, -- Array of {account_id, name, mask, type, subtype, balance}
+
+  -- Status
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'error', 'disconnected')),
+  error_code TEXT,
+  error_message TEXT,
+
+  -- Timestamps
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_synced_at TIMESTAMPTZ,
+
+  -- Constraints
+  UNIQUE(unit_id) -- One connection per unit initially
+);
+
+-- Enable Row Level Security
+ALTER TABLE plaid_connections ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Admins and treasurers can view their unit's plaid connection
+CREATE POLICY "Admins and treasurers can view plaid connection"
+  ON plaid_connections FOR SELECT TO authenticated
+  USING (unit_id IN (
+    SELECT unit_id FROM unit_memberships
+    WHERE profile_id = get_current_profile_id() AND role IN ('admin', 'treasurer')
+  ));
+
+-- Policy: Admins and treasurers can insert plaid connection
+CREATE POLICY "Admins and treasurers can insert plaid connection"
+  ON plaid_connections FOR INSERT TO authenticated
+  WITH CHECK (unit_id IN (
+    SELECT unit_id FROM unit_memberships
+    WHERE profile_id = get_current_profile_id() AND role IN ('admin', 'treasurer')
+  ));
+
+-- Policy: Admins and treasurers can update plaid connection
+CREATE POLICY "Admins and treasurers can update plaid connection"
+  ON plaid_connections FOR UPDATE TO authenticated
+  USING (unit_id IN (
+    SELECT unit_id FROM unit_memberships
+    WHERE profile_id = get_current_profile_id() AND role IN ('admin', 'treasurer')
+  ));
+
+-- Policy: Admins and treasurers can delete plaid connection
+CREATE POLICY "Admins and treasurers can delete plaid connection"
+  ON plaid_connections FOR DELETE TO authenticated
+  USING (unit_id IN (
+    SELECT unit_id FROM unit_memberships
+    WHERE profile_id = get_current_profile_id() AND role IN ('admin', 'treasurer')
+  ));
+
+-- Index for lookups
+CREATE INDEX idx_plaid_connections_unit ON plaid_connections(unit_id);
+
+-- Trigger to update updated_at on changes
+CREATE TRIGGER update_plaid_connections_updated_at
+  BEFORE UPDATE ON plaid_connections
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+-- Add comment for documentation
+COMMENT ON TABLE plaid_connections IS 'Stores Plaid bank connections for units. Access tokens are encrypted at the application layer.';
+COMMENT ON COLUMN plaid_connections.access_token IS 'Plaid access token - encrypted before storage, never exposed to client';
+COMMENT ON COLUMN plaid_connections.accounts IS 'Cached account info from Plaid: [{account_id, name, mask, type, subtype, balance}]';
+
+
+-- ============================================
+-- FROM: 20260207100002_collection_settings.sql
+-- ============================================
+
+-- Migration: 20260207000002_collection_settings.sql
+-- Purpose: Add collection settings to units table for configurable overdue thresholds
+
+-- Add collection settings column to units table
+ALTER TABLE units ADD COLUMN IF NOT EXISTS collection_settings JSONB DEFAULT '{
+  "overdue_threshold_days": 30,
+  "overdue_threshold_amount_cents": 0,
+  "reminder_email_subject": "Payment Reminder - {unit_name}",
+  "reminder_email_template": "default"
+}'::jsonb;
+
+-- Add comment for documentation
+COMMENT ON COLUMN units.collection_settings IS 'Configurable settings for payment collection: overdue_threshold_days, overdue_threshold_amount_cents, reminder_email_subject, reminder_email_template';
+
+
+-- ============================================
+-- FROM: 20260210000001_merit_badge_approval_workflow.sql
+-- ============================================
+
+-- ============================================
+-- ADD APPROVAL WORKFLOW TO MERIT BADGE REQUIREMENTS
+-- Matches the rank requirement approval pattern:
+-- Parent submits → Leader approves
+-- ============================================
+
+-- Add approval workflow fields to merit_badge_requirement_progress
+-- (matching scout_rank_requirement_progress structure)
+
+-- Submission fields (parent marks complete with notes)
+ALTER TABLE scout_merit_badge_requirement_progress
+ADD COLUMN IF NOT EXISTS submitted_by UUID REFERENCES profiles(id),
+ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS submission_notes TEXT;
+
+-- Approval workflow fields (leader reviews)
+ALTER TABLE scout_merit_badge_requirement_progress
+ADD COLUMN IF NOT EXISTS approval_status TEXT DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES profiles(id),
+ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS denial_reason TEXT;
+
+-- Index for pending approvals (matches rank requirements index)
+CREATE INDEX IF NOT EXISTS idx_scout_mb_req_progress_pending
+ON scout_merit_badge_requirement_progress(approval_status)
+WHERE approval_status = 'pending_approval';
+
+-- Index for efficient dashboard queries
+CREATE INDEX IF NOT EXISTS idx_scout_mb_req_progress_submitted_by
+ON scout_merit_badge_requirement_progress(submitted_by)
+WHERE submitted_by IS NOT NULL;
+
+-- Comments
+COMMENT ON COLUMN scout_merit_badge_requirement_progress.submitted_by IS
+  'Profile ID of parent/guardian who submitted this requirement for approval';
+COMMENT ON COLUMN scout_merit_badge_requirement_progress.submitted_at IS
+  'When the requirement was submitted for leader approval';
+COMMENT ON COLUMN scout_merit_badge_requirement_progress.submission_notes IS
+  'Notes from parent about how/when requirement was completed';
+COMMENT ON COLUMN scout_merit_badge_requirement_progress.approval_status IS
+  'Approval workflow status: pending_approval, approved, denied';
+COMMENT ON COLUMN scout_merit_badge_requirement_progress.reviewed_by IS
+  'Profile ID of leader who reviewed/approved this requirement';
+COMMENT ON COLUMN scout_merit_badge_requirement_progress.reviewed_at IS
+  'When the requirement was reviewed by a leader';
+COMMENT ON COLUMN scout_merit_badge_requirement_progress.denial_reason IS
+  'If denied, the reason provided by the leader';
+
+
+-- ============================================
+-- FROM: 20260210000002_parent_mb_requirement_submission_policy.sql
+-- ============================================
+
+-- ============================================
+-- ADD PARENT SUBMISSION POLICY FOR MERIT BADGE REQUIREMENTS
+-- Matches the existing rank requirement parent policy pattern
+-- ============================================
+
+-- Parents can submit completions (update with submission fields only)
+-- This matches the policy for scout_rank_requirement_progress
+CREATE POLICY "Parents can submit MB completions for their scouts"
+    ON scout_merit_badge_requirement_progress FOR UPDATE
+    TO authenticated
+    USING (
+        EXISTS (
+            SELECT 1 FROM scout_merit_badge_progress smbp
+            JOIN scout_guardians sg ON sg.scout_id = smbp.scout_id
+            JOIN profiles p ON p.id = sg.profile_id
+            WHERE smbp.id = scout_merit_badge_requirement_progress.scout_merit_badge_progress_id
+            AND p.user_id = auth.uid()
+        )
+    )
+    WITH CHECK (
+        -- Can only update submission-related fields
+        submitted_by = (SELECT id FROM profiles WHERE user_id = auth.uid())
+    );
+
+
+-- ============================================
+-- FROM: 20260124000002_bsa_authenticated_grants.sql
+-- ============================================
+
+-- Grant SELECT on BSA reference tables to authenticated users
+GRANT SELECT ON TABLE bsa_ranks TO authenticated;
+GRANT SELECT ON TABLE bsa_rank_requirements TO authenticated;
+GRANT SELECT ON TABLE bsa_merit_badges TO authenticated;
+GRANT SELECT ON TABLE bsa_merit_badge_requirements TO authenticated;
+GRANT SELECT ON TABLE bsa_leadership_positions TO authenticated;
+GRANT SELECT ON TABLE bsa_merit_badge_versions TO authenticated;
+
+-- Also grant to anon for public read access (if needed)
+GRANT SELECT ON TABLE bsa_ranks TO anon;
+GRANT SELECT ON TABLE bsa_rank_requirements TO anon;
+GRANT SELECT ON TABLE bsa_merit_badges TO anon;
+GRANT SELECT ON TABLE bsa_merit_badge_requirements TO anon;
+GRANT SELECT ON TABLE bsa_leadership_positions TO anon;
