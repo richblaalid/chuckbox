@@ -8,7 +8,7 @@
 /*
  * Chuckbox Brand Color System (Brand Guide January 2026)
  *
- * Primary: Pine greens (#234D3E family)
+ * Primary: Pine greens (Tailwind green-800 #166534)
  * Accent: Amber (#b45309 for highlights, #d97706 for UI actions)
  * Background: Cream (#FAF3EB family)
  * Neutrals: Warm stone grays
@@ -32,8 +32,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 24 10% 10%;
 
-    /* Primary - Pine Green (Brand Guide v3) */
-    --primary: 160 37% 22%;             /* Pine 800: #234D3E */
+    /* Primary - Forest Green (Tailwind green-800) */
+    --primary: 143 60% 24%;             /* green-800: #166534 */
     --primary-foreground: 33 56% 95%;   /* cream-300 for contrast */
 
     /* Secondary - Light cream for subtle backgrounds */
@@ -55,24 +55,24 @@
     /* Border & Input */
     --border: 30 6% 90%;                /* stone-200: #E7E5E4 */
     --input: 30 6% 90%;
-    --ring: 160 37% 22%;                /* Pine 800 for focus rings */
+    --ring: 143 60% 24%;                /* green-800 for focus rings */
 
     /* Chart colors - Chuckbox branded (Brand Guide January 2026) */
-    --chart-1: 160 37% 22%;             /* Pine 800: #234D3E */
+    --chart-1: 143 60% 24%;             /* green-800: #166534 */
     --chart-2: 25 95% 37%;              /* Amber 700: #b45309 */
     --chart-3: 160 84% 39%;             /* Success green */
-    --chart-4: 157 39% 33%;             /* Pine 600: #3D8B6A */
+    --chart-4: 142 76% 36%;             /* green-600: #16a34a */
     --chart-5: 32 95% 44%;              /* Warning amber */
 
     /* Sidebar */
     --sidebar: 0 0% 100%;
     --sidebar-foreground: 24 10% 10%;
-    --sidebar-primary: 160 37% 22%;
+    --sidebar-primary: 143 60% 24%;
     --sidebar-primary-foreground: 33 56% 95%;
     --sidebar-accent: 30 54% 89%;
     --sidebar-accent-foreground: 24 6% 32%;
     --sidebar-border: 30 6% 90%;
-    --sidebar-ring: 160 37% 22%;
+    --sidebar-ring: 143 60% 24%;
 
     /* Semantic colors (for direct use) */
     --success: 160 84% 39%;             /* #059669 */
@@ -93,7 +93,7 @@
     --popover: 24 10% 16%;
     --popover-foreground: 40 20% 98%;
 
-    --primary: 157 39% 33%;             /* Pine 600: #3D8B6A - lighter for dark mode */
+    --primary: 142 76% 36%;             /* green-600: #16a34a - lighter for dark mode */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 24 6% 26%;             /* stone-700 */
@@ -110,22 +110,22 @@
 
     --border: 24 6% 26%;
     --input: 24 6% 26%;
-    --ring: 152 39% 39%;
+    --ring: 142 76% 36%;
 
-    --chart-1: 152 39% 39%;
+    --chart-1: 142 76% 36%;
     --chart-2: 35 97% 49%;
     --chart-3: 160 84% 39%;
-    --chart-4: 152 32% 47%;
+    --chart-4: 142 69% 58%;             /* green-400: #4ade80 */
     --chart-5: 32 95% 54%;
 
     --sidebar: 24 10% 10%;
     --sidebar-foreground: 40 20% 98%;
-    --sidebar-primary: 152 39% 39%;
+    --sidebar-primary: 142 76% 36%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 24 6% 26%;
     --sidebar-accent-foreground: 40 20% 98%;
     --sidebar-border: 24 6% 26%;
-    --sidebar-ring: 152 39% 39%;
+    --sidebar-ring: 142 76% 36%;
   }
 }
 
@@ -200,65 +200,66 @@
 /*
  * Typography Utility Classes
  * Semantic text styles for consistent typography across the app
- * Font weights adjusted for Nunito (Brand Guide v3)
+ * Display: Bricolage Grotesque for headings
+ * Body: DM Sans for content and UI
  */
 @layer utilities {
-  /* Page titles - main headings (Nunito 800) */
+  /* Page titles - main headings (Bricolage 800) */
   .text-page-title {
     @apply text-3xl font-extrabold tracking-tight text-foreground;
   }
 
-  /* Section titles - card headers, major sections (Nunito 700) */
+  /* Section titles - card headers, major sections (Bricolage 700) */
   .text-section-title {
     @apply text-xl font-bold tracking-tight text-foreground;
   }
 
-  /* Subsection titles - minor headings within cards (Nunito 600) */
+  /* Subsection titles - minor headings within cards (Bricolage 600) */
   .text-subsection-title {
     @apply text-lg font-semibold text-foreground;
   }
 
-  /* Card titles - consistent with CardTitle component (Nunito 700) */
+  /* Card titles - consistent with CardTitle component (Bricolage 700) */
   .text-card-title {
     @apply text-lg font-bold leading-none tracking-tight text-foreground;
   }
 
-  /* Body text - standard readable content (Nunito 400) */
+  /* Body text - standard readable content (DM Sans 400) */
   .text-body {
     @apply text-sm text-foreground leading-relaxed;
   }
 
-  /* Body large - emphasized body text (Nunito 400) */
+  /* Body large - emphasized body text (DM Sans 400) */
   .text-body-lg {
     @apply text-base text-foreground leading-relaxed;
   }
 
-  /* Muted text - secondary information (Nunito 400) */
+  /* Muted text - secondary information (DM Sans 400) */
   .text-muted-sm {
     @apply text-sm text-muted-foreground;
   }
 
-  /* Caption text - labels, hints, metadata (Nunito 400) */
+  /* Caption text - labels, hints, metadata (DM Sans 400) */
   .text-caption {
     @apply text-xs text-muted-foreground;
   }
 
-  /* Label text - form labels (Nunito 600) */
+  /* Label text - form labels (DM Sans 600) */
   .text-label {
     @apply text-sm font-semibold text-foreground;
   }
 
-  /* Data display - numbers, stats, values (Nunito 800) */
+  /* Data display - numbers, stats, values (Bricolage 800) */
   .text-data {
     @apply text-2xl font-extrabold tabular-nums text-foreground;
   }
 
-  /* Data small - smaller metrics (Nunito 700) */
+  /* Data small - smaller metrics (Bricolage 700) */
   .text-data-sm {
     @apply text-lg font-bold tabular-nums text-foreground;
   }
 
-  /* Link text (Nunito 600) */
+  /* Link text (DM Sans 600) */
   .text-link {
     @apply text-sm font-semibold text-primary hover:underline;
   }

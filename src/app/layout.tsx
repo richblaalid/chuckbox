@@ -1,15 +1,23 @@
 import type { Metadata } from 'next'
-import { Nunito, Source_Serif_4 } from 'next/font/google'
+import { Bricolage_Grotesque, DM_Sans, Source_Serif_4 } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { PostHogProvider } from '@/components/providers/posthog-provider'
 import { ThemeProvider } from '@/components/providers/theme-provider'
 import './globals.css'
 
-// Primary font - friendly and highly readable (brand standard)
-const nunito = Nunito({
+// Display font - bold headings and hero text (brand standard)
+const bricolage = Bricolage_Grotesque({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700', '800'],
-  variable: '--font-nunito',
+  variable: '--font-bricolage',
+  display: 'swap',
+})
+
+// Body font - readable UI text and content (brand standard)
+const dmSans = DM_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-dm-sans',
   display: 'swap',
 })
 
@@ -32,7 +40,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${nunito.variable} ${sourceSerif.variable} font-sans antialiased`}>
+      <body className={`${bricolage.variable} ${dmSans.variable} ${sourceSerif.variable} font-sans antialiased`}>
         <ThemeProvider>
           <PostHogProvider>{children}</PostHogProvider>
         </ThemeProvider>

@@ -10,10 +10,10 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        // Primary font - Nunito for headings, body, and UI (brand standard)
-        display: ['var(--font-nunito)', 'system-ui', 'sans-serif'],
-        // Body font - Nunito for all text (brand standard)
-        sans: ['var(--font-nunito)', 'system-ui', 'sans-serif'],
+        // Display font - Bricolage Grotesque for headings and hero text (brand standard)
+        display: ['var(--font-bricolage)', 'system-ui', 'sans-serif'],
+        // Body font - DM Sans for UI text and content (brand standard)
+        sans: ['var(--font-dm-sans)', 'system-ui', 'sans-serif'],
         // Serif for editorial moments
         serif: ['var(--font-source-serif)', 'Georgia', 'serif'],
       },
@@ -53,20 +53,20 @@ const config: Config = {
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
 
-        // Chuckbox Brand Colors - Pine Greens (Brand Guide v3)
-        // Exact Pine palette from brand guidelines
+        // Chuckbox Brand Colors - Pine/Forest Greens (Tailwind green palette)
+        // Aligned with marketing page and docs/brand-guide.html
         forest: {
-          50: '#f0fdf4',    // Lightest pine tint
-          100: '#dcfce7',   // Light pine tint
-          200: '#bbf7d0',   // Pine tint
-          300: '#86efac',   // Light pine
-          400: '#6BC492',   // Pine 400
-          500: '#52A07E',   // Pine 500 - Primary light
-          600: '#3D8B6A',   // Pine 600 - Primary hover
-          700: '#2D6A4F',   // Pine 700 - Primary
-          800: '#234D3E',   // Pine 800 - Primary dark (brand primary)
-          900: '#1B3D30',   // Pine 900 - Deepest pine
-          DEFAULT: '#234D3E', // Pine 800 as default
+          50: '#f0fdf4',    // green-50
+          100: '#dcfce7',   // green-100
+          200: '#bbf7d0',   // green-200
+          300: '#86efac',   // green-300
+          400: '#4ade80',   // green-400
+          500: '#22c55e',   // green-500
+          600: '#16a34a',   // green-600
+          700: '#15803d',   // green-700 - hover states
+          800: '#166534',   // green-800 - PRIMARY (brand primary)
+          900: '#14532d',   // green-900 - deep pine
+          DEFAULT: '#166534', // green-800 as default
         },
         // Chuckbox Brand Colors - Amber Accent (Brand Guide January 2026)
         // amber-700 (#b45309) is the primary accent color for highlights and decorative
