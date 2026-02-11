@@ -34,7 +34,7 @@ const actionConfig = {
     buttonText: 'Approve Rank',
     buttonLoadingText: 'Approving...',
     icon: ShieldCheck,
-    buttonClass: 'bg-emerald-600 hover:bg-emerald-700',
+    buttonVariant: 'success' as const,
   },
   award: {
     title: 'Award Rank',
@@ -43,7 +43,7 @@ const actionConfig = {
     buttonText: 'Award Rank',
     buttonLoadingText: 'Awarding...',
     icon: Award,
-    buttonClass: 'bg-amber-600 hover:bg-amber-700',
+    buttonVariant: 'warning' as const,
   },
 }
 
@@ -91,7 +91,7 @@ export function RankActionDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Icon className={`h-5 w-5 ${actionType === 'approve' ? 'text-emerald-600' : 'text-amber-600'}`} />
+            <Icon className={`h-5 w-5 ${actionType === 'approve' ? 'text-success' : 'text-warning'}`} />
             {config.title}
           </DialogTitle>
           <DialogDescription>
@@ -154,7 +154,8 @@ export function RankActionDialog({
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className={`gap-2 ${config.buttonClass}`}
+            variant={config.buttonVariant}
+            className="gap-2"
           >
             {isSubmitting ? (
               <>

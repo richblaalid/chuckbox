@@ -110,7 +110,7 @@ export function WhatsNextCard({
             </p>
           </div>
           {canEdit && (
-            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+            <Button size="sm" variant="success">
               Submit for Approval
             </Button>
           )}

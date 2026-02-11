@@ -238,7 +238,7 @@ export function RankProgressCard({ rank, scoutId, unitId, canEdit }: RankProgres
             {/* Footer Actions */}
             {canEdit && rank.status === 'in_progress' && completedCount === totalCount && totalCount > 0 && (
               <div className="flex justify-end border-t bg-emerald-50/50 px-4 py-3">
-                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+                <Button size="sm" variant="success">
                   <Award className="mr-2 h-4 w-4" />
                   Submit for Approval
                 </Button>
