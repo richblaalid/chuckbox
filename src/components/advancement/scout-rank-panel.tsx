@@ -76,6 +76,7 @@ interface ScoutRankPanelProps {
   scoutId: string
   unitId: string
   canEdit: boolean
+  canSubmit?: boolean // Parents can submit requirements for approval
   rankName?: string // Fallback if no rank data
   // Current user name for completion dialogs
   currentUserName?: string
@@ -95,6 +96,7 @@ export function ScoutRankPanel({
   scoutId,
   unitId,
   canEdit,
+  canSubmit = false,
   rankName,
   currentUserName,
   rankRequirementsData,
@@ -453,6 +455,8 @@ export function ScoutRankPanel({
           requirements={formattedRequirements}
           unitId={unitId}
           canEdit={canEdit}
+          canSubmit={canSubmit}
+          scoutId={scoutId}
           defaultCollapseCompleted={hasProgressData}
           currentUserName={currentUserName}
           initData={initData}

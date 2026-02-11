@@ -46,6 +46,7 @@ interface MeritBadgeProgress {
     completed_at: string | null
     completed_by?: string | null
     notes?: string | null
+    approval_status?: string | null
     requirement_id?: string
     bsa_merit_badge_requirements?: {
       id: string
@@ -61,6 +62,7 @@ interface ScoutMeritBadgePanelProps {
   scoutId: string
   unitId: string
   canEdit: boolean
+  canSubmit?: boolean // Parents can submit requirements for approval
   onBack: () => void
   currentUserName?: string
 }
@@ -75,6 +77,7 @@ export function ScoutMeritBadgePanel({
   scoutId,
   unitId,
   canEdit,
+  canSubmit = false,
   onBack,
   currentUserName = 'Leader',
 }: ScoutMeritBadgePanelProps) {
@@ -144,6 +147,7 @@ export function ScoutMeritBadgePanel({
       completed_at: string | null
       completed_by: string | null
       notes: string | null
+      approval_status: string | null
     }>()
 
     badge.scout_merit_badge_requirement_progress.forEach(p => {
@@ -156,6 +160,7 @@ export function ScoutMeritBadgePanel({
           completed_at: p.completed_at,
           completed_by: p.completed_by || null,
           notes: p.notes || null,
+          approval_status: p.approval_status || null,
         })
       }
     })
@@ -196,7 +201,7 @@ export function ScoutMeritBadgePanel({
           completedAt: progress?.completed_at || null,
           completedBy: progress?.completed_by || null,
           notes: progress?.notes || null,
-          approvalStatus: null,
+          approvalStatus: progress?.approval_status || null,
           parentRequirementId: req.parent_requirement_id,
           isAlternative: req.is_alternative,
           alternativesGroup: req.alternatives_group,
@@ -464,6 +469,8 @@ export function ScoutMeritBadgePanel({
             requirements={formattedRequirements}
             unitId={unitId}
             canEdit={canEdit}
+            canSubmit={canSubmit}
+            scoutId={scoutId}
             defaultCollapseCompleted={true}
             currentUserName={currentUserName}
             isMeritBadge={true}
