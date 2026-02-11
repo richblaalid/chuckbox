@@ -100,6 +100,20 @@ export default async function ScoutPage({ params }: ScoutPageProps) {
   const canEditScout = membership && ['admin', 'treasurer', 'leader'].includes(membership.role)
   const canEditGuardians = membership && ['admin', 'treasurer'].includes(membership.role)
 
+  // Check if current user is a guardian of this scout (for parent submission feature)
+  // Parents who are also leaders will have canEditScout=true, but we still set this
+  // so non-leader parents can submit requirements for approval
+  const { data: guardianCheck } = profileData
+    ? await supabase
+        .from('scout_guardians')
+        .select('id')
+        .eq('scout_id', id)
+        .eq('profile_id', profileData.id)
+        .maybeSingle()
+    : { data: null }
+
+  const isParentOfScout = !!guardianCheck
+
   interface Scout {
     id: string
     first_name: string
@@ -336,6 +350,7 @@ export default async function ScoutPage({ params }: ScoutPageProps) {
         advancementEnabled={advancementEnabled}
         canEditScout={canEditScout || false}
         canEditGuardians={canEditGuardians || false}
+        isParentOfScout={isParentOfScout}
       />
     </div>
   )

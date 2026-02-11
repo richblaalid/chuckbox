@@ -3,68 +3,16 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Users, Receipt, CreditCard, BarChart3, AlertTriangle, FileText } from 'lucide-react'
-
-interface FinanceSubnavProps {
-  /** Whether to show billing and payments tabs (admin/treasurer only) */
-  showFinancialTabs?: boolean
-}
+import { LayoutDashboard, Users, BarChart3 } from 'lucide-react'
 
 const tabs = [
-  {
-    label: 'Overview',
-    href: '/finances',
-    icon: LayoutDashboard,
-    requiresFinancial: true, // Only admin/treasurer/leader see overview
-  },
-  {
-    label: 'Accounts',
-    href: '/finances/accounts',
-    icon: Users,
-    requiresFinancial: false, // Everyone can see accounts (filtered)
-  },
-  {
-    label: 'Billing',
-    href: '/finances/billing',
-    icon: Receipt,
-    requiresFinancial: true,
-  },
-  {
-    label: 'Payments',
-    href: '/finances/payments',
-    icon: CreditCard,
-    requiresFinancial: true,
-  },
-  {
-    label: 'Collection',
-    href: '/finances/collection',
-    icon: AlertTriangle,
-    requiresFinancial: true,
-  },
-  {
-    label: 'Reports',
-    href: '/finances/reports',
-    icon: BarChart3,
-    requiresFinancial: true,
-  },
-  {
-    label: 'Transactions',
-    href: '/finances/transactions',
-    icon: FileText,
-    requiresFinancial: true,
-  },
+  { label: 'Overview', href: '/finances', icon: LayoutDashboard },
+  { label: 'Scout Accounts', href: '/finances/accounts', icon: Users },
+  { label: 'Reports', href: '/finances/reports', icon: BarChart3 },
 ]
 
-export function FinanceSubnav({ showFinancialTabs = true }: FinanceSubnavProps) {
+export function FinanceSubnav() {
   const pathname = usePathname()
-
-  // Filter tabs based on role
-  const visibleTabs = tabs.filter(tab => {
-    if (tab.requiresFinancial && !showFinancialTabs) {
-      return false
-    }
-    return true
-  })
 
   // Determine active tab - handle nested routes like /finances/accounts/[id]
   const getIsActive = (href: string) => {
@@ -77,7 +25,7 @@ export function FinanceSubnav({ showFinancialTabs = true }: FinanceSubnavProps) 
   return (
     <nav className="border-b border-stone-200">
       <div className="-mb-px flex gap-1 overflow-x-auto">
-        {visibleTabs.map((tab) => {
+        {tabs.map((tab) => {
           const Icon = tab.icon
           const isActive = getIsActive(tab.href)
 

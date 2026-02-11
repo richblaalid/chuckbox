@@ -158,7 +158,7 @@ export function ScoutDetailSidePanel({
         )}
 
         <Link
-          href={`/roster/scouts/${scout.scoutId}`}
+          href={`/scouts/${scout.scoutId}`}
           className="mt-4 flex items-center text-sm text-primary hover:underline"
         >
           View Full History

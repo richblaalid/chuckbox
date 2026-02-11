@@ -117,6 +117,16 @@ interface AdvancementData {
       id: string
       status: string
       completed_at: string | null
+      completed_by?: string | null
+      notes?: string | null
+      approval_status?: string | null
+      requirement_id?: string
+      bsa_merit_badge_requirements?: {
+        id: string
+        requirement_number: string
+        description: string
+        parent_requirement_id?: string | null
+      }
     }>
   }>
   leadershipHistory: Array<{
@@ -158,6 +168,7 @@ interface ScoutProfileTabsProps {
   advancementEnabled: boolean
   canEditScout: boolean
   canEditGuardians: boolean
+  isParentOfScout?: boolean
 }
 
 export function ScoutProfileTabs({
@@ -168,6 +179,7 @@ export function ScoutProfileTabs({
   advancementEnabled,
   canEditScout,
   canEditGuardians,
+  isParentOfScout = false,
 }: ScoutProfileTabsProps) {
   const [activeTab, setActiveTab] = useState(advancementEnabled ? 'advancement' : 'profile')
 
@@ -204,6 +216,7 @@ export function ScoutProfileTabs({
             activityEntries={advancementData.activityEntries}
             activityTotals={advancementData.activityTotals}
             canEdit={canEditScout}
+            canSubmit={isParentOfScout && !canEditScout}
           />
         </TabsContent>
       )}

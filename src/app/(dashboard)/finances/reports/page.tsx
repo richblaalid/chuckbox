@@ -271,7 +271,7 @@ export default async function ReportsPage() {
         </p>
       </div>
 
-      <FinanceSubnav showFinancialTabs={true} />
+      <FinanceSubnav />
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">
