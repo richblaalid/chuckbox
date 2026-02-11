@@ -13,7 +13,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { appendNote } from '@/lib/notes-utils'
 import type { ActionResult } from './types'
-import { checkFeatureEnabled, verifyLeaderRole } from './utils'
+import { checkFeatureEnabled, verifyLeaderRole, verifyParentAccess } from './utils'
 
 /**
  * Start tracking a merit badge for a scout
@@ -428,6 +428,108 @@ export async function addMeritBadgeRequirementNoteWithInit(params: {
     revalidatePath(`/scouts/${progress.scout_id}`)
   }
   return { success: true, data: { progressId: reqProgress.id } }
+}
+
+// ==========================================
+// PARENT SUBMISSION FOR APPROVAL
+// ==========================================
+
+/**
+ * Submit merit badge requirement completion for leader approval (parent action)
+ * Parents can mark requirements as completed, which puts them in pending_approval status
+ * for a leader to review and approve.
+ */
+export async function submitMeritBadgeRequirementForApproval(
+  requirementProgressId: string,
+  scoutId: string,
+  completedAt: string,
+  notes: string
+): Promise<ActionResult> {
+  const featureCheck = await checkFeatureEnabled<void>()
+  if (featureCheck) return featureCheck
+
+  const auth = await verifyParentAccess(scoutId)
+  if ('error' in auth) return { success: false, error: auth.error }
+
+  const adminSupabase = createAdminClient()
+
+  const { error } = await adminSupabase
+    .from('scout_merit_badge_requirement_progress')
+    .update({
+      submitted_by: auth.profileId,
+      submitted_at: new Date().toISOString(),
+      submission_notes: notes,
+      approval_status: 'pending_approval',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', requirementProgressId)
+
+  if (error) {
+    console.error('Error submitting merit badge requirement:', error)
+    return { success: false, error: 'Failed to submit requirement for approval' }
+  }
+
+  revalidatePath('/my-progress')
+  revalidatePath('/advancement')
+  return { success: true }
+}
+
+/**
+ * Retract a parent's own merit badge submission (undo pending approval request)
+ * Parents can only retract their own submissions
+ */
+export async function retractMeritBadgeRequirementSubmission(
+  requirementProgressId: string,
+  scoutId: string
+): Promise<ActionResult> {
+  const featureCheck = await checkFeatureEnabled<void>()
+  if (featureCheck) return featureCheck
+
+  const auth = await verifyParentAccess(scoutId)
+  if ('error' in auth) return { success: false, error: auth.error }
+
+  const adminSupabase = createAdminClient()
+
+  // Verify the submission exists and belongs to this parent
+  const { data: existing } = await adminSupabase
+    .from('scout_merit_badge_requirement_progress')
+    .select('submitted_by, approval_status')
+    .eq('id', requirementProgressId)
+    .single()
+
+  if (!existing) {
+    return { success: false, error: 'Requirement progress not found' }
+  }
+
+  // Only allow retracting pending submissions that the current parent submitted
+  if (existing.approval_status !== 'pending_approval') {
+    return { success: false, error: 'Only pending submissions can be retracted' }
+  }
+
+  if (existing.submitted_by !== auth.profileId) {
+    return { success: false, error: 'You can only retract your own submissions' }
+  }
+
+  // Clear the submission fields
+  const { error } = await adminSupabase
+    .from('scout_merit_badge_requirement_progress')
+    .update({
+      submitted_by: null,
+      submitted_at: null,
+      submission_notes: null,
+      approval_status: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', requirementProgressId)
+
+  if (error) {
+    console.error('Error retracting merit badge submission:', error)
+    return { success: false, error: 'Failed to retract submission' }
+  }
+
+  revalidatePath('/my-progress')
+  revalidatePath('/advancement')
+  return { success: true }
 }
 
 /**
