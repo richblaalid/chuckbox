@@ -195,6 +195,64 @@ export type Database = {
           },
         ]
       }
+      balance_import_batches: {
+        Row: {
+          created_at: string | null
+          id: string
+          imported_by: string
+          mode: string
+          row_count: number
+          status: string
+          undone_at: string | null
+          undone_by: string | null
+          unit_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          imported_by: string
+          mode: string
+          row_count?: number
+          status?: string
+          undone_at?: string | null
+          undone_by?: string | null
+          unit_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          imported_by?: string
+          mode?: string
+          row_count?: number
+          status?: string
+          undone_at?: string | null
+          undone_by?: string | null
+          unit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "balance_import_batches_imported_by_fkey"
+            columns: ["imported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "balance_import_batches_undone_by_fkey"
+            columns: ["undone_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "balance_import_batches_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_charges: {
         Row: {
           amount: number
@@ -406,7 +464,7 @@ export type Database = {
           requirement_number: string
           scoutbook_requirement_number: string | null
           sub_requirement_letter: string | null
-          version_year: number
+          version_year: number | null
         }
         Insert: {
           alternatives_group?: string | null
@@ -424,7 +482,7 @@ export type Database = {
           requirement_number: string
           scoutbook_requirement_number?: string | null
           sub_requirement_letter?: string | null
-          version_year: number
+          version_year?: number | null
         }
         Update: {
           alternatives_group?: string | null
@@ -442,7 +500,7 @@ export type Database = {
           requirement_number?: string
           scoutbook_requirement_number?: string | null
           sub_requirement_letter?: string | null
-          version_year?: number
+          version_year?: number | null
         }
         Relationships: [
           {
@@ -565,7 +623,7 @@ export type Database = {
           rank_id: string
           requirement_number: string
           sub_requirement_letter: string | null
-          version_year: number
+          version_year: number | null
         }
         Insert: {
           alternatives_group?: string | null
@@ -578,7 +636,7 @@ export type Database = {
           rank_id: string
           requirement_number: string
           sub_requirement_letter?: string | null
-          version_year: number
+          version_year?: number | null
         }
         Update: {
           alternatives_group?: string | null
@@ -591,7 +649,7 @@ export type Database = {
           rank_id?: string
           requirement_number?: string
           sub_requirement_letter?: string | null
-          version_year?: number
+          version_year?: number | null
         }
         Relationships: [
           {
@@ -934,6 +992,98 @@ export type Database = {
           },
         ]
       }
+      import_requirement_mismatches: {
+        Row: {
+          advancement_type: string
+          badge_or_rank_name: string
+          bsa_member_id: string | null
+          created_at: string
+          csv_row_data: Json | null
+          error_reason: string | null
+          id: string
+          import_file_name: string | null
+          import_type: string
+          imported_by: string | null
+          requirement_id: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          scout_id: string | null
+          scout_name: string | null
+          unit_id: string
+          version_year: number | null
+        }
+        Insert: {
+          advancement_type: string
+          badge_or_rank_name: string
+          bsa_member_id?: string | null
+          created_at?: string
+          csv_row_data?: Json | null
+          error_reason?: string | null
+          id?: string
+          import_file_name?: string | null
+          import_type: string
+          imported_by?: string | null
+          requirement_id: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          scout_id?: string | null
+          scout_name?: string | null
+          unit_id: string
+          version_year?: number | null
+        }
+        Update: {
+          advancement_type?: string
+          badge_or_rank_name?: string
+          bsa_member_id?: string | null
+          created_at?: string
+          csv_row_data?: Json | null
+          error_reason?: string | null
+          id?: string
+          import_file_name?: string | null
+          import_type?: string
+          imported_by?: string | null
+          requirement_id?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          scout_id?: string | null
+          scout_name?: string | null
+          unit_id?: string
+          version_year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_requirement_mismatches_imported_by_fkey"
+            columns: ["imported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_requirement_mismatches_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_requirement_mismatches_scout_id_fkey"
+            columns: ["scout_id"]
+            isOneToOne: false
+            referencedRelation: "scouts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_requirement_mismatches_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_checkouts: {
         Row: {
           checked_out_at: string | null
@@ -1034,6 +1184,7 @@ export type Database = {
       }
       journal_entries: {
         Row: {
+          balance_import_batch_id: string | null
           created_at: string | null
           created_by: string | null
           description: string
@@ -1049,6 +1200,7 @@ export type Database = {
           void_reason: string | null
         }
         Insert: {
+          balance_import_batch_id?: string | null
           created_at?: string | null
           created_by?: string | null
           description: string
@@ -1064,6 +1216,7 @@ export type Database = {
           void_reason?: string | null
         }
         Update: {
+          balance_import_batch_id?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string
@@ -1079,6 +1232,13 @@ export type Database = {
           void_reason?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "journal_entries_balance_import_batch_id_fkey"
+            columns: ["balance_import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "balance_import_batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "journal_entries_created_by_fkey"
             columns: ["created_by"]
@@ -1532,6 +1692,62 @@ export type Database = {
             columns: ["voided_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plaid_connections: {
+        Row: {
+          access_token: string
+          accounts: Json | null
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          id: string
+          institution_id: string | null
+          institution_name: string | null
+          item_id: string
+          last_synced_at: string | null
+          status: string
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          access_token: string
+          accounts?: Json | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          institution_id?: string | null
+          institution_name?: string | null
+          item_id: string
+          last_synced_at?: string | null
+          status?: string
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string
+          accounts?: Json | null
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          institution_id?: string | null
+          institution_name?: string | null
+          item_id?: string
+          last_synced_at?: string | null
+          status?: string
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plaid_connections_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: true
+            referencedRelation: "units"
             referencedColumns: ["id"]
           },
         ]
@@ -3189,6 +3405,7 @@ export type Database = {
       units: {
         Row: {
           chartered_org: string | null
+          collection_settings: Json | null
           council: string | null
           created_at: string | null
           district: string | null
@@ -3209,6 +3426,7 @@ export type Database = {
         }
         Insert: {
           chartered_org?: string | null
+          collection_settings?: Json | null
           council?: string | null
           created_at?: string | null
           district?: string | null
@@ -3229,6 +3447,7 @@ export type Database = {
         }
         Update: {
           chartered_org?: string | null
+          collection_settings?: Json | null
           council?: string | null
           created_at?: string | null
           district?: string | null
@@ -3376,7 +3595,23 @@ export type Database = {
       get_unit_sections: { Args: { p_unit_id: string }; Returns: string[] }
       get_user_active_unit_ids: { Args: never; Returns: string[] }
       initialize_scout_rank_progress: {
-        Args: { p_rank_id: string; p_scout_id: string }
+        Args: { p_rank_id: string; p_scout_id: string; p_version_id?: string }
+        Returns: string
+      }
+      insert_merit_badge_requirement: {
+        Args: {
+          p_alternatives_group: string
+          p_description: string
+          p_display_order: number
+          p_is_alternative: boolean
+          p_merit_badge_id: string
+          p_nesting_depth: number
+          p_original_scoutbook_id: string
+          p_required_count: number
+          p_requirement_number: string
+          p_sub_requirement_letter: string
+          p_version_id: string
+        }
         Returns: string
       }
       is_leadership_position_current: {
@@ -3413,6 +3648,10 @@ export type Database = {
       update_billing_description: {
         Args: { p_billing_record_id: string; p_new_description: string }
         Returns: Json
+      }
+      update_requirement_parent: {
+        Args: { p_id: string; p_parent_id: string }
+        Returns: undefined
       }
       user_has_role: {
         Args: {
@@ -3458,6 +3697,8 @@ export type Database = {
         | "adjustment"
         | "funds_transfer"
         | "fundraising_credit"
+        | "beginning_balance"
+        | "balance_import_reversal"
       membership_role: "admin" | "treasurer" | "leader" | "parent" | "scout"
       membership_status: "roster" | "invited" | "active" | "inactive"
       payment_link_status: "pending" | "completed" | "expired" | "cancelled"
@@ -3616,6 +3857,8 @@ export const Constants = {
         "adjustment",
         "funds_transfer",
         "fundraising_credit",
+        "beginning_balance",
+        "balance_import_reversal",
       ],
       membership_role: ["admin", "treasurer", "leader", "parent", "scout"],
       membership_status: ["roster", "invited", "active", "inactive"],
