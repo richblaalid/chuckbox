@@ -352,6 +352,9 @@ function countRequirements(reqs: Requirement[]): number {
 /**
  * Apply generic normalization to all requirement numbers.
  * This runs before badge-specific transforms.
+ *
+ * IMPORTANT: Only normalizes `requirement_number` for UI display.
+ * Preserves `scoutbook_id` as-is for Scoutbook import matching.
  */
 function applyGenericNormalization(reqs: Requirement[], badgeName: string): number {
   let normalized = 0
@@ -360,7 +363,8 @@ function applyGenericNormalization(reqs: Requirement[], badgeName: string): numb
     const newNumber = normalizeRequirementNumber(req.requirement_number, badgeName)
     if (newNumber !== req.requirement_number) {
       req.requirement_number = newNumber
-      req.scoutbook_id = newNumber
+      // DO NOT update scoutbook_id - it must remain in original format
+      // for Scoutbook import matching (CSV format like "2b[1]", "4 Option A (1)(a)")
       normalized++
     }
 
@@ -381,6 +385,9 @@ function applyGenericNormalization(reqs: Requirement[], badgeName: string): numb
 
 /**
  * Apply badge-specific transform rules from the registry.
+ *
+ * IMPORTANT: Only transforms `requirement_number` for UI display.
+ * Preserves `scoutbook_id` as-is for Scoutbook import matching.
  */
 function applyTransforms(reqs: Requirement[], rules: TransformRule[]): number {
   let renamed = 0
@@ -392,7 +399,7 @@ function applyTransforms(reqs: Requirement[], rules: TransformRule[]): number {
         const newNumber = req.requirement_number.replace(regex, rule.to)
         if (newNumber !== req.requirement_number) {
           req.requirement_number = newNumber
-          req.scoutbook_id = newNumber // Keep in sync
+          // DO NOT update scoutbook_id - preserve for import matching
           renamed++
         }
       }
