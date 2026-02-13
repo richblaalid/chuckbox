@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       accounts: {
@@ -619,6 +594,7 @@ export type Database = {
           display_order: number
           id: string
           is_alternative: boolean | null
+          is_header: boolean | null
           parent_requirement_id: string | null
           rank_id: string
           requirement_number: string
@@ -632,6 +608,7 @@ export type Database = {
           display_order: number
           id?: string
           is_alternative?: boolean | null
+          is_header?: boolean | null
           parent_requirement_id?: string | null
           rank_id: string
           requirement_number: string
@@ -645,6 +622,7 @@ export type Database = {
           display_order?: number
           id?: string
           is_alternative?: boolean | null
+          is_header?: boolean | null
           parent_requirement_id?: string | null
           rank_id?: string
           requirement_number?: string
@@ -3637,6 +3615,10 @@ export type Database = {
         }
         Returns: Json
       }
+      start_rank_progress: {
+        Args: { p_rank_id: string; p_scout_id: string }
+        Returns: string
+      }
       transfer_funds_to_billing: {
         Args: {
           p_amount: number
@@ -3833,9 +3815,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       account_type: ["asset", "liability", "equity", "income", "expense"],

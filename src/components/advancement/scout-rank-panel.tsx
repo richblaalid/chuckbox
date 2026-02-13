@@ -46,6 +46,7 @@ interface RankProgress {
       parent_requirement_id: string | null
       is_alternative: boolean | null
       alternatives_group: string | null
+      is_header: boolean | null
     }
   }>
 }
@@ -68,6 +69,7 @@ interface RankRequirementsData {
     is_alternative: boolean | null
     alternatives_group: string | null
     version_year: number | null
+    is_header: boolean | null
   }>
 }
 
@@ -299,6 +301,7 @@ export function ScoutRankPanel({
         parentRequirementId: req.bsa_rank_requirements.parent_requirement_id,
         isAlternative: req.bsa_rank_requirements.is_alternative,
         alternativesGroup: req.bsa_rank_requirements.alternatives_group,
+        isHeader: req.bsa_rank_requirements.is_header,
       }))
     : sortedRawRequirements.map(req => ({
         id: req.id,
@@ -314,6 +317,7 @@ export function ScoutRankPanel({
         parentRequirementId: req.parent_requirement_id,
         isAlternative: req.is_alternative,
         alternativesGroup: req.alternatives_group,
+        isHeader: req.is_header,
       }))
 
   return (

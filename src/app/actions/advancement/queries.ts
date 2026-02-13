@@ -664,7 +664,7 @@ export async function getRankRequirements(rankCode: string) {
   // Get all requirements for this rank's current version
   const { data: requirements, error: reqError } = await supabase
     .from('bsa_rank_requirements')
-    .select('id, requirement_number, description, parent_requirement_id, is_alternative, alternatives_group, version_year')
+    .select('id, requirement_number, description, parent_requirement_id, is_alternative, alternatives_group, version_year, is_header')
     .eq('rank_id', rank.id)
     .eq('version_year', versionYear)
     .order('display_order')
@@ -913,6 +913,7 @@ export async function getRankRequirementsForUnit(
     is_alternative: boolean | null
     alternatives_group: string | null
     display_order: number
+    is_header: boolean | null
   }>
 }>> {
   const supabase = createAdminClient()
@@ -929,7 +930,7 @@ export async function getRankRequirementsForUnit(
 
   let reqQuery = supabase
     .from('bsa_rank_requirements')
-    .select('id, rank_id, version_year, requirement_number, parent_requirement_id, sub_requirement_letter, description, is_alternative, alternatives_group, display_order')
+    .select('id, rank_id, version_year, requirement_number, parent_requirement_id, sub_requirement_letter, description, is_alternative, alternatives_group, display_order, is_header')
     .order('display_order')
 
   if (versionYear) {
@@ -1127,6 +1128,7 @@ export async function getRankDataForRank(unitId: string, rankId: string): Promis
     is_alternative: boolean | null
     alternatives_group: string | null
     display_order: number
+    is_header: boolean | null
   }>
   scoutProgress: Array<{
     scoutId: string
@@ -1161,7 +1163,7 @@ export async function getRankDataForRank(unitId: string, rankId: string): Promis
     // Requirements for this specific rank AND version year only (fixes duplication bug)
     supabase
       .from('bsa_rank_requirements')
-      .select('id, version_year, rank_id, requirement_number, parent_requirement_id, sub_requirement_letter, description, is_alternative, alternatives_group, display_order')
+      .select('id, version_year, rank_id, requirement_number, parent_requirement_id, sub_requirement_letter, description, is_alternative, alternatives_group, display_order, is_header')
       .eq('rank_id', rankId)
       .eq('version_year', versionYear)
       .order('display_order'),

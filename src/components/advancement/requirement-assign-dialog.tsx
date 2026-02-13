@@ -39,6 +39,7 @@ interface Requirement {
   is_alternative: boolean | null
   alternatives_group: string | null
   display_order: number
+  is_header: boolean | null
 }
 
 interface RequirementProgress {

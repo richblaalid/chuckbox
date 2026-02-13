@@ -32,6 +32,7 @@ interface Requirement {
   parent_requirement_id: string | null
   is_alternative: boolean | null
   alternatives_group: string | null
+  is_header: boolean | null
 }
 
 interface RequirementProgress {
@@ -180,9 +181,13 @@ function RequirementNodeView({
   // Check if children are alternatives
   const hasAlternativeChildren = node.children.some(c => c.requirement.is_alternative)
 
-  // For leaf nodes (no children), render just the requirement row
+  // Check if this is a header (not completable/selectable)
+  const isHeader = req.is_header === true
+
+  // For leaf nodes (no children) that are NOT headers, render just the requirement row
   // White background with pine green border, campfire orange badge
-  if (!hasChildren) {
+  // Headers without children should be handled as containers below (though unusual)
+  if (!hasChildren && !isHeader) {
     return (
       <div
         className={cn(
@@ -234,18 +239,36 @@ function RequirementNodeView({
           'flex items-center gap-3 px-3 py-2.5 text-sm transition-colors',
           'hover:bg-stone-100/50',
           isCollapsed ? 'rounded-lg' : 'rounded-t-lg',
-          isMultiSelectMode && 'cursor-pointer'
+          isMultiSelectMode && !isHeader && 'cursor-pointer'
         )}
         onClick={() => {
-          if (isMultiSelectMode) {
+          // Headers only toggle collapse, never select
+          if (isHeader) {
+            toggleNode(req.id)
+          } else if (isMultiSelectMode) {
             onSelectionChange(req.id)
           } else {
             toggleNode(req.id)
           }
         }}
       >
-        {/* Multi-select checkbox OR Expand/Collapse Icon */}
-        {isMultiSelectMode ? (
+        {/* Headers always show expand/collapse icon, never checkbox */}
+        {/* Non-headers in multi-select show checkbox */}
+        {isHeader ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleNode(req.id)
+            }}
+            className="flex h-5 w-5 shrink-0 items-center justify-center text-stone-500 hover:text-stone-700"
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </button>
+        ) : isMultiSelectMode ? (
           <Checkbox
             checked={isSelected}
             onCheckedChange={() => onSelectionChange(req.id)}
