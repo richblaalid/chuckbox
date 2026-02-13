@@ -38,7 +38,9 @@ npm run db:reset       # Clear all data from database
 npm run db:seed:base   # Seed unit with admin user ready to login
 npm run db:seed:test   # Add test scouts, parents, and users for each role
 npm run db:seed:all    # Run base + test seeds
-npm run db:fresh       # Reset + seed all (fresh start)
+npm run db:fresh       # Reset + seed + fix + validate (fresh start)
+npm run db:fix         # Run BSA requirement fixes (hierarchy, naming)
+npm run db:validate    # Validate BSA requirement structure (report issues)
 npm run db:dump        # Export current database to JSON (supabase/seeds/)
 npm run db:dump -- name  # Export with custom name
 npm run db:restore -- supabase/seeds/file.json  # Restore from dump
@@ -84,6 +86,11 @@ The application seeds BSA official reference data (ranks, merit badges, leadersh
 - 18 leadership positions
 
 **Seed validation**: The seeder automatically validates data integrity. If critical fields are missing or counts are too low, the seed process will fail with an error message.
+
+**Requirement structure:**
+- `is_header: true` - Organizational headers that group child requirements (not completable)
+- `is_header: false/null` - Completable requirements that scouts can sign off on
+- Headers are excluded from `start_rank_progress()` function
 
 ## Architecture
 
@@ -160,6 +167,42 @@ supabase db push                                   # Push to DEV
 supabase link --project-ref jtzidlmxrorbjnygfvvp  # Link to PROD
 supabase db push                                   # Push to PROD
 ```
+
+### PostgREST Query Limitations
+
+**URL Length Limit for `.in()` Queries**
+
+PostgREST encodes filter parameters in the URL query string. The `.in()` filter with many UUIDs can exceed browser/server URL limits (~8KB), causing a cryptic "Bad Request" error.
+
+| UUIDs | Approximate URL Size | Result |
+|-------|---------------------|--------|
+| 100   | ~4KB                | ✅ Safe |
+| 200   | ~8KB                | ⚠️ Risky |
+| 500+  | ~18KB+              | ❌ Fails |
+
+**Solution: Batch large `.in()` queries**
+
+```typescript
+const BATCH_SIZE = 100  // Safe limit for UUIDs
+
+// Instead of: .in('id', allIds)  // May fail with 500+ IDs
+// Do this:
+let results: Data[] = []
+for (let i = 0; i < allIds.length && results.length < limit; i += BATCH_SIZE) {
+  const batchIds = allIds.slice(i, i + BATCH_SIZE)
+  const { data } = await supabase
+    .from('table')
+    .select('*')
+    .in('id', batchIds)
+    .limit(limit - results.length)
+  if (data) results = [...results, ...data]
+}
+```
+
+**Alternative approaches:**
+- Use RPC functions for complex queries (moves logic to database)
+- Restructure queries to avoid large ID lists (join through relationships instead)
+- For dashboard queries, query with `approval_status = 'pending'` first, then filter by unit
 
 ### Component Patterns
 - UI primitives in `src/components/ui/` (shadcn/ui style)
@@ -388,6 +431,7 @@ Skip planning for:
 - Nested interactive elements (button inside button) cause React hydration issues - use `<div role="button">` with keyboard handlers instead
 - Plaid access tokens are encrypted at rest using `ENCRYPTION_KEY` - see `src/lib/plaid/encryption.ts`
 - Feature flags are checked at render time (not build time) - changes require page refresh, not rebuild
+- PostgREST `.in()` queries with 200+ UUIDs can exceed URL length limits and return "Bad Request" - batch in chunks of 100 (see "PostgREST Query Limitations" section)
 
 ---
 
