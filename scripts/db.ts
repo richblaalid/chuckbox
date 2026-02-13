@@ -37,7 +37,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {
   importAll as importBsaReferenceData,
-  importVersionedMeritBadgeRequirements,
+  importCanonicalMeritBadgeRequirements,
   validateSeedData,
 } from './bsa-reference-data';
 
@@ -157,6 +157,9 @@ async function resetDatabase(): Promise<void> {
     'accounts',
     // Audit log (before units due to FK)
     'audit_log',
+    // Import tables (must come before units and profiles due to FK)
+    'balance_import_batches',
+    'import_jobs',
     // Core tables
     'units',
     'profiles',
@@ -1473,10 +1476,9 @@ async function main(): Promise<void> {
     case 'seed:bsa':
       console.log('\n📚 Seeding BSA Reference Data...');
       // Import ranks and leadership positions from importAll
-      // Merit badges come from the scraped versioned requirements file
       await importBsaReferenceData();
-      console.log('\n📚 Seeding Versioned Merit Badge Requirements...');
-      await importVersionedMeritBadgeRequirements();
+      console.log('\n📚 Seeding Merit Badge Requirements (from canonical data)...');
+      await importCanonicalMeritBadgeRequirements();
       // Validate seeded data integrity
       const bsaValidation = await validateSeedData();
       if (!bsaValidation.valid) {
@@ -1489,8 +1491,8 @@ async function main(): Promise<void> {
       await seedTestData();
       console.log('\n📚 Seeding BSA Reference Data (ranks, positions)...');
       await importBsaReferenceData();
-      console.log('\n📚 Seeding Versioned Merit Badge Requirements (from scraped data)...');
-      await importVersionedMeritBadgeRequirements();
+      console.log('\n📚 Seeding Merit Badge Requirements (from canonical data)...');
+      await importCanonicalMeritBadgeRequirements();
       // Validate seeded data integrity
       const allValidation = await validateSeedData();
       if (!allValidation.valid) {
