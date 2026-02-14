@@ -51,6 +51,9 @@ interface ProvisionResult {
   duplicateWarning?: {
     exists: boolean
     existingUnitName: string
+    existingUnitType?: string
+    existingUnitNumber?: string
+    existingCouncil?: string
   }
 }
 
@@ -192,7 +195,13 @@ function normalizeForComparison(council: string | null): string {
   return normalized
 }
 
-async function checkDuplicateUnit(unitMetadata: UnitMetadata): Promise<{ exists: boolean; unitName?: string }> {
+async function checkDuplicateUnit(unitMetadata: UnitMetadata): Promise<{
+  exists: boolean
+  unitName?: string
+  unitType?: string
+  unitNumber?: string
+  council?: string
+}> {
   if (!unitMetadata.unitType || !unitMetadata.unitNumber) {
     return { exists: false }
   }
@@ -205,7 +214,7 @@ async function checkDuplicateUnit(unitMetadata: UnitMetadata): Promise<{ exists:
   // Fetch units with matching type and number, then filter by normalized council
   const { data: matchingUnits } = await adminSupabase
     .from('units')
-    .select('id, name, council')
+    .select('id, name, council, unit_type, unit_number')
     .eq('unit_type', unitMetadata.unitType)
     .eq('unit_number', unitMetadata.unitNumber)
     .is('parent_unit_id', null)
@@ -222,7 +231,13 @@ async function checkDuplicateUnit(unitMetadata: UnitMetadata): Promise<{ exists:
   })
 
   if (existingUnit) {
-    return { exists: true, unitName: existingUnit.name }
+    return {
+      exists: true,
+      unitName: existingUnit.name,
+      unitType: existingUnit.unit_type,
+      unitNumber: existingUnit.unit_number,
+      council: existingUnit.council ?? undefined,
+    }
   }
 
   return { exists: false }
@@ -259,6 +274,9 @@ export async function provisionUnit(input: ProvisionUnitInput, ipAddress: string
       duplicateWarning: {
         exists: true,
         existingUnitName: duplicateCheck.unitName || 'Unknown',
+        existingUnitType: duplicateCheck.unitType,
+        existingUnitNumber: duplicateCheck.unitNumber,
+        existingCouncil: duplicateCheck.council,
       },
     }
   }

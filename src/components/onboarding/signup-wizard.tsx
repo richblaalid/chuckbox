@@ -23,7 +23,12 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isComplete, setIsComplete] = useState(false)
-  const [duplicateWarning, setDuplicateWarning] = useState<{ existingUnitName: string } | null>(null)
+  const [duplicateWarning, setDuplicateWarning] = useState<{
+    existingUnitName: string
+    existingUnitType?: string
+    existingUnitNumber?: string
+    existingCouncil?: string
+  } | null>(null)
 
   // Step 1: File upload state
   const [file, setFile] = useState<File | null>(null)
@@ -156,7 +161,12 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
 
       // Handle duplicate warning (soft block - user can confirm to proceed)
       if (result.duplicateWarning?.exists) {
-        setDuplicateWarning({ existingUnitName: result.duplicateWarning.existingUnitName })
+        setDuplicateWarning({
+          existingUnitName: result.duplicateWarning.existingUnitName,
+          existingUnitType: result.duplicateWarning.existingUnitType,
+          existingUnitNumber: result.duplicateWarning.existingUnitNumber,
+          existingCouncil: result.duplicateWarning.existingCouncil,
+        })
         setIsLoading(false)
         return
       }
@@ -433,12 +443,24 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
         <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 p-4 space-y-3">
           <div className="flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-            <div>
+            <div className="space-y-2">
               <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
                 A unit with similar information already exists
               </p>
-              <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                We found an existing unit called &ldquo;{duplicateWarning.existingUnitName}&rdquo; that matches this information.
+              <div className="text-sm text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 rounded-md p-3">
+                <p className="font-medium">{duplicateWarning.existingUnitName}</p>
+                {duplicateWarning.existingCouncil && (
+                  <p className="text-amber-600 dark:text-amber-400 mt-1">
+                    {duplicateWarning.existingCouncil}
+                  </p>
+                )}
+                {duplicateWarning.existingUnitType && duplicateWarning.existingUnitNumber && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                    {duplicateWarning.existingUnitType.charAt(0).toUpperCase() + duplicateWarning.existingUnitType.slice(1)} #{duplicateWarning.existingUnitNumber}
+                  </p>
+                )}
+              </div>
+              <p className="text-sm text-amber-700 dark:text-amber-300">
                 If this is your unit, please contact support. Otherwise, you can proceed with creating a new unit.
               </p>
             </div>

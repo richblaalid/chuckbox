@@ -155,7 +155,7 @@ ALTER TABLE units ADD COLUMN IF NOT EXISTS sync_strategy TEXT DEFAULT 'additive'
 #### 0.2 Duplicate Unit Check Improvements
 - [x] **0.2.1** Normalize council names before comparison (lowercase, trim, dedupe) *(completed)*
 - [x] **0.2.2** Change from hard block to soft warning with confirmation option *(completed)*
-- [ ] **0.2.3** Show existing unit details in warning message
+- [x] **0.2.3** Show existing unit details in warning message *(completed)*
 
 ### Phase 1: Hybrid Onboarding UI
 
@@ -393,6 +393,7 @@ ALTER TABLE units ADD COLUMN IF NOT EXISTS sync_strategy TEXT DEFAULT 'additive'
 | 2026-02-13 | 0.1.5 Add edge case tests | cd02ce6 |
 | 2026-02-13 | 0.2.1 Normalize council for comparison | 4fdd01c |
 | 2026-02-13 | 0.2.2 Soft warning for duplicate units | 679cff8 |
+| 2026-02-13 | 0.2.3 Show existing unit details in warning | (pending) |
 | | | |
 
 ---
