@@ -8,9 +8,15 @@ import { FadeIn } from '@/components/ui/page-transition'
 import { parseRosterWithMetadata, type ParsedRoster, type UnitMetadata } from '@/lib/import/bsa-roster-parser'
 import { extractUnitFromCSV, provisionUnit } from '@/app/actions/onboarding'
 
-const STEPS = [
+const STEPS_CSV = [
   { id: 'upload', label: 'Upload Roster' },
   { id: 'confirm', label: 'Confirm Unit' },
+  { id: 'admin', label: 'Your Info' },
+]
+
+const STEPS_MANUAL = [
+  { id: 'upload', label: 'Get Started' },
+  { id: 'unit', label: 'Unit Details' },
   { id: 'admin', label: 'Your Info' },
 ]
 
@@ -48,6 +54,15 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
     firstName: '',
     lastName: '',
     email: '',
+  })
+
+  // Manual unit entry form state (for skip path)
+  const [manualUnitInfo, setManualUnitInfo] = useState({
+    unitType: 'troop' as 'troop' | 'pack' | 'crew',
+    unitNumber: '',
+    unitSuffix: '',
+    council: '',
+    district: '',
   })
 
   // ============================================
@@ -139,7 +154,7 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
   // ============================================
 
   const handleSubmit = useCallback(async (confirmDuplicateOverride = false) => {
-    if (!unitMetadata || !parsedRoster) {
+    if (!unitMetadata) {
       setError('Missing unit data. Please start over.')
       return
     }
@@ -166,8 +181,8 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
         {
           unitMetadata,
           admin: adminInfo,
-          parsedAdults: parsedRoster.adults,
-          parsedScouts: parsedRoster.scouts,
+          parsedAdults: parsedRoster?.adults || [],
+          parsedScouts: parsedRoster?.scouts || [],
           confirmDuplicateOverride,
         },
         '0.0.0.0' // IP will be captured server-side via headers
@@ -368,6 +383,135 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
   }
 
   // ============================================
+  // Render: Step 2 (Manual) - Unit Details Form
+  // ============================================
+
+  const renderManualUnitStep = () => {
+    const canContinue = manualUnitInfo.unitNumber.trim().length > 0
+
+    const handleContinue = () => {
+      // Build unit metadata from manual form
+      const metadata: UnitMetadata = {
+        unitType: manualUnitInfo.unitType,
+        unitNumber: manualUnitInfo.unitNumber.trim(),
+        unitSuffix: manualUnitInfo.unitSuffix.trim() || null,
+        council: manualUnitInfo.council.trim() || null,
+        district: manualUnitInfo.district.trim() || null,
+      }
+      setUnitMetadata(metadata)
+      // For manual path, no roster data
+      setParsedRoster({ adults: [], scouts: [], errors: [] })
+      setCurrentStep(2)
+    }
+
+    return (
+      <FadeIn className="space-y-6">
+        <p className="text-stone-600 dark:text-stone-300 text-center">
+          Enter your unit information below. You can add scouts and adults after completing signup.
+        </p>
+
+        <div className="space-y-4">
+          {/* Unit Type */}
+          <div>
+            <label className="block text-sm font-medium text-stone-700 dark:text-stone-200 mb-2">
+              Unit Type <span className="text-amber-500">*</span>
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              {(['troop', 'pack', 'crew'] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setManualUnitInfo(prev => ({ ...prev, unitType: type }))}
+                  className={`px-4 py-3 rounded-lg border-2 transition-colors font-medium capitalize ${
+                    manualUnitInfo.unitType === type
+                      ? 'border-forest-600 bg-forest-50 dark:bg-forest-900/20 text-forest-700 dark:text-forest-300'
+                      : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300 dark:hover:border-stone-600'
+                  }`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Unit Number and Suffix */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="col-span-2">
+              <label htmlFor="unitNumber" className="block text-sm font-medium text-stone-700 dark:text-stone-200 mb-1">
+                Unit Number <span className="text-amber-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="unitNumber"
+                value={manualUnitInfo.unitNumber}
+                onChange={(e) => setManualUnitInfo(prev => ({ ...prev, unitNumber: e.target.value }))}
+                className="w-full rounded-lg border border-stone-300 dark:border-stone-600 px-4 py-2.5 text-stone-900 dark:text-stone-50 bg-white dark:bg-stone-900 placeholder:text-stone-400 focus:border-forest-600 dark:focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-600/20 dark:focus:ring-forest-500/30"
+                placeholder="9297"
+              />
+            </div>
+            <div>
+              <label htmlFor="unitSuffix" className="block text-sm font-medium text-stone-700 dark:text-stone-200 mb-1">
+                Suffix
+              </label>
+              <input
+                type="text"
+                id="unitSuffix"
+                value={manualUnitInfo.unitSuffix}
+                onChange={(e) => setManualUnitInfo(prev => ({ ...prev, unitSuffix: e.target.value }))}
+                className="w-full rounded-lg border border-stone-300 dark:border-stone-600 px-4 py-2.5 text-stone-900 dark:text-stone-50 bg-white dark:bg-stone-900 placeholder:text-stone-400 focus:border-forest-600 dark:focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-600/20 dark:focus:ring-forest-500/30"
+                placeholder="B"
+                maxLength={2}
+              />
+              <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+                e.g., &quot;B&quot; for 9297B
+              </p>
+            </div>
+          </div>
+
+          {/* Council */}
+          <div>
+            <label htmlFor="council" className="block text-sm font-medium text-stone-700 dark:text-stone-200 mb-1">
+              Council
+            </label>
+            <input
+              type="text"
+              id="council"
+              value={manualUnitInfo.council}
+              onChange={(e) => setManualUnitInfo(prev => ({ ...prev, council: e.target.value }))}
+              className="w-full rounded-lg border border-stone-300 dark:border-stone-600 px-4 py-2.5 text-stone-900 dark:text-stone-50 bg-white dark:bg-stone-900 placeholder:text-stone-400 focus:border-forest-600 dark:focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-600/20 dark:focus:ring-forest-500/30"
+              placeholder="Northern Star Council"
+            />
+          </div>
+
+          {/* District */}
+          <div>
+            <label htmlFor="district" className="block text-sm font-medium text-stone-700 dark:text-stone-200 mb-1">
+              District
+            </label>
+            <input
+              type="text"
+              id="district"
+              value={manualUnitInfo.district}
+              onChange={(e) => setManualUnitInfo(prev => ({ ...prev, district: e.target.value }))}
+              className="w-full rounded-lg border border-stone-300 dark:border-stone-600 px-4 py-2.5 text-stone-900 dark:text-stone-50 bg-white dark:bg-stone-900 placeholder:text-stone-400 focus:border-forest-600 dark:focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-600/20 dark:focus:ring-forest-500/30"
+              placeholder="Voyageurs"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={clearFile} className="flex-1">
+            Back
+          </Button>
+          <Button onClick={handleContinue} disabled={!canContinue} className="flex-1">
+            Continue
+          </Button>
+        </div>
+      </FadeIn>
+    )
+  }
+
+  // ============================================
   // Render: Step 3 - Admin Info
   // ============================================
 
@@ -454,7 +598,7 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
   return (
     <div className="space-y-8">
       {/* Progress indicator */}
-      <TrailMarker steps={STEPS} currentStep={currentStep} className="justify-center" />
+      <TrailMarker steps={signupPath === 'manual' ? STEPS_MANUAL : STEPS_CSV} currentStep={currentStep} className="justify-center" />
 
       {/* Error message */}
       {error && (
@@ -524,7 +668,7 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
       {/* Step content */}
       <div className="min-h-[300px]">
         {currentStep === 0 && renderUploadStep()}
-        {currentStep === 1 && renderConfirmStep()}
+        {currentStep === 1 && (signupPath === 'manual' ? renderManualUnitStep() : renderConfirmStep())}
         {currentStep === 2 && renderAdminStep()}
       </div>
     </div>
