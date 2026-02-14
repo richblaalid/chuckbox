@@ -153,7 +153,7 @@ ALTER TABLE units ADD COLUMN IF NOT EXISTS sync_strategy TEXT DEFAULT 'additive'
 - [x] **0.1.5** Add unit tests for parser edge cases *(completed)*
 
 #### 0.2 Duplicate Unit Check Improvements
-- [ ] **0.2.1** Normalize council names before comparison (lowercase, trim, dedupe)
+- [x] **0.2.1** Normalize council names before comparison (lowercase, trim, dedupe) *(completed)*
 - [ ] **0.2.2** Change from hard block to soft warning with confirmation option
 - [ ] **0.2.3** Show existing unit details in warning message
 

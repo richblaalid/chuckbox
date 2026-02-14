@@ -163,6 +163,30 @@ export async function extractUnitFromCSV(csvContent: string): Promise<ExtractUni
 // Check for Duplicate Unit
 // ============================================
 
+/**
+ * Normalize council name for comparison - lowercase, trim, remove numbers
+ */
+function normalizeForComparison(council: string | null): string {
+  if (!council) return ''
+  // Normalize: lowercase, trim, remove trailing numbers, remove duplicate text
+  let normalized = council.toLowerCase().trim()
+
+  // Check for duplicated text (the council name repeated twice)
+  const halfLength = Math.floor(normalized.length / 2)
+  if (halfLength > 0) {
+    const firstHalf = normalized.substring(0, halfLength)
+    const secondHalf = normalized.substring(halfLength)
+    if (firstHalf === secondHalf) {
+      normalized = firstHalf
+    }
+  }
+
+  // Remove trailing numbers
+  normalized = normalized.replace(/\s+\d+\s*$/, '').trim()
+
+  return normalized
+}
+
 async function checkDuplicateUnit(unitMetadata: UnitMetadata): Promise<{ exists: boolean; unitName?: string }> {
   if (!unitMetadata.unitType || !unitMetadata.unitNumber) {
     return { exists: false }
@@ -170,16 +194,27 @@ async function checkDuplicateUnit(unitMetadata: UnitMetadata): Promise<{ exists:
 
   const adminSupabase = createAdminClient()
 
-  // Check for existing unit with same council, type, number
-  const { data: existingUnit } = await adminSupabase
+  // Normalize the input council name for comparison
+  const normalizedInputCouncil = normalizeForComparison(unitMetadata.council)
+
+  // Fetch units with matching type and number, then filter by normalized council
+  const { data: matchingUnits } = await adminSupabase
     .from('units')
-    .select('id, name')
+    .select('id, name, council')
     .eq('unit_type', unitMetadata.unitType)
     .eq('unit_number', unitMetadata.unitNumber)
-    .ilike('council', unitMetadata.council || '')
     .is('parent_unit_id', null)
     .eq('is_section', false)
-    .maybeSingle()
+
+  if (!matchingUnits || matchingUnits.length === 0) {
+    return { exists: false }
+  }
+
+  // Find a unit with matching normalized council name
+  const existingUnit = matchingUnits.find(unit => {
+    const normalizedStoredCouncil = normalizeForComparison(unit.council)
+    return normalizedStoredCouncil === normalizedInputCouncil
+  })
 
   if (existingUnit) {
     return { exists: true, unitName: existingUnit.name }
