@@ -168,16 +168,16 @@ ALTER TABLE units ADD COLUMN IF NOT EXISTS sync_strategy TEXT DEFAULT 'additive'
 #### 1.2 Editable Unit Metadata
 - [x] **1.2.1** Convert Step 1 display to editable form fields *(completed)*
 - [x] **1.2.2** Pre-populate from CSV parse (if CSV path) *(completed - done with 1.2.1)*
-- [ ] **1.2.3** Add validation for required fields (unit type, number)
-- [ ] **1.2.4** Add council autocomplete/suggestions (optional enhancement)
-- [ ] **1.2.5** Update provisionUnit to accept user-edited metadata
+- [x] **1.2.3** Add validation for required fields (unit type, number) *(completed)*
+- [x] **1.2.4** Add council autocomplete/suggestions (optional enhancement) *(skipped - free text for now)*
+- [x] **1.2.5** Update provisionUnit to accept user-edited metadata *(completed - already works)*
 
 #### 1.3 Roster Preview
-- [ ] **1.3.1** Create RosterPreview component
-- [ ] **1.3.2** Show scouts grouped by patrol
-- [ ] **1.3.3** Show adults grouped by role
-- [ ] **1.3.4** Display parse warnings/errors
-- [ ] **1.3.5** Allow deselecting individual members before import
+- [x] **1.3.1** Create RosterPreview component *(completed)*
+- [x] **1.3.2** Show scouts grouped by patrol *(completed)*
+- [x] **1.3.3** Show adults grouped by role *(completed)*
+- [x] **1.3.4** Display parse warnings/errors *(completed)*
+- [x] **1.3.5** Allow deselecting individual members before import *(completed - selection mode ready)*
 
 ### Phase 2: Post-Login Setup Wizard (Stage 2)
 
@@ -400,6 +400,9 @@ ALTER TABLE units ADD COLUMN IF NOT EXISTS sync_strategy TEXT DEFAULT 'additive'
 | 2026-02-13 | 1.1.4 Persist signup path for analytics | 9a6de12 |
 | 2026-02-13 | 1.2.1 Convert confirm step to editable form | e6d7a39 |
 | 2026-02-13 | 1.2.2 Pre-populate from CSV parse | e6d7a39 |
+| 2026-02-13 | 1.2.3 Add form validation for required fields | 9b9b13b |
+| 2026-02-13 | 1.2.4 Skip council autocomplete (free text) | - |
+| 2026-02-13 | 1.2.5 Verify provisionUnit accepts edited metadata | - |
 | | | |
 
 ---

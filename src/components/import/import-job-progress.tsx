@@ -60,8 +60,8 @@ export function ImportJobProgress({
     // Initial check
     checkStatus()
 
-    // Poll every 2 seconds
-    intervalId = setInterval(checkStatus, 2000)
+    // Poll every second for responsive updates
+    intervalId = setInterval(checkStatus, 1000)
 
     return () => {
       mounted = false
@@ -74,10 +74,12 @@ export function ImportJobProgress({
     : 0
 
   const phaseLabels: Record<string, string> = {
+    loading_reference_data: 'Loading reference data...',
+    scouts: 'Creating scout records...',
     ranks: 'Processing ranks...',
+    badges: 'Processing merit badges...',
     rank_requirements: 'Processing rank requirements...',
-    merit_badges: 'Processing merit badges...',
-    merit_badge_requirements: 'Processing merit badge requirements...',
+    badge_requirements: 'Processing badge requirements...',
   }
 
   const currentPhaseLabel = job?.current_phase

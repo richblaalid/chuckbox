@@ -7,6 +7,7 @@ import { TrailMarker } from '@/components/ui/trail-marker'
 import { FadeIn } from '@/components/ui/page-transition'
 import { parseRosterWithMetadata, type ParsedRoster, type UnitMetadata } from '@/lib/import/bsa-roster-parser'
 import { extractUnitFromCSV, provisionUnit } from '@/app/actions/onboarding'
+import { RosterPreview } from './roster-preview'
 
 const STEPS_CSV = [
   { id: 'upload', label: 'Upload Roster' },
@@ -468,24 +469,14 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
           </div>
         </div>
 
-        {/* Roster Summary */}
-        {rosterSummary && (
-          <div className="grid grid-cols-3 gap-4">
-            <div className="rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 p-4 text-center">
-              <Users className="h-6 w-6 text-stone-400 dark:text-stone-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-forest-700 dark:text-forest-300">{rosterSummary.scoutCount}</p>
-              <p className="text-sm text-stone-500 dark:text-stone-400">Scouts</p>
-            </div>
-            <div className="rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 p-4 text-center">
-              <Users className="h-6 w-6 text-stone-400 dark:text-stone-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-forest-700 dark:text-forest-300">{rosterSummary.adultCount}</p>
-              <p className="text-sm text-stone-500 dark:text-stone-400">Adults</p>
-            </div>
-            <div className="rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 p-4 text-center">
-              <Users className="h-6 w-6 text-stone-400 dark:text-stone-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-forest-700 dark:text-forest-300">{rosterSummary.patrolCount}</p>
-              <p className="text-sm text-stone-500 dark:text-stone-400">Patrols</p>
-            </div>
+        {/* Roster Preview */}
+        {parsedRoster && (parsedRoster.scouts.length > 0 || parsedRoster.adults.length > 0) && (
+          <div className="border-t border-stone-200 dark:border-stone-700 pt-6">
+            <RosterPreview
+              scouts={parsedRoster.scouts}
+              adults={parsedRoster.adults}
+              errors={parsedRoster.errors}
+            />
           </div>
         )}
 

@@ -16,7 +16,11 @@
     "db:seed:base": "npx tsx scripts/db.ts seed:base",
     "db:seed:test": "npx tsx scripts/db.ts seed:test",
     "db:seed:all": "npx tsx scripts/db.ts seed:all",
-    "db:fresh": "npx tsx scripts/db.ts reset && npx tsx scripts/db.ts seed:all",
+    "db:fresh": "npx tsx scripts/db.ts reset && npx tsx scripts/db.ts seed:all && npx tsx scripts/fix-bsa-requirements.ts && npx tsx scripts/validate-bsa-structure.ts",
+    "db:fix": "npx tsx scripts/fix-bsa-requirements.ts",
+    "db:validate": "npx tsx scripts/validate-bsa-structure.ts",
+    "db:validate:strict": "npx tsx scripts/validate-bsa-structure.ts --strict",
+    "db:normalize": "npx tsx scripts/normalize-canonical-data.ts",
     "db:dump": "npx tsx scripts/db.ts dump",
     "db:restore": "npx tsx scripts/db.ts restore",
     "db:list": "npx tsx scripts/db.ts list"

@@ -1,0 +1,83 @@
+{
+  "_comment": "Manual parent-child mappings for requirements where ID patterns don't work",
+  "_instructions": "Each entry maps a parent header ID to its child IDs. The fix script will use this to properly nest children.",
+
+  "overrides": [
+    {
+      "badge": "Archery",
+      "version": 2019,
+      "mappings": [
+        {
+          "parentId": "5A(f)",
+          "childIds": ["5f[1]a Opt A", "5f[1]b Opt A", "5f[1]c Opt A", "5f[1]d Opt A", "5f[1]e Opt A", "5f[2] Opt A", "5f[3] Opt A", "5f[4] Opt A"],
+          "_note": "Option A - Do ONE of the following archery scoring options"
+        },
+        {
+          "parentId": "5B(f)",
+          "childIds": ["5f[1]a Opt B", "5f[1]b Opt B", "5f[1]c Opt B", "5f[1]d Opt B", "5f[1]e Opt B", "5f[2] Opt B", "5f[3] Opt B", "5f[4] Opt B"],
+          "_note": "Option B - Do ONE of the following archery scoring options"
+        }
+      ]
+    },
+    {
+      "badge": "Archery",
+      "version": 2023,
+      "mappings": [
+        {
+          "parentId": "5A(f)",
+          "childIds": ["5f[1]a Opt A", "5f[1]b Opt A", "5f[1]c Opt A", "5f[1]d Opt A", "5f[2] Opt A", "5f[3] Opt A", "5f[4] Opt A"],
+          "_note": "Option A - Do ONE of the following archery scoring options"
+        },
+        {
+          "parentId": "5B(f)",
+          "childIds": ["5f[1]a Opt B", "5f[1]b Opt B", "5f[1]c Opt B", "5f[1]d Opt B", "5f[2] Opt B", "5f[3] Opt B", "5f[4] Opt B"],
+          "_note": "Option B - Do ONE of the following archery scoring options"
+        }
+      ]
+    },
+    {
+      "badge": "Environmental Science",
+      "version": 2020,
+      "mappings": [
+        {
+          "parentId": "2",
+          "childIds": [],
+          "_note": "TODO: Ecology section - identify sub-requirements or mark as completable"
+        },
+        {
+          "parentId": "5",
+          "childIds": [],
+          "_note": "TODO: Land Pollution section"
+        },
+        {
+          "parentId": "6",
+          "childIds": [],
+          "_note": "TODO: Rare/Threatened Species section"
+        }
+      ]
+    }
+  ],
+
+  "_remaining_issues": [
+    "Environmental Science v2023 - 2, 5, 6",
+    "Fingerprinting v2004 - 2",
+    "First Aid v2025 - 10., 15.",
+    "Multisport v2025 - 4",
+    "Multisport v2026 - 4",
+    "Nature v2014 - 6, 7",
+    "Nature v2025 - 7.",
+    "Personal Management v2016 - 1B0",
+    "Personal Management v2019 - 1B0",
+    "Plant Science v2014 - 8",
+    "Plant Science v2017 - 8",
+    "Plant Science v2023 - 8",
+    "Public Health v2026 - 5, 7",
+    "Radio v2017 - 9A, 9B(c), 9B(d)",
+    "Radio v2026 - 2",
+    "Railroading v2022 - 7A, 7B",
+    "Rifle Shooting v2002 - 2",
+    "Scouting Heritage v2026 - 2",
+    "Skating v2016 - 2",
+    "Skating v2024 - 2"
+  ]
+}

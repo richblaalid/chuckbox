@@ -1,0 +1,92 @@
+{
+  "description": "Registry of BSA requirement fix scripts. Used by fix-bsa-requirements.ts to run applicable fixes.",
+  "lastUpdated": "2026-02-12T17:28:41.289Z",
+  "fixes": [
+    {
+      "badge": "Cycling",
+      "version": 2026,
+      "script": "scripts/fix-cycling-2026-requirements.ts",
+      "description": "Fix requirement 6 option A/B nesting structure",
+      "issueTypes": [
+        "inconsistent_nesting"
+      ],
+      "enabled": false,
+      "lastRun": "2026-02-12T17:28:05.908Z",
+      "disabledReason": "Canonical data now normalized at source - no post-seed fixes needed"
+    },
+    {
+      "badge": "Multisport",
+      "version": 2026,
+      "script": "scripts/fix-multisport-2026-requirements.ts",
+      "description": "Fix requirement 4 option A/B/C/D structure and naming",
+      "issueTypes": [
+        "inconsistent_nesting"
+      ],
+      "enabled": false,
+      "lastRun": "2026-02-12T17:28:13.036Z",
+      "disabledReason": "Canonical data now normalized at source - no post-seed fixes needed"
+    },
+    {
+      "badge": "Multisport",
+      "version": 2025,
+      "script": "scripts/fix-multisport-2025-requirements.ts",
+      "description": "Fix requirement 4 option structure for 2025 version",
+      "issueTypes": [
+        "inconsistent_nesting"
+      ],
+      "enabled": false,
+      "lastRun": "2026-02-12T17:28:25.948Z",
+      "disabledReason": "Canonical data now normalized at source - no post-seed fixes needed"
+    }
+  ],
+  "knownIssues": [
+    {
+      "badge": "Animal Science",
+      "version": 2025,
+      "description": "Headers 6Db, 6Eb, 6Fc marked as headers but have no children",
+      "status": "needs_fix_script"
+    },
+    {
+      "badge": "Golf",
+      "version": 2024,
+      "description": "Option patterns with incorrect nesting",
+      "status": "needs_fix_script"
+    },
+    {
+      "badge": "Nature",
+      "version": 2025,
+      "description": "Requirement 4 option patterns with orphaned sub-requirements",
+      "status": "needs_fix_script"
+    },
+    {
+      "badge": "Geology",
+      "version": 2026,
+      "description": "Header 4Cb without children",
+      "status": "needs_fix_script"
+    },
+    {
+      "badge": "Plant Science",
+      "version": 2026,
+      "description": "Headers 8Gc, 8Gd, 8Lc without children",
+      "status": "needs_fix_script"
+    },
+    {
+      "badge": "Snow Sports",
+      "version": 2026,
+      "description": "Header 7Cb without children",
+      "status": "needs_fix_script"
+    },
+    {
+      "badge": "Metalwork",
+      "version": 2025,
+      "description": "Header 5Dd without children",
+      "status": "needs_fix_script"
+    },
+    {
+      "badge": "Insect Study",
+      "version": 2025,
+      "description": "Header 5b without children, odd requirement numbers 51./52.",
+      "status": "needs_fix_script"
+    }
+  ]
+}

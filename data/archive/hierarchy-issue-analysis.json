@@ -1,0 +1,397 @@
+{
+  "summary": {
+    "total": 35,
+    "autoFix": 0,
+    "needsReview": 35
+  },
+  "autoFixCandidates": [],
+  "needsReview": [
+    {
+      "badge": "Archery",
+      "version": 2019,
+      "headerId": "5A(f)",
+      "headerDesc": "Do ONE of the following:",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Archery",
+      "version": 2019,
+      "headerId": "5B(f)",
+      "headerDesc": "Do ONE of the following:",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Archery",
+      "version": 2023,
+      "headerId": "5A(f)",
+      "headerDesc": "Do ONE of the following:",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Archery",
+      "version": 2023,
+      "headerId": "5B(f)",
+      "headerDesc": "Do ONE of the following:",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Environmental Science",
+      "version": 2020,
+      "headerId": "2",
+      "headerDesc": "Ecology. Do the following and discuss with your counselor:  ",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Environmental Science",
+      "version": 2020,
+      "headerId": "5",
+      "headerDesc": "Land Pollution. Do ONE of the following and discuss with you",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Environmental Science",
+      "version": 2020,
+      "headerId": "6",
+      "headerDesc": "Rare, Threatened, or Endangered Species. Do ONE of the follo",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Environmental Science",
+      "version": 2023,
+      "headerId": "2",
+      "headerDesc": "Ecology. Do the following and discuss with your counselor:  ",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Environmental Science",
+      "version": 2023,
+      "headerId": "5",
+      "headerDesc": "Land Pollution. Do ONE of the following and discuss with you",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Environmental Science",
+      "version": 2023,
+      "headerId": "6",
+      "headerDesc": "Rare, Threatened, or Endangered Species. Do ONE of the follo",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Fingerprinting",
+      "version": 2004,
+      "headerId": "2",
+      "headerDesc": "Do the following:",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "First Aid",
+      "version": 2025,
+      "headerId": "10.",
+      "headerDesc": "Moving a Patient. Do the following:",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "First Aid",
+      "version": 2025,
+      "headerId": "15.",
+      "headerDesc": "Do ONE of the following:",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Multisport",
+      "version": 2025,
+      "headerId": "4",
+      "headerDesc": "Complete ALL of the activities that apply to the multisport ",
+      "recommendation": "needs_review",
+      "reason": "Has potential children with non-standard IDs",
+      "potentialChildren": [
+        "4a1 Aquabike Option",
+        "4a1 Aquathlon Option",
+        "4a1 Duathlon Option",
+        "4a1 Triathlon Option",
+        "4a2 Aquabike Option"
+      ]
+    },
+    {
+      "badge": "Multisport",
+      "version": 2026,
+      "headerId": "4",
+      "headerDesc": "Complete ALL of the following for the multisport format opti",
+      "recommendation": "needs_review",
+      "reason": "Has potential children with non-standard IDs",
+      "potentialChildren": [
+        "4 Option A (1)(a)",
+        "4 Option A (1)(b)",
+        "4 Option A (1)(c)",
+        "4 Option A (2)(a)",
+        "4 Option A (2)(b)"
+      ]
+    },
+    {
+      "badge": "Nature",
+      "version": 2014,
+      "headerId": "6",
+      "headerDesc": "Do the following:",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Nature",
+      "version": 2014,
+      "headerId": "7",
+      "headerDesc": "Do ONE of the following:",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Nature",
+      "version": 2025,
+      "headerId": "7.",
+      "headerDesc": "Do ONE of the following:",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Personal Management",
+      "version": 2016,
+      "headerId": "1B0",
+      "headerDesc": "Do the following:",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Personal Management",
+      "version": 2019,
+      "headerId": "1B0",
+      "headerDesc": "Do the following:",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Plant Science",
+      "version": 2014,
+      "headerId": "8",
+      "headerDesc": "Choose ONE of the following options and complete each requir",
+      "recommendation": "needs_review",
+      "reason": "Has potential children with non-standard IDs",
+      "potentialChildren": [
+        "8A Opt 1",
+        "8A Opt 2",
+        "8A1 Opt 3",
+        "8A2 Opt 3",
+        "8A3 Opt 3"
+      ]
+    },
+    {
+      "badge": "Plant Science",
+      "version": 2017,
+      "headerId": "8",
+      "headerDesc": "Choose ONE of the following options and complete each requir",
+      "recommendation": "needs_review",
+      "reason": "Has potential children with non-standard IDs",
+      "potentialChildren": [
+        "8A Opt 1",
+        "8A Opt 2",
+        "8A1 Opt 3",
+        "8A2 Opt 3",
+        "8A3 Opt 3"
+      ]
+    },
+    {
+      "badge": "Plant Science",
+      "version": 2023,
+      "headerId": "8",
+      "headerDesc": "Choose ONE of the following options and complete each requir",
+      "recommendation": "needs_review",
+      "reason": "Has potential children with non-standard IDs",
+      "potentialChildren": [
+        "8A Opt 1",
+        "8A Opt 2",
+        "8A1 Opt 3",
+        "8A2 Opt 3",
+        "8A3 Opt 3"
+      ]
+    },
+    {
+      "badge": "Public Health",
+      "version": 2026,
+      "headerId": "5",
+      "headerDesc": "With your parent or guardian's and counselor's approval, do ",
+      "recommendation": "needs_review",
+      "reason": "Has potential children with non-standard IDs",
+      "potentialChildren": [
+        "5(a)(1)",
+        "5(a)(2)",
+        "5(a)(3)",
+        "5(b)(1)",
+        "5(b)(2)"
+      ]
+    },
+    {
+      "badge": "Public Health",
+      "version": 2026,
+      "headerId": "7",
+      "headerDesc": "With your parent or guardian's and counselor's approval, do ",
+      "recommendation": "needs_review",
+      "reason": "Has potential children with non-standard IDs",
+      "potentialChildren": [
+        "7(a)(1)",
+        "7(a)(2)",
+        "7(b)(1)",
+        "7(b)(2)",
+        "7(b)(3)"
+      ]
+    },
+    {
+      "badge": "Radio",
+      "version": 2017,
+      "headerId": "9A",
+      "headerDesc": "Option A—Amateur Radio. Do the following:",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Radio",
+      "version": 2017,
+      "headerId": "9B(c)",
+      "headerDesc": "Option C—Shortwave and Medium-Wave Listening. Do the followi",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Radio",
+      "version": 2017,
+      "headerId": "9B(d)",
+      "headerDesc": "Option D—Amateur Radio Direction Finding. Do the following:",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Radio",
+      "version": 2026,
+      "headerId": "2",
+      "headerDesc": "Radio Fundamentals. Do the following:",
+      "recommendation": "needs_review",
+      "reason": "Has potential children with non-standard IDs",
+      "potentialChildren": [
+        "2(a)(1)",
+        "2(a)(2)",
+        "2(a)(3)",
+        "2(b)(1)",
+        "2(b)(2)"
+      ]
+    },
+    {
+      "badge": "Railroading",
+      "version": 2022,
+      "headerId": "7A",
+      "headerDesc": "Option A—Model Railroading.  With your parent or guardian's ",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Railroading",
+      "version": 2022,
+      "headerId": "7B",
+      "headerDesc": "Option B—Railfanning.  With your parent or guardian's and co",
+      "recommendation": "needs_review",
+      "reason": "Choice header but no matching children found - naming mismatch",
+      "potentialChildren": []
+    },
+    {
+      "badge": "Rifle Shooting",
+      "version": 2002,
+      "headerId": "2",
+      "headerDesc": "Do ONE of the following options:",
+      "recommendation": "needs_review",
+      "reason": "Has potential children with non-standard IDs",
+      "potentialChildren": [
+        "2a Opt a",
+        "2a Opt b",
+        "2a Opt c",
+        "2b Opt a",
+        "2b Opt b"
+      ]
+    },
+    {
+      "badge": "Scouting Heritage",
+      "version": 2026,
+      "headerId": "2",
+      "headerDesc": "Do the following:",
+      "recommendation": "needs_review",
+      "reason": "Has potential children with non-standard IDs",
+      "potentialChildren": [
+        "2(a)(1)",
+        "2(a)(2)",
+        "2(a)(3)",
+        "2(a)(4)",
+        "2(a)(5)"
+      ]
+    },
+    {
+      "badge": "Skating",
+      "version": 2016,
+      "headerId": "2",
+      "headerDesc": "Complete ALL of the requirements for ONE of the following op",
+      "recommendation": "needs_review",
+      "reason": "Has potential children with non-standard IDs",
+      "potentialChildren": [
+        "2a[1] Ice",
+        "2a[1] Line",
+        "2a[1] Roll",
+        "2a[2] Ice",
+        "2a[2] Line"
+      ]
+    },
+    {
+      "badge": "Skating",
+      "version": 2024,
+      "headerId": "2",
+      "headerDesc": "Working under the supervision of an experienced adult, do ON",
+      "recommendation": "needs_review",
+      "reason": "Has potential children with non-standard IDs",
+      "potentialChildren": [
+        "2a[1] Board",
+        "2a[1] Ice",
+        "2a[1] Line",
+        "2a[1] Roll",
+        "2a[2] Board"
+      ]
+    }
+  ]
+}

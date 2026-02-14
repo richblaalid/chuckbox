@@ -98,7 +98,7 @@ If 4A(1)(a), 4A(1)(b) exist but no 4A(1):
 - [x] **0.2.3** Add badge-specific rules for Cycling v2026 (from existing fix script)
 - [x] **0.2.4** Add badge-specific rules for Multisport v2026 (from existing fix script)
 
-### Phase 1: Core Transformation Engine
+### Phase 1: Core Transformation Engine ✅ COMPLETE
 
 #### 1.1 Requirement Number Normalization ✅ COMPLETE
 
@@ -108,19 +108,19 @@ If 4A(1)(a), 4A(1)(b) exist but no 4A(1):
 - [x] **1.1.4** Apply bracket-to-parenthetical conversion (`[1]` → `(1)`)
 - [x] **1.1.5** Strip sport/type labels (`Ice`, `Roll`, etc.)
 
-#### 1.2 Hierarchy Reconstruction
+#### 1.2 Hierarchy Reconstruction ✅ COMPLETE
 
-- [ ] **1.2.1** Implement `buildHierarchy(flatReqs: Requirement[]): Requirement[]`
-- [ ] **1.2.2** Calculate parent from requirement number (remove innermost level)
-- [ ] **1.2.3** Identify missing parent headers
-- [ ] **1.2.4** Insert synthetic headers with descriptions
-- [ ] **1.2.5** Set `is_header` based on children presence
+- [x] **1.2.1** Implement hierarchy functions (`insertHeaders`, `reparentRequirements`, `findRequirement`)
+- [x] **1.2.2** Implement `getParentNumber()` - calculate parent from requirement number
+- [x] **1.2.3** Identify missing parent headers (via transform rules)
+- [x] **1.2.4** Insert synthetic headers with descriptions (`insertHeaders()`)
+- [x] **1.2.5** Set `is_header` based on children presence (`fixHierarchy()`)
 
-#### 1.3 Depth & Order Calculation
+#### 1.3 Depth & Order Calculation ✅ COMPLETE
 
-- [ ] **1.3.1** Implement `calculateNestingDepth(req: Requirement): number`
-- [ ] **1.3.2** Implement `assignDisplayOrders(reqs: Requirement[]): void`
-- [ ] **1.3.3** Validate parent chain matches nesting depth
+- [x] **1.3.1** Implement `calculateNestingDepth(req: Requirement): number`
+- [x] **1.3.2** Implement `assignDisplayOrders(reqs: Requirement[]): void`
+- [x] **1.3.3** Implement `validateHierarchy()` - validate parent chain matches nesting depth
 
 ### Phase 2: Badge-Specific Transforms
 
@@ -243,6 +243,9 @@ After:  0 issues across 141 badges
 |------|------|--------|-------|
 | 0.1.1-0.2.4 | 2026-02-11 | - | Phase 0 Foundation complete |
 | 1.1.1-1.1.5 | 2026-02-11 | - | Requirement number normalization complete (1657 changes across 95 versions) |
+| 1.2.1-1.2.5 | 2026-02-11 | - | Hierarchy reconstruction: insertHeaders, reparentRequirements, getParentNumber, fixHierarchy |
+| 1.3.1-1.3.3 | 2026-02-11 | - | Depth/order: calculateNestingDepth, assignDisplayOrders, validateHierarchy |
+| Full run | 2026-02-11 | - | Generated bsa-data-canonical-normalized.json: 97 versions, 1763 total changes, 6 headers inserted |
 
 ---
 

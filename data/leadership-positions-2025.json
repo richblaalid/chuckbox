@@ -1,0 +1,202 @@
+{
+  "positions": [
+    {
+      "code": "patrol_leader",
+      "name": "Patrol Leader",
+      "qualifies_for_star": true,
+      "qualifies_for_life": true,
+      "qualifies_for_eagle": true,
+      "min_tenure_months": 4,
+      "is_patrol_level": true,
+      "is_troop_level": false,
+      "description": "Elected by patrol members to lead the patrol and represent them in the patrol leaders' council."
+    },
+    {
+      "code": "senior_patrol_leader",
+      "name": "Senior Patrol Leader",
+      "qualifies_for_star": true,
+      "qualifies_for_life": true,
+      "qualifies_for_eagle": true,
+      "min_tenure_months": 4,
+      "is_patrol_level": false,
+      "is_troop_level": true,
+      "description": "The top junior leader in the troop, responsible for running troop meetings and leading the patrol leaders' council."
+    },
+    {
+      "code": "assistant_senior_patrol_leader",
+      "name": "Assistant Senior Patrol Leader",
+      "qualifies_for_star": true,
+      "qualifies_for_life": true,
+      "qualifies_for_eagle": true,
+      "min_tenure_months": 4,
+      "is_patrol_level": false,
+      "is_troop_level": true,
+      "description": "Helps the senior patrol leader and fills in when the SPL is absent."
+    },
+    {
+      "code": "troop_guide",
+      "name": "Troop Guide",
+      "qualifies_for_star": true,
+      "qualifies_for_life": true,
+      "qualifies_for_eagle": true,
+      "min_tenure_months": 4,
+      "is_patrol_level": false,
+      "is_troop_level": true,
+      "description": "Works with new Scouts and helps them learn Scouting skills and earn their early ranks."
+    },
+    {
+      "code": "den_chief",
+      "name": "Den Chief",
+      "qualifies_for_star": true,
+      "qualifies_for_life": true,
+      "qualifies_for_eagle": true,
+      "min_tenure_months": 4,
+      "is_patrol_level": false,
+      "is_troop_level": true,
+      "description": "Works with a Cub Scout den, helping with meetings and activities."
+    },
+    {
+      "code": "scribe",
+      "name": "Scribe",
+      "qualifies_for_star": true,
+      "qualifies_for_life": true,
+      "qualifies_for_eagle": true,
+      "min_tenure_months": 4,
+      "is_patrol_level": false,
+      "is_troop_level": true,
+      "description": "Keeps the troop records, including attendance and advancement records."
+    },
+    {
+      "code": "librarian",
+      "name": "Librarian",
+      "qualifies_for_star": true,
+      "qualifies_for_life": true,
+      "qualifies_for_eagle": true,
+      "min_tenure_months": 4,
+      "is_patrol_level": false,
+      "is_troop_level": true,
+      "description": "Keeps track of troop literature, including merit badge pamphlets and other resources."
+    },
+    {
+      "code": "historian",
+      "name": "Historian",
+      "qualifies_for_star": true,
+      "qualifies_for_life": true,
+      "qualifies_for_eagle": true,
+      "min_tenure_months": 4,
+      "is_patrol_level": false,
+      "is_troop_level": true,
+      "description": "Collects and preserves troop photographs, news clippings, and other historical materials."
+    },
+    {
+      "code": "quartermaster",
+      "name": "Quartermaster",
+      "qualifies_for_star": true,
+      "qualifies_for_life": true,
+      "qualifies_for_eagle": true,
+      "min_tenure_months": 4,
+      "is_patrol_level": false,
+      "is_troop_level": true,
+      "description": "Keeps track of troop equipment and coordinates its maintenance."
+    },
+    {
+      "code": "bugler",
+      "name": "Bugler",
+      "qualifies_for_star": true,
+      "qualifies_for_life": true,
+      "qualifies_for_eagle": true,
+      "min_tenure_months": 4,
+      "is_patrol_level": false,
+      "is_troop_level": true,
+      "description": "Plays the bugle at troop ceremonies and campouts."
+    },
+    {
+      "code": "junior_assistant_scoutmaster",
+      "name": "Junior Assistant Scoutmaster",
+      "qualifies_for_star": true,
+      "qualifies_for_life": true,
+      "qualifies_for_eagle": true,
+      "min_tenure_months": 4,
+      "is_patrol_level": false,
+      "is_troop_level": true,
+      "description": "A Scout at least 16 years old who provides leadership and works with younger Scouts."
+    },
+    {
+      "code": "chaplain_aide",
+      "name": "Chaplain Aide",
+      "qualifies_for_star": true,
+      "qualifies_for_life": true,
+      "qualifies_for_eagle": true,
+      "min_tenure_months": 4,
+      "is_patrol_level": false,
+      "is_troop_level": true,
+      "description": "Works with the troop chaplain to provide spiritual guidance and organize religious services."
+    },
+    {
+      "code": "instructor",
+      "name": "Instructor",
+      "qualifies_for_star": true,
+      "qualifies_for_life": true,
+      "qualifies_for_eagle": true,
+      "min_tenure_months": 4,
+      "is_patrol_level": false,
+      "is_troop_level": true,
+      "description": "Teaches Scouting skills to other Scouts."
+    },
+    {
+      "code": "webmaster",
+      "name": "Webmaster",
+      "qualifies_for_star": true,
+      "qualifies_for_life": true,
+      "qualifies_for_eagle": true,
+      "min_tenure_months": 4,
+      "is_patrol_level": false,
+      "is_troop_level": true,
+      "description": "Maintains the troop website and online presence."
+    },
+    {
+      "code": "outdoor_ethics_guide",
+      "name": "Outdoor Ethics Guide",
+      "qualifies_for_star": true,
+      "qualifies_for_life": true,
+      "qualifies_for_eagle": true,
+      "min_tenure_months": 4,
+      "is_patrol_level": false,
+      "is_troop_level": true,
+      "description": "Helps the troop understand and practice Leave No Trace and Tread Lightly! principles."
+    },
+    {
+      "code": "leave_no_trace_trainer",
+      "name": "Leave No Trace Trainer",
+      "qualifies_for_star": true,
+      "qualifies_for_life": true,
+      "qualifies_for_eagle": true,
+      "min_tenure_months": 4,
+      "is_patrol_level": false,
+      "is_troop_level": true,
+      "description": "Trains other Scouts in Leave No Trace principles and practices."
+    },
+    {
+      "code": "oa_representative",
+      "name": "Order of the Arrow Representative",
+      "qualifies_for_star": true,
+      "qualifies_for_life": true,
+      "qualifies_for_eagle": true,
+      "min_tenure_months": 4,
+      "is_patrol_level": false,
+      "is_troop_level": true,
+      "description": "Serves as a communication link between the troop and the Order of the Arrow."
+    },
+    {
+      "code": "assistant_patrol_leader",
+      "name": "Assistant Patrol Leader",
+      "qualifies_for_star": false,
+      "qualifies_for_life": false,
+      "qualifies_for_eagle": false,
+      "min_tenure_months": 4,
+      "is_patrol_level": true,
+      "is_troop_level": false,
+      "description": "Helps the patrol leader and fills in when the PL is absent. Note: Does not count toward advancement."
+    }
+  ]
+}

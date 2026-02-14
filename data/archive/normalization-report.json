@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-02-12T17:25:07.055Z",
+  "mode": "applied",
+  "inputFile": "/Users/richblaalid/Projects/chuckbox/data/bsa-data-canonical.json",
+  "outputFile": "/Users/richblaalid/Projects/chuckbox/data/bsa-data-canonical-normalized.json",
+  "stats": [],
+  "totalBadgesProcessed": 141,
+  "totalRequirementsProcessed": 0,
+  "totalChanges": 0
+}

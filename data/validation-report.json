@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-02-13T19:52:40.471Z",
+  "totalBadges": 141,
+  "totalRequirements": 3848,
+  "badgesWithIssues": 0,
+  "totalIssues": 0,
+  "issuesByType": {
+    "orphaned": 0,
+    "header_no_children": 0,
+    "inconsistent_nesting": 0,
+    "duplicate_number": 0
+  },
+  "badges": []
+}

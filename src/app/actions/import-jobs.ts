@@ -206,12 +206,29 @@ export async function processImportJob(
       job.staged_data as unknown as StagedTroopAdvancement,
       job.selected_scout_ids as string[],
       job.created_by,
-      // Progress callback
+      // Progress callback - update phase and items
       async (processed: number, phase: string) => {
+        // Calculate phase-based progress when processed is 0
+        // This gives visual feedback during setup phases
+        const totalItems = job.total_items || 1
+        const phaseProgress: Record<string, number> = {
+          'loading_reference_data': Math.floor(totalItems * 0.05),
+          'scouts': Math.floor(totalItems * 0.10),
+          'ranks': Math.floor(totalItems * 0.15),
+          'badges': Math.floor(totalItems * 0.25),
+          'rank_requirements': Math.floor(totalItems * 0.40),
+          'badge_requirements': Math.floor(totalItems * 0.50),
+        }
+
+        // Use actual processed count if available, otherwise use phase estimate
+        const effectiveProcessed = processed > 0
+          ? processed
+          : (phaseProgress[phase] || 0)
+
         await adminSupabase
           .from('import_jobs')
           .update({
-            processed_items: processed,
+            processed_items: effectiveProcessed,
             current_phase: phase,
           })
           .eq('id', jobId)

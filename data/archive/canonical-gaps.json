@@ -1,0 +1,20 @@
+{
+  "generated_at": "2026-01-27T23:35:01.982Z",
+  "total_gaps": 2,
+  "gaps": [
+    {
+      "badge_name": "Nature",
+      "version_year": 2020,
+      "scoutbook_id": "*",
+      "description": null,
+      "note": "No Scoutbook data for this version - using BSA data only"
+    },
+    {
+      "badge_name": "Nature",
+      "version_year": 2023,
+      "scoutbook_id": "*",
+      "description": null,
+      "note": "No Scoutbook data for this version - using BSA data only"
+    }
+  ]
+}

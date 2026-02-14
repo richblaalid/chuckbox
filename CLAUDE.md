@@ -67,22 +67,30 @@ npm run db:restore -- supabase/seeds/before-testing.json  # Restore
 
 The application seeds BSA official reference data (ranks, merit badges, leadership positions) from canonical data files. This data is critical for advancement tracking.
 
-**Canonical data files** (source of truth in `data/`):
+**SINGLE SOURCE OF TRUTH:**
+All BSA reference data (ranks, merit badges, requirements) comes from ONE file: `data/bsa-data-canonical-normalized.json`. This file contains:
+- 141 merit badges with full metadata (images, categories, descriptions)
+- 361 badge versions across all years
+- 10,590 merit badge requirements (hierarchical structure with parent/child relationships)
+- 7 ranks with 222 requirements
+- Proper `scoutbook_id` mapping for Scoutbook sync compatibility
+
+**Canonical data files** (in `data/`):
 | File | Purpose |
 |------|---------|
-| `bsa-data-canonical.json` | Unified BSA data: merit badges, requirements, ranks (primary source) |
+| `bsa-data-canonical-normalized.json` | **PRIMARY** - All BSA data (badges, ranks, requirements) |
 | `leadership-positions-2025.json` | Leadership positions (18 positions) |
 
 **Rules for modifying seeders** (`scripts/bsa-reference-data.ts`, `scripts/db.ts`):
 - NEVER reduce data quality when modifying seeders (e.g., removing fields like `image_url`, `category`)
 - Always test with `npm run db:fresh` after any seeder changes
 - The seed process validates expected counts - if validation fails, the seeder exits with error
-- When adding new badge/requirement fields, update both the canonical data file AND the seeder
+- When adding new badge/requirement fields, update the canonical data file first
 
 **Expected counts after seeding:**
 - 141 merit badges (with images and categories)
-- 7 ranks with 144+ requirements
-- 11,000+ merit badge requirements (across all versions)
+- 7 ranks with 222 requirements
+- 10,590 merit badge requirements (across 361 versions)
 - 18 leadership positions
 
 **Seed validation**: The seeder automatically validates data integrity. If critical fields are missing or counts are too low, the seed process will fail with an error message.
@@ -90,6 +98,7 @@ The application seeds BSA official reference data (ranks, merit badges, leadersh
 **Requirement structure:**
 - `is_header: true` - Organizational headers that group child requirements (not completable)
 - `is_header: false/null` - Completable requirements that scouts can sign off on
+- `parent_requirement_id` - Links child requirements to their parent (for nesting)
 - Headers are excluded from `start_rank_progress()` function
 
 ## Architecture

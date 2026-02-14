@@ -1482,6 +1482,9 @@ export async function processImportJobInternal(
 ): Promise<TroopAdvancementImportResult> {
   const adminSupabase = createAdminClient()
 
+  // Signal that we're loading reference data
+  if (onProgress) await onProgress(0, 'loading_reference_data')
+
   // Load reference data
   const { data: ranks } = await adminSupabase
     .from('bsa_ranks')
@@ -1581,6 +1584,20 @@ export async function processImportJobInternal(
   let processedItems = 0
 
   const selectedScouts = staged.scouts.filter((s) => selectedBsaMemberIds.includes(s.bsaMemberId))
+
+  // Debug: Log what's in the staged data
+  const stagedDataSummary = {
+    totalSelectedScouts: selectedScouts.length,
+    totalMeritBadgeReqs: selectedScouts.reduce((sum, s) => sum + (s.meritBadgeRequirements?.length || 0), 0),
+    totalRankReqs: selectedScouts.reduce((sum, s) => sum + (s.rankRequirements?.length || 0), 0),
+    sampleScout: selectedScouts[0] ? {
+      name: selectedScouts[0].fullName,
+      meritBadgeReqCount: selectedScouts[0].meritBadgeRequirements?.length || 0,
+      rankReqCount: selectedScouts[0].rankRequirements?.length || 0,
+      firstMeritBadgeReq: selectedScouts[0].meritBadgeRequirements?.[0] || null,
+    } : null,
+  }
+  console.log('[Staged Data Summary]', JSON.stringify(stagedDataSummary, null, 2))
 
   // Create scouts first
   const scoutsToCreate = selectedScouts.filter((s) => s.matchStatus === 'unmatched')
@@ -1953,17 +1970,48 @@ export async function processImportJobInternal(
 
   const badgeReqToInsert: Array<{ scout_merit_badge_progress_id: string; requirement_id: string; status: ReqProgressStatus; completed_at: string | null; completed_by: string }> = []
 
+  // Debug: Log badge requirements processing summary
+  const badgeReqDebug = {
+    totalScouts: selectedScouts.length,
+    scoutsWithBadgeReqs: 0,
+    totalBadgeReqs: 0,
+    noScoutId: 0,
+    noReqNumber: 0,
+    noBadge: 0,
+    noProgressId: 0,
+    noRequirement: 0,
+    alreadyCompleted: 0,
+    toInsert: 0,
+  }
+
   for (const scout of selectedScouts) {
     const scoutId = scoutIdByBsaMemberId.get(scout.bsaMemberId)
-    if (!scoutId) continue
+    if (!scoutId) {
+      badgeReqDebug.noScoutId++
+      continue
+    }
+
+    if (scout.meritBadgeRequirements.length > 0) {
+      badgeReqDebug.scoutsWithBadgeReqs++
+      badgeReqDebug.totalBadgeReqs += scout.meritBadgeRequirements.length
+    }
 
     for (const stagedReq of scout.meritBadgeRequirements) {
-      if (!stagedReq.requirementNumber) continue
+      if (!stagedReq.requirementNumber) {
+        badgeReqDebug.noReqNumber++
+        continue
+      }
       const dbBadge = findBadge(stagedReq.code)
-      if (!dbBadge) continue
+      if (!dbBadge) {
+        badgeReqDebug.noBadge++
+        continue
+      }
 
       const progressId = badgeProgressIdMap.get(`${scoutId}:${dbBadge.id}`)
-      if (!progressId) continue
+      if (!progressId) {
+        badgeReqDebug.noProgressId++
+        continue
+      }
 
       const versionYears = [parseInt(stagedReq.version, 10), dbBadge.requirement_version_year].filter((v) => v && !isNaN(v))
       let requirement = null
@@ -1995,11 +2043,18 @@ export async function processImportJobInternal(
         }
       }
 
-      if (!requirement) continue
+      if (!requirement) {
+        badgeReqDebug.noRequirement++
+        continue
+      }
 
       const existing = existingBadgeReqMap.get(`${progressId}:${requirement.id}`)
-      if (existing && ['completed', 'approved', 'awarded'].includes(existing.status)) continue
+      if (existing && ['completed', 'approved', 'awarded'].includes(existing.status)) {
+        badgeReqDebug.alreadyCompleted++
+        continue
+      }
 
+      badgeReqDebug.toInsert++
       badgeReqToInsert.push({
         scout_merit_badge_progress_id: progressId,
         requirement_id: requirement.id,
@@ -2009,6 +2064,21 @@ export async function processImportJobInternal(
       })
     }
   }
+
+  // Log debug summary
+  console.log('[Badge Requirements Import Debug]', JSON.stringify(badgeReqDebug, null, 2))
+
+  // Deduplicate badge requirements - PostgreSQL can't upsert the same row twice in one statement
+  const uniqueBadgeReqs = new Map<string, typeof badgeReqToInsert[0]>()
+  for (const req of badgeReqToInsert) {
+    const key = `${req.scout_merit_badge_progress_id}:${req.requirement_id}`
+    // Keep the first occurrence (or one with a date if the first has no date)
+    if (!uniqueBadgeReqs.has(key) || (!uniqueBadgeReqs.get(key)!.completed_at && req.completed_at)) {
+      uniqueBadgeReqs.set(key, req)
+    }
+  }
+  const deduplicatedBadgeReqs = Array.from(uniqueBadgeReqs.values())
+  console.log(`[Badge Requirements] Deduplicated: ${badgeReqToInsert.length} -> ${deduplicatedBadgeReqs.length} (removed ${badgeReqToInsert.length - deduplicatedBadgeReqs.length} duplicates)`)
 
   // Batch upsert requirements
   for (let i = 0; i < rankReqToInsert.length; i += BATCH_SIZE) {
@@ -2021,10 +2091,14 @@ export async function processImportJobInternal(
     if (onProgress) await onProgress(processedItems, 'rank_requirements')
   }
 
-  for (let i = 0; i < badgeReqToInsert.length; i += BATCH_SIZE) {
-    const batch = badgeReqToInsert.slice(i, i + BATCH_SIZE)
-    const { error } = await adminSupabase.from('scout_merit_badge_requirement_progress').upsert(batch, { onConflict: 'scout_merit_badge_progress_id,requirement_id' })
-    if (!error) {
+  console.log(`[Badge Requirements] Attempting to upsert ${deduplicatedBadgeReqs.length} records in batches of ${BATCH_SIZE}`)
+  for (let i = 0; i < deduplicatedBadgeReqs.length; i += BATCH_SIZE) {
+    const batch = deduplicatedBadgeReqs.slice(i, i + BATCH_SIZE)
+    const { error, data } = await adminSupabase.from('scout_merit_badge_requirement_progress').upsert(batch, { onConflict: 'scout_merit_badge_progress_id,requirement_id' }).select('id')
+    if (error) {
+      console.error(`[Badge Requirements] Batch ${i / BATCH_SIZE + 1} FAILED:`, error.message, error.details)
+    } else {
+      console.log(`[Badge Requirements] Batch ${i / BATCH_SIZE + 1} SUCCESS: ${data?.length || 0} records`)
       result.badgeRequirementsImported += batch.length
       processedItems += batch.length
     }

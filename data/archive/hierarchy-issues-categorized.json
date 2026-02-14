@@ -1,0 +1,399 @@
+{
+  "mismatched": [
+    {
+      "badge": "Archery",
+      "version": 2019,
+      "headerId": "5A(f)",
+      "headerDesc": "Do ONE of the following:",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "5a Opt A",
+        "5a Opt B",
+        "5b Opt A",
+        "5b Opt B",
+        "5c Opt A"
+      ],
+      "reason": "Found 26 potential children with same base number"
+    },
+    {
+      "badge": "Archery",
+      "version": 2019,
+      "headerId": "5B(f)",
+      "headerDesc": "Do ONE of the following:",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "5a Opt A",
+        "5a Opt B",
+        "5b Opt A",
+        "5b Opt B",
+        "5c Opt A"
+      ],
+      "reason": "Found 26 potential children with same base number"
+    },
+    {
+      "badge": "Archery",
+      "version": 2023,
+      "headerId": "5A(f)",
+      "headerDesc": "Do ONE of the following:",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "5a Opt A",
+        "5a Opt B",
+        "5b Opt A",
+        "5b Opt B",
+        "5c Opt A"
+      ],
+      "reason": "Found 24 potential children with same base number"
+    },
+    {
+      "badge": "Archery",
+      "version": 2023,
+      "headerId": "5B(f)",
+      "headerDesc": "Do ONE of the following:",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "5a Opt A",
+        "5a Opt B",
+        "5b Opt A",
+        "5b Opt B",
+        "5c Opt A"
+      ],
+      "reason": "Found 24 potential children with same base number"
+    },
+    {
+      "badge": "Multisport",
+      "version": 2025,
+      "headerId": "4",
+      "headerDesc": "Complete ALL of the activities that apply to the m",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "4 Triathlon",
+        "4a Triathlon",
+        "4a1 Triathlon Option",
+        "4a2 Triathlon Option",
+        "4a3 Triathlon Option"
+      ],
+      "reason": "Found 40 potential children with same base number"
+    },
+    {
+      "badge": "Multisport",
+      "version": 2026,
+      "headerId": "4",
+      "headerDesc": "Complete ALL of the following for the multisport f",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "4 Option A",
+        "4 Option A (1)",
+        "4 Option A (1)(a)",
+        "4 Option A (1)(b)",
+        "4 Option A (1)(c)"
+      ],
+      "reason": "Found 40 potential children with same base number"
+    },
+    {
+      "badge": "Plant Science",
+      "version": 2014,
+      "headerId": "8",
+      "headerDesc": "Choose ONE of the following options and complete e",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "8A Opt 1",
+        "8A Opt 2",
+        "8A1 Opt 3",
+        "8A2 Opt 3",
+        "8A3 Opt 3"
+      ],
+      "reason": "Found 72 potential children with same base number"
+    },
+    {
+      "badge": "Plant Science",
+      "version": 2017,
+      "headerId": "8",
+      "headerDesc": "Choose ONE of the following options and complete e",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "8A Opt 1",
+        "8A Opt 2",
+        "8A1 Opt 3",
+        "8A2 Opt 3",
+        "8A3 Opt 3"
+      ],
+      "reason": "Found 72 potential children with same base number"
+    },
+    {
+      "badge": "Plant Science",
+      "version": 2023,
+      "headerId": "8",
+      "headerDesc": "Choose ONE of the following options and complete e",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "8A Opt 1",
+        "8A Opt 2",
+        "8A1 Opt 3",
+        "8A2 Opt 3",
+        "8A3 Opt 3"
+      ],
+      "reason": "Found 72 potential children with same base number"
+    },
+    {
+      "badge": "Public Health",
+      "version": 2026,
+      "headerId": "5",
+      "headerDesc": "With your parent or guardian's and counselor's app",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "5(a)(1)",
+        "5(a)(2)",
+        "5(a)(3)",
+        "5(b)(1)",
+        "5(b)(2)"
+      ],
+      "reason": "Found 7 potential children with same base number"
+    },
+    {
+      "badge": "Public Health",
+      "version": 2026,
+      "headerId": "7",
+      "headerDesc": "With your parent or guardian's and counselor's app",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "7(a)(1)",
+        "7(a)(2)",
+        "7(b)(1)",
+        "7(b)(2)",
+        "7(b)(3)"
+      ],
+      "reason": "Found 5 potential children with same base number"
+    },
+    {
+      "badge": "Radio",
+      "version": 2017,
+      "headerId": "9A",
+      "headerDesc": "Option A—Amateur Radio. Do the following:",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "9a[1]",
+        "9a[2]",
+        "9a[3]",
+        "9a[4]",
+        "9a[5]"
+      ],
+      "reason": "Found 23 potential children with same base number"
+    },
+    {
+      "badge": "Radio",
+      "version": 2026,
+      "headerId": "2",
+      "headerDesc": "Radio Fundamentals. Do the following:",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "2(a)(1)",
+        "2(a)(2)",
+        "2(a)(3)",
+        "2(b)(1)",
+        "2(b)(2)"
+      ],
+      "reason": "Found 6 potential children with same base number"
+    },
+    {
+      "badge": "Railroading",
+      "version": 2022,
+      "headerId": "7A",
+      "headerDesc": "Option A—Model Railroading.  With your parent or g",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "7 Option A(1)",
+        "7 Option A(2)",
+        "7 Option A(3)",
+        "7 Option A(4)",
+        "7 Option A(5)"
+      ],
+      "reason": "Found 12 potential children with same base number"
+    },
+    {
+      "badge": "Railroading",
+      "version": 2022,
+      "headerId": "7B",
+      "headerDesc": "Option B—Railfanning.  With your parent or guardia",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "7 Option A(1)",
+        "7 Option A(2)",
+        "7 Option A(3)",
+        "7 Option A(4)",
+        "7 Option A(5)"
+      ],
+      "reason": "Found 12 potential children with same base number"
+    },
+    {
+      "badge": "Rifle Shooting",
+      "version": 2002,
+      "headerId": "2",
+      "headerDesc": "Do ONE of the following options:",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "2a Opt a",
+        "2a Opt b",
+        "2a Opt c",
+        "2b Opt a",
+        "2b Opt b"
+      ],
+      "reason": "Found 37 potential children with same base number"
+    },
+    {
+      "badge": "Scouting Heritage",
+      "version": 2026,
+      "headerId": "2",
+      "headerDesc": "Do the following:",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "2(a)(1)",
+        "2(a)(2)",
+        "2(a)(3)",
+        "2(a)(4)",
+        "2(a)(5)"
+      ],
+      "reason": "Found 13 potential children with same base number"
+    },
+    {
+      "badge": "Skating",
+      "version": 2016,
+      "headerId": "2",
+      "headerDesc": "Complete ALL of the requirements for ONE of the fo",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "2a[1] Ice",
+        "2a[1] Line",
+        "2a[1] Roll",
+        "2a[2] Ice",
+        "2a[2] Line"
+      ],
+      "reason": "Found 46 potential children with same base number"
+    },
+    {
+      "badge": "Skating",
+      "version": 2024,
+      "headerId": "2",
+      "headerDesc": "Working under the supervision of an experienced ad",
+      "category": "mismatched_naming",
+      "potentialChildren": [
+        "2a[1] Board",
+        "2a[1] Ice",
+        "2a[1] Line",
+        "2a[1] Roll",
+        "2a[2] Board"
+      ],
+      "reason": "Found 65 potential children with same base number"
+    }
+  ],
+  "missing": [
+    {
+      "badge": "Environmental Science",
+      "version": 2020,
+      "headerId": "2",
+      "headerDesc": "Ecology. Do the following and discuss with your co",
+      "category": "missing_data",
+      "potentialChildren": [],
+      "reason": "No requirements found with same base number - data may be incomplete"
+    },
+    {
+      "badge": "Environmental Science",
+      "version": 2020,
+      "headerId": "5",
+      "headerDesc": "Land Pollution. Do ONE of the following and discus",
+      "category": "missing_data",
+      "potentialChildren": [],
+      "reason": "No requirements found with same base number - data may be incomplete"
+    },
+    {
+      "badge": "Environmental Science",
+      "version": 2020,
+      "headerId": "6",
+      "headerDesc": "Rare, Threatened, or Endangered Species. Do ONE of",
+      "category": "missing_data",
+      "potentialChildren": [],
+      "reason": "No requirements found with same base number - data may be incomplete"
+    },
+    {
+      "badge": "Environmental Science",
+      "version": 2023,
+      "headerId": "2",
+      "headerDesc": "Ecology. Do the following and discuss with your co",
+      "category": "missing_data",
+      "potentialChildren": [],
+      "reason": "No requirements found with same base number - data may be incomplete"
+    },
+    {
+      "badge": "Environmental Science",
+      "version": 2023,
+      "headerId": "5",
+      "headerDesc": "Land Pollution. Do ONE of the following and discus",
+      "category": "missing_data",
+      "potentialChildren": [],
+      "reason": "No requirements found with same base number - data may be incomplete"
+    },
+    {
+      "badge": "Environmental Science",
+      "version": 2023,
+      "headerId": "6",
+      "headerDesc": "Rare, Threatened, or Endangered Species. Do ONE of",
+      "category": "missing_data",
+      "potentialChildren": [],
+      "reason": "No requirements found with same base number - data may be incomplete"
+    },
+    {
+      "badge": "Fingerprinting",
+      "version": 2004,
+      "headerId": "2",
+      "headerDesc": "Do the following:",
+      "category": "missing_data",
+      "potentialChildren": [],
+      "reason": "No requirements found with same base number - data may be incomplete"
+    },
+    {
+      "badge": "Nature",
+      "version": 2014,
+      "headerId": "6",
+      "headerDesc": "Do the following:",
+      "category": "missing_data",
+      "potentialChildren": [],
+      "reason": "No requirements found with same base number - data may be incomplete"
+    },
+    {
+      "badge": "Nature",
+      "version": 2014,
+      "headerId": "7",
+      "headerDesc": "Do ONE of the following:",
+      "category": "missing_data",
+      "potentialChildren": [],
+      "reason": "No requirements found with same base number - data may be incomplete"
+    },
+    {
+      "badge": "Nature",
+      "version": 2025,
+      "headerId": "7.",
+      "headerDesc": "Do ONE of the following:",
+      "category": "missing_data",
+      "potentialChildren": [],
+      "reason": "No requirements found with same base number - data may be incomplete"
+    },
+    {
+      "badge": "Radio",
+      "version": 2017,
+      "headerId": "9B(c)",
+      "headerDesc": "Option C—Shortwave and Medium-Wave Listening. Do t",
+      "category": "missing_data",
+      "potentialChildren": [],
+      "reason": "No requirements found with same base number - data may be incomplete"
+    },
+    {
+      "badge": "Radio",
+      "version": 2017,
+      "headerId": "9B(d)",
+      "headerDesc": "Option D—Amateur Radio Direction Finding. Do the f",
+      "category": "missing_data",
+      "potentialChildren": [],
+      "reason": "No requirements found with same base number - data may be incomplete"
+    }
+  ]
+}

@@ -288,33 +288,70 @@ flowchart TD
 ### Phase 1: UX Improvements (Blocking Q1)
 
 #### 1.1 Quick Payment Entry
-- [ ] **1.1.1** Create QuickPaymentForm component
-  - Files: `src/components/payments/quick-payment-form.tsx`
+- [x] **1.1.1** Create QuickPaymentForm component ✓
+  - Files: `src/components/payments/quick-payment-dialog.tsx`
   - Features: Scout dropdown, amount input, payment method, submit
   - Test: Form renders, validates input
 
-- [ ] **1.1.2** Add quick payment to dashboard
-  - Files: `src/app/(dashboard)/dashboard/page.tsx`
-  - Test: Quick payment form visible for Treasurer/Admin roles
+- [x] **1.1.2** Add quick payment to dashboard ✓
+  - Files: `src/app/(dashboard)/dashboard/page.tsx`, `src/app/(dashboard)/finances/page.tsx`
+  - Test: Quick payment dialog visible for Treasurer/Admin roles
 
-- [ ] **1.1.3** Wire up quick payment server action
-  - Files: `src/app/(dashboard)/dashboard/actions.ts`
+- [x] **1.1.3** Wire up quick payment server action ✓
+  - Files: `src/app/api/payments/quick/route.ts`
   - Test: Payment creates journal entry, updates scout balance
 
 #### 1.2 Streamlined Billing
-- [ ] **1.2.1** Audit current billing flow click count
+- [x] **1.2.1** Audit current billing flow click count ✓
   - Output: Document current steps and identify removable friction
   - Test: Baseline measurement documented
 
-- [ ] **1.2.2** Add smart defaults to billing form
+  **Audit Results (2026-02-08):**
+
+  Current flow requires **7-10+ clicks/interactions**:
+
+  | Step | Clicks | Description |
+  |------|--------|-------------|
+  | Navigation | 2-3 | Dashboard → Finances → Billing → Expand form |
+  | Billing type | 1 | Toggle Fixed/Split |
+  | Amount | 1 | Enter amount (keyboard) |
+  | Description | 1 | Enter description (keyboard) |
+  | Scout selection | 1-N | Select All or individual scouts |
+  | Notifications | 0-1 | Optional checkbox |
+  | Submit | 1 | Create Billing button |
+
+  **Friction points identified:**
+  1. Navigation overhead (2-3 clicks before seeing form)
+  2. Form is in CollapsibleCard (may need to expand)
+  3. No smart defaults - always starts blank
+  4. Must manually select scouts every time (no presets)
+  5. No keyboard shortcuts
+  6. Description has no suggestions/autocomplete
+  7. Cannot create billing directly from events
+
+  **Target: 4-5 clicks (50% reduction)**
+
+- [x] **1.2.2** Add smart defaults to billing form ✓
   - Files: `src/components/billing/billing-form.tsx`
   - Features: Remember last billing type, pre-select active scouts, keyboard shortcuts
   - Test: Fewer required interactions to create billing
 
-- [ ] **1.2.3** Add "Quick Billing" variant for common scenarios
+  **Implementation:**
+  - Remembers billing type preference in localStorage
+  - Cmd/Ctrl+Enter keyboard shortcut to submit
+  - Added keyboard hint below submit button
+  - "Create Billing" button from finances page opens form automatically
+
+- [x] **1.2.3** Add "Quick Billing" variant for common scenarios ✓
   - Files: `src/components/billing/quick-billing-form.tsx`
   - Features: Event selector auto-fills amount from event cost
-  - Test: Event billing in 3 clicks
+  - Test: Event billing in 2 clicks (select event → submit)
+
+  **Implementation:**
+  - Created QuickBillingForm component
+  - Auto-populates from events with cost_per_scout
+  - Bills all active scouts with one click
+  - Shows preview of total before submission
 
 ---
 
@@ -398,18 +435,28 @@ flowchart TD
   - Files: `src/app/(dashboard)/finances/reports/page.tsx`
   - Test: Report accessible, printable
 
-#### 3.3 Dues by Patrol
-- [ ] **3.3.1** Create dues-by-patrol query
+#### 3.3 Transaction History
+- [ ] **3.3.1** Create transaction history page
+  - Files: `src/app/(dashboard)/finances/transactions/page.tsx`
+  - Features: Full journal entry list with filtering by date range, type, scout
+  - Test: Page loads, shows all posted journal entries with pagination
+
+- [ ] **3.3.2** Add transactions link to finance subnav
+  - Files: `src/components/finances/finance-subnav.tsx`
+  - Test: Link visible for Treasurer/Admin roles
+
+#### 3.4 Dues by Patrol
+- [ ] **3.4.1** Create dues-by-patrol query
   - Files: `src/app/api/reports/dues-by-patrol/route.ts`
   - Logic: Join scout_accounts with scouts/patrols, group by patrol
   - Test: API returns correct groupings
 
-- [ ] **3.3.2** Create DuesByPatrolReport component
+- [ ] **3.4.2** Create DuesByPatrolReport component
   - Files: `src/components/reports/dues-by-patrol-report.tsx`
   - Features: Patrol sections, paid/unpaid indicators, totals per patrol
   - Test: Renders correctly grouped data
 
-- [ ] **3.3.3** Add dues-by-patrol to reports page
+- [ ] **3.4.3** Add dues-by-patrol to reports page
   - Files: `src/app/(dashboard)/finances/reports/page.tsx`
   - Test: Report accessible
 
@@ -589,11 +636,11 @@ PLAID_ENV=sandbox  # sandbox | development | production
 | Phase | Total | Complete | Status |
 |-------|-------|----------|--------|
 | Phase 0: Foundation | 6 | 6 | ✅ Complete |
-| Phase 1: UX Improvements | 6 | 0 | ⬜ Not Started |
+| Phase 1: UX Improvements | 6 | 6 | ✅ Complete |
 | Phase 2: Collection Center | 9 | 0 | ⬜ Not Started |
-| Phase 3: Financial Reports | 9 | 0 | ⬜ Not Started |
+| Phase 3: Financial Reports | 11 | 0 | ⬜ Not Started |
 | Phase 4: Bank Integration | 11 | 0 | ⬜ Not Started |
-| **Total** | **41** | **6** | 🔄 In Progress (15%) |
+| **Total** | **43** | **12** | 🔄 In Progress (28%) |
 
 ---
 
@@ -603,6 +650,10 @@ PLAID_ENV=sandbox  # sandbox | development | production
 |------|------|--------|-------|
 | 0.1.1, 0.1.2, 0.1.3 | 2026-02-07 | 1ffb178 | Plaid connections + collection settings migrations, types regenerated |
 | 0.2.1, 0.2.2, 0.2.3 | 2026-02-07 | 140b9c8 | Plaid SDK installed, client config created, env vars added |
+| 1.1.1, 1.1.2, 1.1.3 | 2026-02-08 | PR #9 | Quick payment dialog, button styling standardization |
+| 1.2.1 | 2026-02-08 | — | Billing flow audit: 7-10 clicks baseline, 50% reduction target |
+| 1.2.2 | 2026-02-08 | — | Smart defaults: pre-select scouts, remember type, ⌘+Enter shortcut |
+| 1.2.3 | 2026-02-08 | — | Quick Billing: event-based billing in 2 clicks |
 
 ---
 

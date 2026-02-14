@@ -11,7 +11,14 @@
       "Bash(grep:*)",
       "Bash(xargs:*)",
       "Bash(npm run test:coverage:*)",
-      "mcp__playwright__playwright_console_logs"
+      "mcp__playwright__playwright_console_logs",
+      "Bash(git commit:*)",
+      "Bash(node -e:*)",
+      "Bash(npx tsx:*)",
+      "Bash(for badge in \"Shotgun Shooting\" \"Radio\" \"Skating\" \"Archery\" \"Plant Science\")",
+      "Bash(do)",
+      "Bash(echo:*)",
+      "Bash(done)"
     ]
   }
 }

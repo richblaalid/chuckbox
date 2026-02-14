@@ -1,0 +1,480 @@
+{
+  "description": "Transform rules for normalizing BSA canonical requirement data. Each badge/version can have rules to rename requirement numbers and insert missing headers.",
+  "standardFormat": "Top-level: 1, 2, 3 | Sub-level: 1a, 1b | Sub-sub: 1a(1) | Sub-sub-sub: 1a(1)(a) | Options: 4A, 4B | Option subs: 4A(1), 4A(1)(a)",
+  "lastUpdated": "2026-02-12T00:00:00.000Z",
+  "transforms": [
+    {
+      "badge": "Cycling",
+      "version": 2014,
+      "description": "Fix requirement 7 option a/b nesting structure with bracket notation",
+      "rules": [],
+      "insertHeaders": [
+        { "number": "7a", "description": "Option A—Road Biking", "insertAfter": "7" },
+        { "number": "7a(1)", "description": "Take a road safety test", "insertAfter": "7a" },
+        { "number": "7a(3)", "description": "Complete a long ride", "insertAfter": "7a(1)" },
+        { "number": "7b", "description": "Option B—Off-Road Biking", "insertAfter": "7a" },
+        { "number": "7b(1)", "description": "Take a trail safety test", "insertAfter": "7b" }
+      ]
+    },
+    {
+      "badge": "Cycling",
+      "version": 2023,
+      "description": "Fix requirement 6 option A/B nesting structure",
+      "rules": [],
+      "insertHeaders": [
+        { "number": "6A", "description": "Option A—Road Biking", "insertAfter": "6" },
+        { "number": "6B", "description": "Option B—Off-Road Biking", "insertAfter": "6A" }
+      ]
+    },
+    {
+      "badge": "Cycling",
+      "version": 2025,
+      "description": "Fix requirement 6 option A/B nesting structure",
+      "rules": [],
+      "insertHeaders": [
+        { "number": "6A", "description": "Option A—Road Biking", "insertAfter": "6" },
+        { "number": "6B", "description": "Option B—Off-Road Biking", "insertAfter": "6A" }
+      ]
+    },
+    {
+      "badge": "Cycling",
+      "version": 2026,
+      "description": "Fix requirement 6 option A/B nesting structure",
+      "rules": [
+        { "from": "^6 Option ([AB])$", "to": "6$1" },
+        { "from": "^6 Option ([AB])\\((\\d+)\\)$", "to": "6$1($2)" },
+        { "from": "^6 Option ([AB])\\((\\d+)\\)\\(([a-z])\\)$", "to": "6$1($2)($3)" }
+      ],
+      "insertHeaders": [
+        { "number": "6A", "description": "Option A—Road Biking", "insertAfter": "6" },
+        { "number": "6A(1)", "description": "Take a road safety test with your counselor", "insertAfter": "6A" },
+        { "number": "6B", "description": "Option B—Trail or Mixed Surface Biking", "insertAfter": "6A" },
+        { "number": "6B(1)", "description": "Take a trail safety test with your counselor", "insertAfter": "6B" }
+      ]
+    },
+    {
+      "badge": "Multisport",
+      "version": 2026,
+      "description": "Fix requirement 4 option A/B/C/D structure and naming",
+      "rules": [
+        { "from": "^4([ABCD])([a-c])$", "to": "4$1(1)($2)" },
+        { "from": "^4([ABCD])([a-c])_2$", "to": "4$1(2)($2)" },
+        { "from": "^4([ABCD])([a-c])_3$", "to": "4$1(3)($2)" },
+        { "from": "^4([ABCD])\\(1\\)$", "to": "4$1(1)" },
+        { "from": "^4([ABCD])c\\((\\d+)\\)$", "to": "4$1($2)" }
+      ],
+      "insertHeaders": [
+        { "number": "4A", "description": "Option A—Triathlon: Do ALL of the following for swimming, biking, and running.", "insertAfter": "4" },
+        { "number": "4B", "description": "Option B—Duathlon: Do ALL of the following for biking and running.", "insertAfter": "4A" },
+        { "number": "4C", "description": "Option C—Aquathlon: Do ALL of the following for swimming and running.", "insertAfter": "4B" },
+        { "number": "4D", "description": "Option D—Aquabike: Do ALL of the following for swimming and biking.", "insertAfter": "4C" }
+      ]
+    },
+    {
+      "badge": "Multisport",
+      "version": 2025,
+      "description": "Convert sport-specific naming to Option A/B/C/D format",
+      "preRules": [
+        { "from": "^4([a-c])(\\d) Triathlon Option$", "to": "4A($1)($2)" },
+        { "from": "^4([a-c])(\\d) Duathlon Option$", "to": "4B($1)($2)" },
+        { "from": "^4([a-c])(\\d) Aquathlon Option$", "to": "4C($1)($2)" },
+        { "from": "^4([a-c])(\\d) Aquabike Option$", "to": "4D($1)($2)" },
+        { "from": "^4([a-c]) Triathlon$", "to": "4A($1)" },
+        { "from": "^4([a-c]) Duathlon$", "to": "4B($1)" },
+        { "from": "^4([a-c]) Aquathlon$", "to": "4C($1)" },
+        { "from": "^4([a-c]) Aquabike$", "to": "4D($1)" },
+        { "from": "^4 Triathlon$", "to": "4A" },
+        { "from": "^4 Duathlon$", "to": "4B" },
+        { "from": "^4 Aquathlon$", "to": "4C" },
+        { "from": "^4 Aquabike$", "to": "4D" }
+      ],
+      "rules": [],
+      "insertHeaders": []
+    },
+    {
+      "badge": "Golf",
+      "version": 2024,
+      "description": "Standardize Option A/B patterns and add missing headers",
+      "rules": [
+        { "from": "^2 Option ([AB]) \\((\\d+)\\)$", "to": "2$1($2)" },
+        { "from": "^2 Option ([AB]) \\((\\d+)\\)\\(([a-z])\\)$", "to": "2$1($2)($3)" }
+      ],
+      "insertHeaders": [
+        { "number": "2A", "description": "Option A—9-Hole Course", "insertAfter": "2" },
+        { "number": "2A(1)", "description": "Complete the following", "insertAfter": "2A" },
+        { "number": "2A(3)", "description": "Complete the following", "insertAfter": "2A(1)" },
+        { "number": "2A(4)", "description": "Complete the following", "insertAfter": "2A(3)" },
+        { "number": "2A(5)", "description": "Complete the following", "insertAfter": "2A(4)" },
+        { "number": "2A(6)", "description": "Complete the following", "insertAfter": "2A(5)" },
+        { "number": "2B", "description": "Option B—Driving Range", "insertAfter": "2A" },
+        { "number": "2B(1)", "description": "Complete the following", "insertAfter": "2B" },
+        { "number": "2B(3)", "description": "Complete the following", "insertAfter": "2B(1)" },
+        { "number": "2B(4)", "description": "Complete the following", "insertAfter": "2B(3)" },
+        { "number": "2B(5)", "description": "Complete the following", "insertAfter": "2B(4)" },
+        { "number": "2B(6)", "description": "Complete the following", "insertAfter": "2B(5)" }
+      ]
+    },
+    {
+      "badge": "Nature",
+      "version": 2020,
+      "description": "Add missing headers for requirement 4 options",
+      "rules": [],
+      "insertHeaders": [
+        { "number": "4A", "description": "Option A—Natural Science", "insertAfter": "4" },
+        { "number": "4Aa", "description": "Birds", "insertAfter": "4A" },
+        { "number": "4Ab", "description": "Mammals", "insertAfter": "4Aa" },
+        { "number": "4Ac", "description": "Reptiles and Amphibians", "insertAfter": "4Ab" },
+        { "number": "4Ad", "description": "Insects and Spiders", "insertAfter": "4Ac" },
+        { "number": "4Ae", "description": "Fish", "insertAfter": "4Ad" },
+        { "number": "4Af", "description": "Mollusks and Crustaceans", "insertAfter": "4Ae" },
+        { "number": "4Ag", "description": "Plants", "insertAfter": "4Af" },
+        { "number": "4B", "description": "Option B—Earth Science", "insertAfter": "4A" },
+        { "number": "4Bh", "description": "Soils and Rocks", "insertAfter": "4B" }
+      ]
+    },
+    {
+      "badge": "Nature",
+      "version": 2023,
+      "description": "Add missing headers for requirement 4 options",
+      "rules": [],
+      "insertHeaders": [
+        { "number": "4A", "description": "Option A—Natural Science", "insertAfter": "4" },
+        { "number": "4Aa", "description": "Birds", "insertAfter": "4A" },
+        { "number": "4Ab", "description": "Mammals", "insertAfter": "4Aa" },
+        { "number": "4Ac", "description": "Reptiles and Amphibians", "insertAfter": "4Ab" },
+        { "number": "4Ad", "description": "Insects and Spiders", "insertAfter": "4Ac" },
+        { "number": "4Ae", "description": "Fish", "insertAfter": "4Ad" },
+        { "number": "4Af", "description": "Mollusks and Crustaceans", "insertAfter": "4Ae" },
+        { "number": "4Ag", "description": "Plants", "insertAfter": "4Af" },
+        { "number": "4B", "description": "Option B—Earth Science", "insertAfter": "4A" },
+        { "number": "4Bh", "description": "Soils and Rocks", "insertAfter": "4B" }
+      ]
+    },
+    {
+      "badge": "Nature",
+      "version": 2025,
+      "description": "Convert bracket notation to parenthetical",
+      "rules": [
+        { "from": "\\[(\\d+)\\]", "to": "($1)" }
+      ],
+      "insertHeaders": []
+    },
+    {
+      "badge": "Radio",
+      "version": 2009,
+      "description": "Add missing headers for requirement 9 sub-options",
+      "rules": [
+        { "from": "\\[(\\d+)\\]", "to": "($1)" }
+      ],
+      "insertHeaders": [
+        { "number": "9a", "description": "Amateur Radio", "insertAfter": "9" },
+        { "number": "9b", "description": "Shortwave Radio", "insertAfter": "9a" },
+        { "number": "9c", "description": "Citizens Band Radio", "insertAfter": "9b" }
+      ]
+    },
+    {
+      "badge": "Radio",
+      "version": 2017,
+      "description": "Convert bracket notation to parenthetical",
+      "rules": [
+        { "from": "\\[(\\d+)\\]", "to": "($1)" }
+      ],
+      "insertHeaders": []
+    },
+    {
+      "badge": "Radio",
+      "version": 2026,
+      "description": "Add missing headers for requirement 4 and 8 options (Note: 8E requirements in source data are at wrong level)",
+      "preRules": [
+        { "from": "^8 Option E\\((\\d+)\\)$", "to": "8E($1)" },
+        { "from": "^8 Option E\\((\\d+)\\)\\(([a-z])\\)$", "to": "8E($1)($2)" }
+      ],
+      "rules": [],
+      "insertHeaders": [
+        { "number": "4", "description": "Radio Signal Types. Do the following:", "insertAfter": "3" },
+        { "number": "8A", "description": "Option A—Amateur Radio", "insertAfter": "8" },
+        { "number": "8B", "description": "Option B—Shortwave Radio", "insertAfter": "8A" },
+        { "number": "8C", "description": "Option C—GMRS Radio", "insertAfter": "8B" },
+        { "number": "8D", "description": "Option D—Citizens Band Radio", "insertAfter": "8C" }
+      ]
+    },
+    {
+      "badge": "Shotgun Shooting",
+      "version": 2014,
+      "description": "Convert Opt A/B patterns and add missing headers",
+      "preRules": [
+        { "from": "^2([a-z]) Opt A$", "to": "2A($1)" },
+        { "from": "^2([a-z]) Opt B$", "to": "2B($1)" }
+      ],
+      "rules": [
+        { "from": "\\[(\\d+)\\]", "to": "($1)" }
+      ],
+      "insertHeaders": [
+        { "number": "1f", "description": "Hunting laws and wildlife", "insertAfter": "1e" },
+        { "number": "2A", "description": "Option A—Shotgun Shooting (Modern Shotshell Type)", "insertAfter": "2" },
+        { "number": "2B", "description": "Option B—Muzzle-Loading Shotgun Shooting", "insertAfter": "2A" }
+      ]
+    },
+    {
+      "badge": "Shotgun Shooting",
+      "version": 2025,
+      "description": "Convert Opt A/B patterns and add missing headers",
+      "preRules": [
+        { "from": "^2([a-z]) Opt A$", "to": "2A($1)" },
+        { "from": "^2([a-z]) Opt B$", "to": "2B($1)" }
+      ],
+      "rules": [
+        { "from": "\\[(\\d+)\\]", "to": "($1)" }
+      ],
+      "insertHeaders": [
+        { "number": "1g", "description": "Hunting laws and wildlife", "insertAfter": "1f" },
+        { "number": "2A", "description": "Option A—Shotgun Shooting (Modern Shotshell Type)", "insertAfter": "2" },
+        { "number": "2B", "description": "Option B—Muzzle-Loading Shotgun Shooting", "insertAfter": "2A" }
+      ]
+    },
+    {
+      "badge": "Shotgun Shooting",
+      "version": 2026,
+      "description": "Convert bracket notation and add missing headers",
+      "rules": [
+        { "from": "\\[(\\d+)\\]", "to": "($1)" }
+      ],
+      "insertHeaders": [
+        { "number": "1g", "description": "Hunting laws and wildlife", "insertAfter": "1f" },
+        { "number": "2A", "description": "Option A—Shotgun Shooting (Modern Shotshell Type)", "insertAfter": "2" },
+        { "number": "2B", "description": "Option B—Muzzle-Loading Shotgun Shooting", "insertAfter": "2A" }
+      ]
+    },
+    {
+      "badge": "Skating",
+      "version": 2016,
+      "description": "Standardize option patterns and strip type labels",
+      "rules": [
+        { "from": "\\[(\\d+)\\] \\w+$", "to": "($1)" },
+        { "from": " Ice$", "to": "" },
+        { "from": " Roll$", "to": "" },
+        { "from": " Board$", "to": "" },
+        { "from": " Line$", "to": "" }
+      ],
+      "insertHeaders": []
+    },
+    {
+      "badge": "Skating",
+      "version": 2024,
+      "description": "Standardize option patterns and strip type labels",
+      "rules": [
+        { "from": "\\[(\\d+)\\] \\w+$", "to": "($1)" },
+        { "from": " Ice$", "to": "" },
+        { "from": " Roll$", "to": "" },
+        { "from": " Board$", "to": "" },
+        { "from": " Line$", "to": "" }
+      ],
+      "insertHeaders": []
+    },
+    {
+      "badge": "Skating",
+      "version": 2026,
+      "description": "Standardize option patterns and add missing headers",
+      "rules": [],
+      "insertHeaders": [
+        { "number": "2A", "description": "Option A—Ice Skating", "insertAfter": "2" },
+        { "number": "2B", "description": "Option B—Inline Skating", "insertAfter": "2A" },
+        { "number": "2C", "description": "Option C—Roller Skating", "insertAfter": "2B" },
+        { "number": "2D", "description": "Option D—Skateboarding", "insertAfter": "2C" }
+      ]
+    },
+    {
+      "badge": "Archery",
+      "version": 2016,
+      "description": "Convert Opt A/B patterns and add missing headers",
+      "preRules": [
+        { "from": "^5([a-h]) Opt A$", "to": "5A($1)" },
+        { "from": "^5([a-h]) Opt B$", "to": "5B($1)" },
+        { "from": "^5f\\[(\\d+)\\]([a-e]) Opt A$", "to": "5A(f)($1)($2)" },
+        { "from": "^5f\\[(\\d+)\\]([a-e]) Opt B$", "to": "5B(f)($1)($2)" },
+        { "from": "^5f\\[(\\d+)\\] Opt A$", "to": "5A(f)($1)" },
+        { "from": "^5f\\[(\\d+)\\] Opt B$", "to": "5B(f)($1)" },
+        { "from": "^5f$", "to": "5(f)" },
+        { "from": "^5f\\[(\\d+)\\]$", "to": "5(f)($1)" },
+        { "from": "^5f\\[(\\d+)\\]([a-e])$", "to": "5(f)($1)($2)" }
+      ],
+      "rules": [],
+      "insertHeaders": [
+        { "number": "2d", "description": "Range safety and regulations", "insertAfter": "2c" },
+        { "number": "5A", "description": "Option A—Using a Recurve Bow or Longbow", "insertAfter": "5" },
+        { "number": "5B", "description": "Option B—Using a Compound Bow", "insertAfter": "5A" }
+      ]
+    },
+    {
+      "badge": "Archery",
+      "version": 2019,
+      "description": "Convert Opt A/B patterns and add missing headers",
+      "preRules": [
+        { "from": "^5([a-h]) Opt A$", "to": "5A($1)" },
+        { "from": "^5([a-h]) Opt B$", "to": "5B($1)" },
+        { "from": "^5f\\[(\\d+)\\]([a-e]) Opt A$", "to": "5A(f)($1)($2)" },
+        { "from": "^5f\\[(\\d+)\\]([a-e]) Opt B$", "to": "5B(f)($1)($2)" },
+        { "from": "^5f\\[(\\d+)\\] Opt A$", "to": "5A(f)($1)" },
+        { "from": "^5f\\[(\\d+)\\] Opt B$", "to": "5B(f)($1)" },
+        { "from": "^5f$", "to": "5(f)" },
+        { "from": "^5f\\[(\\d+)\\]$", "to": "5(f)($1)" },
+        { "from": "^5f\\[(\\d+)\\]([a-e])$", "to": "5(f)($1)($2)" }
+      ],
+      "rules": [],
+      "insertHeaders": [
+        { "number": "2d", "description": "Range safety and regulations", "insertAfter": "2c" },
+        { "number": "5A", "description": "Option A—Using a Recurve Bow or Longbow", "insertAfter": "5" },
+        { "number": "5B", "description": "Option B—Using a Compound Bow", "insertAfter": "5A" }
+      ]
+    },
+    {
+      "badge": "Archery",
+      "version": 2023,
+      "description": "Convert Opt A/B patterns and add missing headers",
+      "preRules": [
+        { "from": "^5([a-h]) Opt A$", "to": "5A($1)" },
+        { "from": "^5([a-h]) Opt B$", "to": "5B($1)" },
+        { "from": "^5f\\[(\\d+)\\]([a-e]) Opt A$", "to": "5A(f)($1)($2)" },
+        { "from": "^5f\\[(\\d+)\\]([a-e]) Opt B$", "to": "5B(f)($1)($2)" },
+        { "from": "^5f\\[(\\d+)\\] Opt A$", "to": "5A(f)($1)" },
+        { "from": "^5f\\[(\\d+)\\] Opt B$", "to": "5B(f)($1)" },
+        { "from": "^5f$", "to": "5(f)" },
+        { "from": "^5f\\[(\\d+)\\]$", "to": "5(f)($1)" },
+        { "from": "^5f\\[(\\d+)\\]([a-e])$", "to": "5(f)($1)($2)" }
+      ],
+      "rules": [],
+      "insertHeaders": [
+        { "number": "2d", "description": "Range safety and regulations", "insertAfter": "2c" },
+        { "number": "5A", "description": "Option A—Using a Recurve Bow or Longbow", "insertAfter": "5" },
+        { "number": "5B", "description": "Option B—Using a Compound Bow", "insertAfter": "5A" }
+      ]
+    },
+    {
+      "badge": "Archery",
+      "version": 2025,
+      "description": "Convert period notation and add missing headers",
+      "preRules": [
+        { "from": "^5\\. Opt ([AB])( \\(\\d+\\).*)?$", "to": "5$1$2" }
+      ],
+      "rules": [],
+      "insertHeaders": []
+    },
+    {
+      "badge": "Plant Science",
+      "version": 2014,
+      "description": "Convert Option 1/2/3 numbering scheme: 8X Opt N -> 8(N)X, convert bracket notation",
+      "preRules": [
+        { "from": "^8 Option 1$", "to": "8(1)" },
+        { "from": "^8 Option 2$", "to": "8(2)" },
+        { "from": "^8 Option 3$", "to": "8(3)" },
+        { "from": "^8([A-F])\\[(\\d+)\\]([a-z])? Opt 1$", "to": "8(1)$1($2)$3" },
+        { "from": "^8([A-F])\\[(\\d+)\\] Opt 1$", "to": "8(1)$1($2)" },
+        { "from": "^8([A-F]) Opt 1$", "to": "8(1)$1" },
+        { "from": "^8([A-F])\\[(\\d+)\\]([a-z])? Opt 2$", "to": "8(2)$1($2)$3" },
+        { "from": "^8([A-F])\\[(\\d+)\\] Opt 2$", "to": "8(2)$1($2)" },
+        { "from": "^8([A-F]) Opt 2$", "to": "8(2)$1" },
+        { "from": "^8([A-F])\\[(\\d+)\\]([a-z])? Opt 3$", "to": "8(3)$1($2)$3" },
+        { "from": "^8([A-F])\\[(\\d+)\\] Opt 3$", "to": "8(3)$1($2)" },
+        { "from": "^8([A-F]) Opt 3$", "to": "8(3)$1" },
+        { "from": "^8([A-F])(\\d+) Opt 1$", "to": "8(1)$1($2)" },
+        { "from": "^8([A-F])(\\d+) Opt 2$", "to": "8(2)$1($2)" },
+        { "from": "^8([A-F])(\\d+) Opt 3$", "to": "8(3)$1($2)" },
+        { "from": "^8([A-F])\\[(\\d+)\\]([a-z])(\\d+) Opt 1$", "to": "8(1)$1($2)($3)($4)" },
+        { "from": "^8([A-F])\\[(\\d+)\\]([a-z])(\\d+) Opt 2$", "to": "8(2)$1($2)($3)($4)" },
+        { "from": "^8([A-F])\\[(\\d+)\\]([a-z])(\\d+) Opt 3$", "to": "8(3)$1($2)($3)($4)" }
+      ],
+      "rules": [],
+      "insertHeaders": []
+    },
+    {
+      "badge": "Plant Science",
+      "version": 2017,
+      "description": "Convert Option 1/2/3 numbering scheme: 8X Opt N -> 8(N)X, convert bracket notation",
+      "preRules": [
+        { "from": "^8 Option 1$", "to": "8(1)" },
+        { "from": "^8 Option 2$", "to": "8(2)" },
+        { "from": "^8 Option 3$", "to": "8(3)" },
+        { "from": "^8([A-F])\\[(\\d+)\\]([a-z])? Opt 1$", "to": "8(1)$1($2)$3" },
+        { "from": "^8([A-F])\\[(\\d+)\\] Opt 1$", "to": "8(1)$1($2)" },
+        { "from": "^8([A-F]) Opt 1$", "to": "8(1)$1" },
+        { "from": "^8([A-F])\\[(\\d+)\\]([a-z])? Opt 2$", "to": "8(2)$1($2)$3" },
+        { "from": "^8([A-F])\\[(\\d+)\\] Opt 2$", "to": "8(2)$1($2)" },
+        { "from": "^8([A-F]) Opt 2$", "to": "8(2)$1" },
+        { "from": "^8([A-F])\\[(\\d+)\\]([a-z])? Opt 3$", "to": "8(3)$1($2)$3" },
+        { "from": "^8([A-F])\\[(\\d+)\\] Opt 3$", "to": "8(3)$1($2)" },
+        { "from": "^8([A-F]) Opt 3$", "to": "8(3)$1" },
+        { "from": "^8([A-F])(\\d+) Opt 1$", "to": "8(1)$1($2)" },
+        { "from": "^8([A-F])(\\d+) Opt 2$", "to": "8(2)$1($2)" },
+        { "from": "^8([A-F])(\\d+) Opt 3$", "to": "8(3)$1($2)" },
+        { "from": "^8([A-F])\\[(\\d+)\\]([a-z])(\\d+) Opt 1$", "to": "8(1)$1($2)($3)($4)" },
+        { "from": "^8([A-F])\\[(\\d+)\\]([a-z])(\\d+) Opt 2$", "to": "8(2)$1($2)($3)($4)" },
+        { "from": "^8([A-F])\\[(\\d+)\\]([a-z])(\\d+) Opt 3$", "to": "8(3)$1($2)($3)($4)" }
+      ],
+      "rules": [],
+      "insertHeaders": []
+    },
+    {
+      "badge": "Plant Science",
+      "version": 2023,
+      "description": "Convert Option 1/2/3 numbering scheme: 8X Opt N -> 8(N)X, convert bracket notation",
+      "preRules": [
+        { "from": "^8 Option 1$", "to": "8(1)" },
+        { "from": "^8 Option 2$", "to": "8(2)" },
+        { "from": "^8 Option 3$", "to": "8(3)" },
+        { "from": "^8([A-F])\\[(\\d+)\\]([a-z])? Opt 1$", "to": "8(1)$1($2)$3" },
+        { "from": "^8([A-F])\\[(\\d+)\\] Opt 1$", "to": "8(1)$1($2)" },
+        { "from": "^8([A-F]) Opt 1$", "to": "8(1)$1" },
+        { "from": "^8([A-F])\\[(\\d+)\\]([a-z])? Opt 2$", "to": "8(2)$1($2)$3" },
+        { "from": "^8([A-F])\\[(\\d+)\\] Opt 2$", "to": "8(2)$1($2)" },
+        { "from": "^8([A-F]) Opt 2$", "to": "8(2)$1" },
+        { "from": "^8([A-F])\\[(\\d+)\\]([a-z])? Opt 3$", "to": "8(3)$1($2)$3" },
+        { "from": "^8([A-F])\\[(\\d+)\\] Opt 3$", "to": "8(3)$1($2)" },
+        { "from": "^8([A-F]) Opt 3$", "to": "8(3)$1" },
+        { "from": "^8([A-F])(\\d+) Opt 1$", "to": "8(1)$1($2)" },
+        { "from": "^8([A-F])(\\d+) Opt 2$", "to": "8(2)$1($2)" },
+        { "from": "^8([A-F])(\\d+) Opt 3$", "to": "8(3)$1($2)" },
+        { "from": "^8([A-F])\\[(\\d+)\\]([a-z])(\\d+) Opt 1$", "to": "8(1)$1($2)($3)($4)" },
+        { "from": "^8([A-F])\\[(\\d+)\\]([a-z])(\\d+) Opt 2$", "to": "8(2)$1($2)($3)($4)" },
+        { "from": "^8([A-F])\\[(\\d+)\\]([a-z])(\\d+) Opt 3$", "to": "8(3)$1($2)($3)($4)" }
+      ],
+      "rules": [],
+      "insertHeaders": []
+    },
+    {
+      "badge": "Plant Science",
+      "version": 2026,
+      "description": "Convert Option A/B/C patterns (Note: some deep requirements at root in source data)",
+      "preRules": [
+        { "from": "^8 Option ([ABC])$", "to": "8$1" },
+        { "from": "^8 Option ([ABC]) \\((\\d+)\\)$", "to": "8$1($2)" },
+        { "from": "^8 Option ([ABC]) \\((\\d+)\\)\\(([a-z])\\)$", "to": "8$1($2)($3)" },
+        { "from": "^8 Option ([ABC])\\((\\d+)\\)$", "to": "8$1($2)" },
+        { "from": "^8 Option ([ABC])\\((\\d+)\\)\\(([a-z])\\)$", "to": "8$1($2)($3)" },
+        { "from": "^8 Option ([ABC])\\((\\d+)\\)\\(([a-z])\\)\\((\\d+)\\)$", "to": "8$1($2)($3)($4)" },
+        { "from": "^8 Option ([ABC]) \\((\\d+)\\)\\(([a-z])\\)\\((\\d+)\\)$", "to": "8$1($2)($3)($4)" }
+      ],
+      "rules": [],
+      "insertHeaders": []
+    },
+    {
+      "badge": "Journalism",
+      "version": 2007,
+      "description": "Add missing parent headers for requirement 2 options",
+      "rules": [],
+      "insertHeaders": [
+        { "number": "2a", "description": "Option A—Newspaper, magazine, and online journalism", "insertAfter": "2" },
+        { "number": "2b", "description": "Option B—Radio and television journalism", "insertAfter": "2a" }
+      ]
+    },
+    {
+      "badge": "Journalism",
+      "version": 2024,
+      "description": "Add missing parent headers for requirement 2 options",
+      "rules": [],
+      "insertHeaders": [
+        { "number": "2A", "description": "Option A—Newspaper, magazine, and online journalism", "insertAfter": "2" },
+        { "number": "2B", "description": "Option B—Radio and television journalism", "insertAfter": "2A" }
+      ]
+    }
+  ]
+}

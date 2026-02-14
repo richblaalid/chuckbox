@@ -1477,7 +1477,7 @@ async function main(): Promise<void> {
       console.log('\n📚 Seeding BSA Reference Data...');
       // Import ranks and leadership positions from importAll
       await importBsaReferenceData();
-      console.log('\n📚 Seeding Merit Badge Requirements (from canonical data)...');
+      console.log('\n📚 Seeding Merit Badge Requirements from Canonical Data...');
       await importCanonicalMeritBadgeRequirements();
       // Validate seeded data integrity
       const bsaValidation = await validateSeedData();
@@ -1491,7 +1491,7 @@ async function main(): Promise<void> {
       await seedTestData();
       console.log('\n📚 Seeding BSA Reference Data (ranks, positions)...');
       await importBsaReferenceData();
-      console.log('\n📚 Seeding Merit Badge Requirements (from canonical data)...');
+      console.log('\n📚 Seeding Merit Badge Requirements from Canonical Data...');
       await importCanonicalMeritBadgeRequirements();
       // Validate seeded data integrity
       const allValidation = await validateSeedData();
