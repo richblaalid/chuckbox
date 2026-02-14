@@ -160,7 +160,7 @@ ALTER TABLE units ADD COLUMN IF NOT EXISTS sync_strategy TEXT DEFAULT 'additive'
 ### Phase 1: Hybrid Onboarding UI
 
 #### 1.1 Signup Flow Updates (Stage 1)
-- [ ] **1.1.1** Add "Skip for Now" option to CSV upload step
+- [x] **1.1.1** Add "Skip for Now" option to CSV upload step *(completed)*
 - [ ] **1.1.2** Create manual unit metadata form (for skip path)
 - [ ] **1.1.3** Mark unit as `needs_setup: true` when skipping CSV
 - [ ] **1.1.4** Persist signup path choice for analytics
@@ -393,7 +393,7 @@ ALTER TABLE units ADD COLUMN IF NOT EXISTS sync_strategy TEXT DEFAULT 'additive'
 | 2026-02-13 | 0.1.5 Add edge case tests | cd02ce6 |
 | 2026-02-13 | 0.2.1 Normalize council for comparison | 4fdd01c |
 | 2026-02-13 | 0.2.2 Soft warning for duplicate units | 679cff8 |
-| 2026-02-13 | 0.2.3 Show existing unit details in warning | (pending) |
+| 2026-02-13 | 0.2.3 Show existing unit details in warning | e4c701b |
 | | | |
 
 ---

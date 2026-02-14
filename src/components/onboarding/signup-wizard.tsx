@@ -30,6 +30,9 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
     existingCouncil?: string
   } | null>(null)
 
+  // Track signup path: 'csv' (from file upload) or 'manual' (skip for now)
+  const [signupPath, setSignupPath] = useState<'csv' | 'manual'>('csv')
+
   // Step 1: File upload state
   const [file, setFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -117,6 +120,17 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
     setRosterSummary(null)
     setParsedRoster(null)
     setCurrentStep(0)
+    setSignupPath('csv')
+    setError(null)
+  }, [])
+
+  // Handle "Skip for Now" - go to manual entry path
+  const handleSkipForNow = useCallback(() => {
+    setSignupPath('manual')
+    setUnitMetadata(null)
+    setParsedRoster(null)
+    setRosterSummary(null)
+    setCurrentStep(1) // Go to unit info step (will be manual entry form)
     setError(null)
   }, [])
 
@@ -267,6 +281,20 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
           </div>
         </div>
       )}
+
+      {/* Skip for Now option */}
+      <div className="mt-6 pt-6 border-t border-stone-200 dark:border-stone-700 text-center">
+        <p className="text-sm text-stone-500 dark:text-stone-400 mb-2">
+          Don&apos;t have your roster CSV ready?
+        </p>
+        <button
+          type="button"
+          onClick={handleSkipForNow}
+          className="text-sm font-medium text-forest-600 dark:text-forest-400 hover:text-forest-700 dark:hover:text-forest-300 underline underline-offset-2"
+        >
+          Skip for now and enter unit details manually
+        </button>
+      </div>
     </FadeIn>
   )
 
