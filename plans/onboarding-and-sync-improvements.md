@@ -394,6 +394,12 @@ ALTER TABLE units ADD COLUMN IF NOT EXISTS sync_strategy TEXT DEFAULT 'additive'
 | 2026-02-13 | 0.2.1 Normalize council for comparison | 4fdd01c |
 | 2026-02-13 | 0.2.2 Soft warning for duplicate units | 679cff8 |
 | 2026-02-13 | 0.2.3 Show existing unit details in warning | e4c701b |
+| 2026-02-13 | 1.1.1 Add Skip for Now option | 8c348c1 |
+| 2026-02-13 | 1.1.2 Create manual unit metadata form | 4be7ee3 |
+| 2026-02-13 | 1.1.3 Mark unit needs_setup for manual path | cdad273 |
+| 2026-02-13 | 1.1.4 Persist signup path for analytics | 9a6de12 |
+| 2026-02-13 | 1.2.1 Convert confirm step to editable form | e6d7a39 |
+| 2026-02-13 | 1.2.2 Pre-populate from CSV parse | e6d7a39 |
 | | | |
 
 ---
