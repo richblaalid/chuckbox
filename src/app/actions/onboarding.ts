@@ -303,12 +303,16 @@ export async function provisionUnit(input: ProvisionUnitInput, ipAddress: string
       council: unitMetadata.council,
       district: unitMetadata.district,
     }
-    // Add needs_setup field (column may not be in generated types yet)
-    const unitInsertWithSetup = { ...unitInsertData, needs_setup: needsSetup }
+    // Add needs_setup and signup_path fields (columns may not be in generated types yet)
+    const unitInsertWithExtras = {
+      ...unitInsertData,
+      needs_setup: needsSetup,
+      signup_path: input.signupPath || 'csv',
+    }
 
     const { data: unit, error: unitError } = await adminSupabase
       .from('units')
-      .insert(unitInsertWithSetup as typeof unitInsertData)
+      .insert(unitInsertWithExtras as typeof unitInsertData)
       .select('id')
       .single()
 
