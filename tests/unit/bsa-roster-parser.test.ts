@@ -573,6 +573,60 @@ John,Smith,123456789,M,john@test.com`
       expect(result.scouts).toHaveLength(0)
       expect(result.errors).toContain('Could not find YOUTH MEMBERS section')
     })
+
+    it('should stop parsing at DEN CHIEF MEMBERS section', () => {
+      // This tests the bug fix where DEN CHIEF section with different headers
+      // was causing duplicate entries because the parser continued past it
+      const content = `ADULT MEMBERS
+First Name,Last Name,BSA Number,Gender,Email
+John,Smith,123456789,M,john@test.com
+YOUTH MEMBERS
+First Name,Last Name,BSA Number,Gender,Patrol
+Jane,Doe,987654321,F,Wolf
+" ","DEN CHIEF MEMBERS"
+" ","DEN","Pack","Scout BSA Troop"
+"1","1","Pack 100","Troop 100"`
+
+      const result = parseRosterCSV(content)
+      expect(result.scouts).toHaveLength(1)
+      expect(result.scouts[0].firstName).toBe('Jane')
+      expect(result.scouts[0].patrol).toBe('Wolf')
+    })
+
+    it('should stop parsing at other ALL CAPS section markers', () => {
+      const content = `ADULT MEMBERS
+First Name,Last Name,BSA Number,Gender,Email
+John,Smith,123456789,M,john@test.com
+YOUTH MEMBERS
+First Name,Last Name,BSA Number,Gender,Patrol
+Jane,Doe,987654321,F,Wolf
+" ","SOME OTHER SECTION"
+" ","Column1","Column2"
+"1","Data1","Data2"`
+
+      const result = parseRosterCSV(content)
+      expect(result.scouts).toHaveLength(1)
+    })
+
+    it('should not create duplicate scouts from misaligned rows', () => {
+      // This tests that rows after a section marker with different columns
+      // don't create malformed entries
+      const content = `ADULT MEMBERS
+First Name,Last Name,BSA Number,Gender,Email
+John,Smith,123456789,M,john@test.com
+YOUTH MEMBERS
+First Name,Last Name,BSA Number,Gender,Patrol
+Jane,Doe,987654321,F,Wolf
+Sam,Johnson,111111111,M,Eagle
+" ","DEN CHIEF MEMBERS"
+" ","DEN","Pack"
+"1","1","Pack 100"`
+
+      const result = parseRosterCSV(content)
+      expect(result.scouts).toHaveLength(2)
+      expect(result.scouts[0].firstName).toBe('Jane')
+      expect(result.scouts[1].firstName).toBe('Sam')
+    })
   })
 
   describe('validateRoster', () => {

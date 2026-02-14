@@ -150,7 +150,7 @@ ALTER TABLE units ADD COLUMN IF NOT EXISTS sync_strategy TEXT DEFAULT 'additive'
 - [x] **0.1.2** Fix importer to not overwrite patrol_id with null *(completed)*
 - [x] **0.1.3** Fix council name parsing (remove duplicate text, trailing numbers) *(completed)*
 - [x] **0.1.4** Fix district name parsing (same issue) *(completed)*
-- [ ] **0.1.5** Add unit tests for parser edge cases
+- [x] **0.1.5** Add unit tests for parser edge cases *(completed)*
 
 #### 0.2 Duplicate Unit Check Improvements
 - [ ] **0.2.1** Normalize council names before comparison (lowercase, trim, dedupe)
