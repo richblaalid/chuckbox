@@ -154,7 +154,7 @@ ALTER TABLE units ADD COLUMN IF NOT EXISTS sync_strategy TEXT DEFAULT 'additive'
 
 #### 0.2 Duplicate Unit Check Improvements
 - [x] **0.2.1** Normalize council names before comparison (lowercase, trim, dedupe) *(completed)*
-- [ ] **0.2.2** Change from hard block to soft warning with confirmation option
+- [x] **0.2.2** Change from hard block to soft warning with confirmation option *(completed)*
 - [ ] **0.2.3** Show existing unit details in warning message
 
 ### Phase 1: Hybrid Onboarding UI

@@ -23,6 +23,7 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isComplete, setIsComplete] = useState(false)
+  const [duplicateWarning, setDuplicateWarning] = useState<{ existingUnitName: string } | null>(null)
 
   // Step 1: File upload state
   const [file, setFile] = useState<File | null>(null)
@@ -118,7 +119,7 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
   // Step 3: Submit
   // ============================================
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (confirmDuplicateOverride = false) => {
     if (!unitMetadata || !parsedRoster) {
       setError('Missing unit data. Please start over.')
       return
@@ -138,6 +139,7 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
 
     setIsLoading(true)
     setError(null)
+    setDuplicateWarning(null)
 
     try {
       // Get IP address from request headers (will be done server-side)
@@ -147,9 +149,17 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
           admin: adminInfo,
           parsedAdults: parsedRoster.adults,
           parsedScouts: parsedRoster.scouts,
+          confirmDuplicateOverride,
         },
         '0.0.0.0' // IP will be captured server-side via headers
       )
+
+      // Handle duplicate warning (soft block - user can confirm to proceed)
+      if (result.duplicateWarning?.exists) {
+        setDuplicateWarning({ existingUnitName: result.duplicateWarning.existingUnitName })
+        setIsLoading(false)
+        return
+      }
 
       if (!result.success) {
         setError(result.error || 'Failed to create unit')
@@ -268,7 +278,7 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
       <FadeIn className="space-y-6">
         <div className="rounded-lg border border-forest-200 dark:border-forest-700 bg-forest-50 dark:bg-forest-900/20 p-6">
           <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 h-12 w-12 rounded-full bg-forest-100 dark:bg-forest-800 flex items-center justify-center">
+            <div className="shrink-0 h-12 w-12 rounded-full bg-forest-100 dark:bg-forest-800 flex items-center justify-center">
               <Building2 className="h-6 w-6 text-forest-600 dark:text-forest-400" />
             </div>
             <div>
@@ -382,7 +392,7 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
           Back
         </Button>
         <Button
-          onClick={handleSubmit}
+          onClick={() => handleSubmit()}
           disabled={isLoading || !adminInfo.firstName || !adminInfo.lastName || !adminInfo.email}
           className="flex-1"
         >
@@ -411,9 +421,52 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
       {/* Error message */}
       {error && (
         <div className="rounded-lg bg-error-light dark:bg-error/10 border border-error/20 p-4 flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-error flex-shrink-0 mt-0.5" />
+          <AlertCircle className="h-5 w-5 text-error shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-medium text-error-dark dark:text-error">{error}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate unit warning - soft block with confirmation option */}
+      {duplicateWarning && (
+        <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 p-4 space-y-3">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                A unit with similar information already exists
+              </p>
+              <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                We found an existing unit called &ldquo;{duplicateWarning.existingUnitName}&rdquo; that matches this information.
+                If this is your unit, please contact support. Otherwise, you can proceed with creating a new unit.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-3 ml-8">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDuplicateWarning(null)}
+              className="border-amber-300 dark:border-amber-600 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+            >
+              Go Back
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => handleSubmit(true)}
+              disabled={isLoading}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Anyway'
+              )}
+            </Button>
           </div>
         </div>
       )}

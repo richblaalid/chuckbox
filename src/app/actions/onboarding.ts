@@ -40,6 +40,7 @@ interface ProvisionUnitInput {
   }
   parsedAdults: ParsedAdult[]
   parsedScouts: ParsedScout[]
+  confirmDuplicateOverride?: boolean // If true, proceed despite duplicate warning
 }
 
 interface ProvisionResult {
@@ -47,6 +48,10 @@ interface ProvisionResult {
   error?: string
   unitId?: string
   profileId?: string
+  duplicateWarning?: {
+    exists: boolean
+    existingUnitName: string
+  }
 }
 
 interface VerifyProvisionResult {
@@ -247,10 +252,14 @@ export async function provisionUnit(input: ProvisionUnitInput, ipAddress: string
 
   // Check for duplicate unit
   const duplicateCheck = await checkDuplicateUnit(unitMetadata)
-  if (duplicateCheck.exists) {
+  if (duplicateCheck.exists && !input.confirmDuplicateOverride) {
+    // Return a warning, not a hard error - allow user to confirm and proceed
     return {
       success: false,
-      error: `A unit with this information already exists (${duplicateCheck.unitName}). If you believe this is your unit, please contact support.`,
+      duplicateWarning: {
+        exists: true,
+        existingUnitName: duplicateCheck.unitName || 'Unknown',
+      },
     }
   }
 
