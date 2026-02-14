@@ -166,8 +166,8 @@ ALTER TABLE units ADD COLUMN IF NOT EXISTS sync_strategy TEXT DEFAULT 'additive'
 - [x] **1.1.4** Persist signup path choice for analytics *(completed)*
 
 #### 1.2 Editable Unit Metadata
-- [ ] **1.2.1** Convert Step 1 display to editable form fields
-- [ ] **1.2.2** Pre-populate from CSV parse (if CSV path)
+- [x] **1.2.1** Convert Step 1 display to editable form fields *(completed)*
+- [x] **1.2.2** Pre-populate from CSV parse (if CSV path) *(completed - done with 1.2.1)*
 - [ ] **1.2.3** Add validation for required fields (unit type, number)
 - [ ] **1.2.4** Add council autocomplete/suggestions (optional enhancement)
 - [ ] **1.2.5** Update provisionUnit to accept user-edited metadata

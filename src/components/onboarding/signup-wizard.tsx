@@ -58,7 +58,7 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
 
   // Manual unit entry form state (for skip path)
   const [manualUnitInfo, setManualUnitInfo] = useState({
-    unitType: 'troop' as 'troop' | 'pack' | 'crew',
+    unitType: 'troop' as 'troop' | 'pack' | 'crew' | 'ship',
     unitNumber: '',
     unitSuffix: '',
     council: '',
@@ -93,6 +93,14 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
       setUnitMetadata(result.unitMetadata)
       setRosterSummary(result.rosterSummary || null)
       setParsedRoster(result.roster)
+      // Pre-populate editable form from CSV data
+      setManualUnitInfo({
+        unitType: result.unitMetadata.unitType || 'troop',
+        unitNumber: result.unitMetadata.unitNumber || '',
+        unitSuffix: result.unitMetadata.unitSuffix || '',
+        council: result.unitMetadata.council || '',
+        district: result.unitMetadata.district || '',
+      })
       setIsParsing(false)
       setCurrentStep(1) // Move to confirmation step
     } catch (err) {
@@ -315,42 +323,118 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
   )
 
   // ============================================
-  // Render: Step 2 - Confirm Unit
+  // Render: Step 2 - Confirm/Edit Unit (CSV path)
   // ============================================
 
   const renderConfirmStep = () => {
-    if (!unitMetadata) return null
+    const canContinue = manualUnitInfo.unitNumber.trim().length > 0
 
-    const unitTypeName = unitMetadata.unitType
-      ? unitMetadata.unitType.charAt(0).toUpperCase() + unitMetadata.unitType.slice(1)
-      : 'Unit'
-    const unitDisplayName = unitMetadata.unitSuffix
-      ? `${unitTypeName} ${unitMetadata.unitNumber}${unitMetadata.unitSuffix}`
-      : `${unitTypeName} ${unitMetadata.unitNumber}`
+    const handleContinue = () => {
+      // Build unit metadata from edited form
+      const metadata: UnitMetadata = {
+        unitType: manualUnitInfo.unitType,
+        unitNumber: manualUnitInfo.unitNumber.trim(),
+        unitSuffix: manualUnitInfo.unitSuffix.trim() || null,
+        council: manualUnitInfo.council.trim() || null,
+        district: manualUnitInfo.district.trim() || null,
+      }
+      setUnitMetadata(metadata)
+      setCurrentStep(2)
+    }
 
     return (
       <FadeIn className="space-y-6">
-        <div className="rounded-lg border border-forest-200 dark:border-forest-700 bg-forest-50 dark:bg-forest-900/20 p-6">
-          <div className="flex items-start gap-4">
-            <div className="shrink-0 h-12 w-12 rounded-full bg-forest-100 dark:bg-forest-800 flex items-center justify-center">
-              <Building2 className="h-6 w-6 text-forest-600 dark:text-forest-400" />
+        <p className="text-stone-600 dark:text-stone-300 text-center">
+          We detected this unit from your roster. You can edit the details below if needed.
+        </p>
+
+        <div className="space-y-4">
+          {/* Unit Type */}
+          <div>
+            <label className="block text-sm font-medium text-stone-700 dark:text-stone-200 mb-2">
+              Unit Type <span className="text-amber-500">*</span>
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {(['troop', 'pack', 'crew', 'ship'] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setManualUnitInfo(prev => ({ ...prev, unitType: type }))}
+                  className={`px-4 py-3 rounded-lg border-2 transition-colors font-medium capitalize ${
+                    manualUnitInfo.unitType === type
+                      ? 'border-forest-600 bg-forest-50 dark:bg-forest-900/20 text-forest-700 dark:text-forest-300'
+                      : 'border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 text-stone-700 dark:text-stone-300 hover:border-stone-300 dark:hover:border-stone-600'
+                  }`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Unit Number and Suffix */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="col-span-2">
+              <label htmlFor="csvUnitNumber" className="block text-sm font-medium text-stone-700 dark:text-stone-200 mb-1">
+                Unit Number <span className="text-amber-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="csvUnitNumber"
+                value={manualUnitInfo.unitNumber}
+                onChange={(e) => setManualUnitInfo(prev => ({ ...prev, unitNumber: e.target.value }))}
+                className="w-full rounded-lg border border-stone-300 dark:border-stone-600 px-4 py-2.5 text-stone-900 dark:text-stone-50 bg-white dark:bg-stone-900 placeholder:text-stone-400 focus:border-forest-600 dark:focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-600/20 dark:focus:ring-forest-500/30"
+                placeholder="9297"
+              />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-forest-800 dark:text-forest-200">
-                {unitDisplayName}
-              </h3>
-              {unitMetadata.council && (
-                <p className="text-stone-600 dark:text-stone-300">{unitMetadata.council}</p>
-              )}
-              {unitMetadata.district && (
-                <p className="text-sm text-stone-500 dark:text-stone-400">
-                  District: {unitMetadata.district}
-                </p>
-              )}
+              <label htmlFor="csvUnitSuffix" className="block text-sm font-medium text-stone-700 dark:text-stone-200 mb-1">
+                Suffix
+              </label>
+              <input
+                type="text"
+                id="csvUnitSuffix"
+                value={manualUnitInfo.unitSuffix}
+                onChange={(e) => setManualUnitInfo(prev => ({ ...prev, unitSuffix: e.target.value }))}
+                className="w-full rounded-lg border border-stone-300 dark:border-stone-600 px-4 py-2.5 text-stone-900 dark:text-stone-50 bg-white dark:bg-stone-900 placeholder:text-stone-400 focus:border-forest-600 dark:focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-600/20 dark:focus:ring-forest-500/30"
+                placeholder="B"
+                maxLength={2}
+              />
             </div>
+          </div>
+
+          {/* Council */}
+          <div>
+            <label htmlFor="csvCouncil" className="block text-sm font-medium text-stone-700 dark:text-stone-200 mb-1">
+              Council
+            </label>
+            <input
+              type="text"
+              id="csvCouncil"
+              value={manualUnitInfo.council}
+              onChange={(e) => setManualUnitInfo(prev => ({ ...prev, council: e.target.value }))}
+              className="w-full rounded-lg border border-stone-300 dark:border-stone-600 px-4 py-2.5 text-stone-900 dark:text-stone-50 bg-white dark:bg-stone-900 placeholder:text-stone-400 focus:border-forest-600 dark:focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-600/20 dark:focus:ring-forest-500/30"
+              placeholder="Northern Star Council"
+            />
+          </div>
+
+          {/* District */}
+          <div>
+            <label htmlFor="csvDistrict" className="block text-sm font-medium text-stone-700 dark:text-stone-200 mb-1">
+              District
+            </label>
+            <input
+              type="text"
+              id="csvDistrict"
+              value={manualUnitInfo.district}
+              onChange={(e) => setManualUnitInfo(prev => ({ ...prev, district: e.target.value }))}
+              className="w-full rounded-lg border border-stone-300 dark:border-stone-600 px-4 py-2.5 text-stone-900 dark:text-stone-50 bg-white dark:bg-stone-900 placeholder:text-stone-400 focus:border-forest-600 dark:focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-600/20 dark:focus:ring-forest-500/30"
+              placeholder="Voyageurs"
+            />
           </div>
         </div>
 
+        {/* Roster Summary */}
         {rosterSummary && (
           <div className="grid grid-cols-3 gap-4">
             <div className="rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 p-4 text-center">
@@ -373,9 +457,9 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
 
         <div className="flex gap-3">
           <Button variant="outline" onClick={clearFile} className="flex-1">
-            This isn&apos;t right
+            Start Over
           </Button>
-          <Button onClick={() => setCurrentStep(2)} className="flex-1">
+          <Button onClick={handleContinue} disabled={!canContinue} className="flex-1">
             Continue
           </Button>
         </div>
@@ -417,8 +501,8 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
             <label className="block text-sm font-medium text-stone-700 dark:text-stone-200 mb-2">
               Unit Type <span className="text-amber-500">*</span>
             </label>
-            <div className="grid grid-cols-3 gap-3">
-              {(['troop', 'pack', 'crew'] as const).map((type) => (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {(['troop', 'pack', 'crew', 'ship'] as const).map((type) => (
                 <button
                   key={type}
                   type="button"
