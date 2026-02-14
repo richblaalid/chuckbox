@@ -41,6 +41,7 @@ interface ProvisionUnitInput {
   parsedAdults: ParsedAdult[]
   parsedScouts: ParsedScout[]
   confirmDuplicateOverride?: boolean // If true, proceed despite duplicate warning
+  signupPath?: 'csv' | 'manual' // Track how user signed up
 }
 
 interface ProvisionResult {
@@ -291,16 +292,23 @@ export async function provisionUnit(input: ProvisionUnitInput, ipAddress: string
       : `${unitTypeName} ${unitMetadata.unitNumber}`
 
     // 1. Create unit with pending status
+    // Set needs_setup=true for manual path (no CSV uploaded)
+    const needsSetup = input.signupPath === 'manual'
+
+    // Build insert data - needs_setup column added by migration 20260213000001
+    const unitInsertData = {
+      name: unitName,
+      unit_number: unitMetadata.unitNumber,
+      unit_type: unitMetadata.unitType,
+      council: unitMetadata.council,
+      district: unitMetadata.district,
+    }
+    // Add needs_setup field (column may not be in generated types yet)
+    const unitInsertWithSetup = { ...unitInsertData, needs_setup: needsSetup }
+
     const { data: unit, error: unitError } = await adminSupabase
       .from('units')
-      .insert({
-        name: unitName,
-        unit_number: unitMetadata.unitNumber,
-        unit_type: unitMetadata.unitType,
-        council: unitMetadata.council,
-        district: unitMetadata.district,
-        // Note: provisioning_status column will be added by migration 20260118000000_unit_provisioning.sql
-      })
+      .insert(unitInsertWithSetup as typeof unitInsertData)
       .select('id')
       .single()
 

@@ -162,7 +162,7 @@ ALTER TABLE units ADD COLUMN IF NOT EXISTS sync_strategy TEXT DEFAULT 'additive'
 #### 1.1 Signup Flow Updates (Stage 1)
 - [x] **1.1.1** Add "Skip for Now" option to CSV upload step *(completed)*
 - [x] **1.1.2** Create manual unit metadata form (for skip path) *(completed)*
-- [ ] **1.1.3** Mark unit as `needs_setup: true` when skipping CSV
+- [x] **1.1.3** Mark unit as `needs_setup: true` when skipping CSV *(completed)*
 - [ ] **1.1.4** Persist signup path choice for analytics
 
 #### 1.2 Editable Unit Metadata

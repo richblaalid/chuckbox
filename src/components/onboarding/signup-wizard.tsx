@@ -184,6 +184,7 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
           parsedAdults: parsedRoster?.adults || [],
           parsedScouts: parsedRoster?.scouts || [],
           confirmDuplicateOverride,
+          signupPath,
         },
         '0.0.0.0' // IP will be captured server-side via headers
       )
