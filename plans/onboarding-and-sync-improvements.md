@@ -148,7 +148,7 @@ ALTER TABLE units ADD COLUMN IF NOT EXISTS sync_strategy TEXT DEFAULT 'additive'
 #### 0.1 Parser Improvements
 - [x] **0.1.1** Fix roster parser to stop at DEN CHIEF section *(completed)*
 - [x] **0.1.2** Fix importer to not overwrite patrol_id with null *(completed)*
-- [ ] **0.1.3** Fix council name parsing (remove duplicate text, trailing numbers)
+- [x] **0.1.3** Fix council name parsing (remove duplicate text, trailing numbers) *(completed)*
 - [ ] **0.1.4** Fix district name parsing (same issue)
 - [ ] **0.1.5** Add unit tests for parser edge cases
 

@@ -587,12 +587,36 @@ function parseUnitNumberAndSuffix(unitStr: string): { number: string | null; suf
 }
 
 /**
- * Clean council name - removes trailing council number if present
- * "Northern Star Council 250" -> "Northern Star Council"
+ * Normalize council name - handles common parsing issues:
+ * 1. Removes trailing council number (e.g., "Northern Star Council 250" -> "Northern Star Council")
+ * 2. Removes duplicate text (e.g., "Northern Star Council 250Northern Star Council 250" -> "Northern Star Council")
+ * 3. Trims whitespace
  */
-function cleanCouncilName(council: string): string {
+export function normalizeCouncilName(council: string): string {
+  if (!council) return ''
+
+  let cleaned = council.trim()
+
+  // Check for duplicated text (the council name repeated twice)
+  // This can happen when parsing certain CSV formats
+  const halfLength = Math.floor(cleaned.length / 2)
+  if (halfLength > 0) {
+    const firstHalf = cleaned.substring(0, halfLength)
+    const secondHalf = cleaned.substring(halfLength)
+    if (firstHalf === secondHalf) {
+      cleaned = firstHalf
+    }
+  }
+
   // Remove trailing council number (e.g., "Northern Star Council 250" -> "Northern Star Council")
-  return council.replace(/\s+\d+\s*$/, '').trim()
+  cleaned = cleaned.replace(/\s+\d+\s*$/, '').trim()
+
+  return cleaned
+}
+
+// Keep the old function name for internal backward compatibility
+function cleanCouncilName(council: string): string {
+  return normalizeCouncilName(council)
 }
 
 /**

@@ -5,10 +5,41 @@ import {
   deriveRole,
   getCurrentPosition,
   getScoutPosition,
+  normalizeCouncilName,
   type ParsedRoster,
 } from '@/lib/import/bsa-roster-parser'
 
 describe('BSA Roster Parser', () => {
+  describe('normalizeCouncilName', () => {
+    it('should remove trailing council number', () => {
+      expect(normalizeCouncilName('Northern Star Council 250')).toBe('Northern Star Council')
+    })
+
+    it('should remove duplicate text', () => {
+      expect(normalizeCouncilName('Northern Star Council 250Northern Star Council 250')).toBe('Northern Star Council')
+    })
+
+    it('should handle duplicate text without numbers', () => {
+      expect(normalizeCouncilName('Northern Star CouncilNorthern Star Council')).toBe('Northern Star Council')
+    })
+
+    it('should trim whitespace', () => {
+      expect(normalizeCouncilName('  Northern Star Council  ')).toBe('Northern Star Council')
+    })
+
+    it('should handle normal council name without modifications', () => {
+      expect(normalizeCouncilName('Northern Star Council')).toBe('Northern Star Council')
+    })
+
+    it('should handle empty string', () => {
+      expect(normalizeCouncilName('')).toBe('')
+    })
+
+    it('should handle council name with multiple numbers', () => {
+      expect(normalizeCouncilName('Council 123 456')).toBe('Council 123')
+    })
+  })
+
   describe('deriveRole', () => {
     it('should return leader for Scoutmaster', () => {
       expect(deriveRole(['Scoutmaster'])).toBe('leader')
