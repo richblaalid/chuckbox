@@ -65,6 +65,11 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
     district: '',
   })
 
+  // Form validation state
+  const [validationErrors, setValidationErrors] = useState<{
+    unitNumber?: string
+  }>({})
+
   // ============================================
   // Step 1: File Upload
   // ============================================
@@ -327,9 +332,22 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
   // ============================================
 
   const renderConfirmStep = () => {
-    const canContinue = manualUnitInfo.unitNumber.trim().length > 0
+    const validateForm = (): boolean => {
+      const errors: { unitNumber?: string } = {}
+
+      if (!manualUnitInfo.unitNumber.trim()) {
+        errors.unitNumber = 'Unit number is required'
+      } else if (!/^\d+$/.test(manualUnitInfo.unitNumber.trim())) {
+        errors.unitNumber = 'Unit number must contain only digits'
+      }
+
+      setValidationErrors(errors)
+      return Object.keys(errors).length === 0
+    }
 
     const handleContinue = () => {
+      if (!validateForm()) return
+
       // Build unit metadata from edited form
       const metadata: UnitMetadata = {
         unitType: manualUnitInfo.unitType,
@@ -339,7 +357,16 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
         district: manualUnitInfo.district.trim() || null,
       }
       setUnitMetadata(metadata)
+      setValidationErrors({})
       setCurrentStep(2)
+    }
+
+    const handleUnitNumberChange = (value: string) => {
+      setManualUnitInfo(prev => ({ ...prev, unitNumber: value }))
+      // Clear error when user starts typing
+      if (validationErrors.unitNumber) {
+        setValidationErrors(prev => ({ ...prev, unitNumber: undefined }))
+      }
     }
 
     return (
@@ -382,10 +409,17 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
                 type="text"
                 id="csvUnitNumber"
                 value={manualUnitInfo.unitNumber}
-                onChange={(e) => setManualUnitInfo(prev => ({ ...prev, unitNumber: e.target.value }))}
-                className="w-full rounded-lg border border-stone-300 dark:border-stone-600 px-4 py-2.5 text-stone-900 dark:text-stone-50 bg-white dark:bg-stone-900 placeholder:text-stone-400 focus:border-forest-600 dark:focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-600/20 dark:focus:ring-forest-500/30"
+                onChange={(e) => handleUnitNumberChange(e.target.value)}
+                className={`w-full rounded-lg border px-4 py-2.5 text-stone-900 dark:text-stone-50 bg-white dark:bg-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 ${
+                  validationErrors.unitNumber
+                    ? 'border-error focus:border-error focus:ring-error/20'
+                    : 'border-stone-300 dark:border-stone-600 focus:border-forest-600 dark:focus:border-forest-500 focus:ring-forest-600/20 dark:focus:ring-forest-500/30'
+                }`}
                 placeholder="9297"
               />
+              {validationErrors.unitNumber && (
+                <p className="mt-1 text-sm text-error">{validationErrors.unitNumber}</p>
+              )}
             </div>
             <div>
               <label htmlFor="csvUnitSuffix" className="block text-sm font-medium text-stone-700 dark:text-stone-200 mb-1">
@@ -459,7 +493,7 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
           <Button variant="outline" onClick={clearFile} className="flex-1">
             Start Over
           </Button>
-          <Button onClick={handleContinue} disabled={!canContinue} className="flex-1">
+          <Button onClick={handleContinue} className="flex-1">
             Continue
           </Button>
         </div>
@@ -472,9 +506,22 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
   // ============================================
 
   const renderManualUnitStep = () => {
-    const canContinue = manualUnitInfo.unitNumber.trim().length > 0
+    const validateForm = (): boolean => {
+      const errors: { unitNumber?: string } = {}
+
+      if (!manualUnitInfo.unitNumber.trim()) {
+        errors.unitNumber = 'Unit number is required'
+      } else if (!/^\d+$/.test(manualUnitInfo.unitNumber.trim())) {
+        errors.unitNumber = 'Unit number must contain only digits'
+      }
+
+      setValidationErrors(errors)
+      return Object.keys(errors).length === 0
+    }
 
     const handleContinue = () => {
+      if (!validateForm()) return
+
       // Build unit metadata from manual form
       const metadata: UnitMetadata = {
         unitType: manualUnitInfo.unitType,
@@ -484,9 +531,18 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
         district: manualUnitInfo.district.trim() || null,
       }
       setUnitMetadata(metadata)
+      setValidationErrors({})
       // For manual path, no roster data
       setParsedRoster({ adults: [], scouts: [], errors: [] })
       setCurrentStep(2)
+    }
+
+    const handleUnitNumberChange = (value: string) => {
+      setManualUnitInfo(prev => ({ ...prev, unitNumber: value }))
+      // Clear error when user starts typing
+      if (validationErrors.unitNumber) {
+        setValidationErrors(prev => ({ ...prev, unitNumber: undefined }))
+      }
     }
 
     return (
@@ -529,10 +585,17 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
                 type="text"
                 id="unitNumber"
                 value={manualUnitInfo.unitNumber}
-                onChange={(e) => setManualUnitInfo(prev => ({ ...prev, unitNumber: e.target.value }))}
-                className="w-full rounded-lg border border-stone-300 dark:border-stone-600 px-4 py-2.5 text-stone-900 dark:text-stone-50 bg-white dark:bg-stone-900 placeholder:text-stone-400 focus:border-forest-600 dark:focus:border-forest-500 focus:outline-none focus:ring-2 focus:ring-forest-600/20 dark:focus:ring-forest-500/30"
+                onChange={(e) => handleUnitNumberChange(e.target.value)}
+                className={`w-full rounded-lg border px-4 py-2.5 text-stone-900 dark:text-stone-50 bg-white dark:bg-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 ${
+                  validationErrors.unitNumber
+                    ? 'border-error focus:border-error focus:ring-error/20'
+                    : 'border-stone-300 dark:border-stone-600 focus:border-forest-600 dark:focus:border-forest-500 focus:ring-forest-600/20 dark:focus:ring-forest-500/30'
+                }`}
                 placeholder="9297"
               />
+              {validationErrors.unitNumber && (
+                <p className="mt-1 text-sm text-error">{validationErrors.unitNumber}</p>
+              )}
             </div>
             <div>
               <label htmlFor="unitSuffix" className="block text-sm font-medium text-stone-700 dark:text-stone-200 mb-1">
@@ -588,7 +651,7 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
           <Button variant="outline" onClick={clearFile} className="flex-1">
             Back
           </Button>
-          <Button onClick={handleContinue} disabled={!canContinue} className="flex-1">
+          <Button onClick={handleContinue} className="flex-1">
             Continue
           </Button>
         </div>
