@@ -403,6 +403,8 @@ ALTER TABLE units ADD COLUMN IF NOT EXISTS sync_strategy TEXT DEFAULT 'additive'
 | 2026-02-13 | 1.2.3 Add form validation for required fields | 9b9b13b |
 | 2026-02-13 | 1.2.4 Skip council autocomplete (free text) | - |
 | 2026-02-13 | 1.2.5 Verify provisionUnit accepts edited metadata | - |
+| 2026-02-13 | 1.3.1-1.3.4 Create RosterPreview component | 12659ab |
+| 2026-02-13 | 1.3.5 Integrate RosterPreview into signup wizard | 29c1962 |
 | | | |
 
 ---

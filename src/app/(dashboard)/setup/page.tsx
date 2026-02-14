@@ -54,6 +54,15 @@ export default async function SetupPage() {
     council: string | null
   }
 
+  // Fetch needs_setup separately (column may not be in generated types yet)
+  const { data: unitData } = await supabase
+    .from('units')
+    .select('needs_setup')
+    .eq('id', unit.id)
+    .single()
+
+  const needsSetup = (unitData as { needs_setup?: boolean | null } | null)?.needs_setup ?? false
+
   // Check if setup is already complete by querying with service role
   // Note: setup_completed_at column will be added by migration 20260118000000_unit_provisioning.sql
   // For now, we'll allow access to the setup page if the user is an admin
@@ -81,6 +90,7 @@ export default async function SetupPage() {
       unitName={unit.name}
       unitType={unit.unit_type}
       council={unit.council}
+      needsSetup={needsSetup}
       rosterSummary={{
         adultCount: adultCount || 0,
         scoutCount: scoutCount || 0,
