@@ -6,6 +6,7 @@ import {
   getCurrentPosition,
   getScoutPosition,
   normalizeCouncilName,
+  normalizeDistrictName,
   type ParsedRoster,
 } from '@/lib/import/bsa-roster-parser'
 
@@ -37,6 +38,32 @@ describe('BSA Roster Parser', () => {
 
     it('should handle council name with multiple numbers', () => {
       expect(normalizeCouncilName('Council 123 456')).toBe('Council 123')
+    })
+  })
+
+  describe('normalizeDistrictName', () => {
+    it('should remove trailing district number', () => {
+      expect(normalizeDistrictName('H 108')).toBe('H')
+    })
+
+    it('should remove duplicate text', () => {
+      expect(normalizeDistrictName('H 108H 108')).toBe('H')
+    })
+
+    it('should handle duplicate text without numbers', () => {
+      expect(normalizeDistrictName('NorthNorth')).toBe('North')
+    })
+
+    it('should trim whitespace', () => {
+      expect(normalizeDistrictName('  North District  ')).toBe('North District')
+    })
+
+    it('should handle normal district name without modifications', () => {
+      expect(normalizeDistrictName('North')).toBe('North')
+    })
+
+    it('should handle empty string', () => {
+      expect(normalizeDistrictName('')).toBe('')
     })
   })
 

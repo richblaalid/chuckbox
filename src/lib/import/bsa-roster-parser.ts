@@ -620,6 +620,34 @@ function cleanCouncilName(council: string): string {
 }
 
 /**
+ * Normalize district name - handles common parsing issues:
+ * 1. Removes trailing district number (e.g., "H 108" -> "H")
+ * 2. Removes duplicate text (e.g., "H 108H 108" -> "H")
+ * 3. Trims whitespace
+ */
+export function normalizeDistrictName(district: string): string {
+  if (!district) return ''
+
+  let cleaned = district.trim()
+
+  // Check for duplicated text (the district name repeated twice)
+  // This can happen when parsing certain CSV formats
+  const halfLength = Math.floor(cleaned.length / 2)
+  if (halfLength > 0) {
+    const firstHalf = cleaned.substring(0, halfLength)
+    const secondHalf = cleaned.substring(halfLength)
+    if (firstHalf === secondHalf) {
+      cleaned = firstHalf
+    }
+  }
+
+  // Remove trailing district number (e.g., "H 108" -> "H")
+  cleaned = cleaned.replace(/\s+\d+\s*$/, '').trim()
+
+  return cleaned
+}
+
+/**
  * Extract unit metadata from BSA roster CSV content
  * Parses the first adult or youth row to get unit info
  */
@@ -669,7 +697,7 @@ export function extractUnitMetadata(content: string): UnitMetadata {
       // Get district
       const district = getVal('District')
       if (district) {
-        result.district = district
+        result.district = normalizeDistrictName(district)
       }
 
       // Get unit info from "Unit Number" column (adult section) or "Unit" (youth section)
@@ -709,7 +737,7 @@ export function extractUnitMetadata(content: string): UnitMetadata {
 
       const district = getVal('District')
       if (district && !result.district) {
-        result.district = district
+        result.district = normalizeDistrictName(district)
       }
 
       const unitStr = getVal('Unit')
