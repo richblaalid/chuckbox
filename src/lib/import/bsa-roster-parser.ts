@@ -439,9 +439,19 @@ export function parseRosterCSV(content: string): ParsedRoster {
       const headers = parseCSVLine(headerLine)
 
       // Parse youth data rows
+      // Stop at other section markers (DEN CHIEF MEMBERS, etc.)
       for (let i = youthHeaderIndex + 1; i < lines.length; i++) {
         const line = lines[i]
-        if (!line || line.startsWith('" "')) continue
+        if (!line) continue
+
+        // Stop if we hit another section marker (e.g., "DEN CHIEF MEMBERS", "ADULT MEMBERS")
+        // Section markers start with `" "` followed by text in all caps
+        if (line.startsWith('" "') && line.match(/^" ","[A-Z\s]+"/)) {
+          break
+        }
+
+        // Skip empty section marker rows
+        if (line.startsWith('" "')) continue
 
         try {
           const values = parseCSVLine(line)

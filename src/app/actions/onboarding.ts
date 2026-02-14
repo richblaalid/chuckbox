@@ -669,18 +669,27 @@ async function importRosterData(
           // Update existing scout
           const scoutPositions = getScoutPosition(scout.positions)
           const patrolId = scout.patrol ? patrolNameToId.get(scout.patrol.toLowerCase()) : null
+
+          // Build update object - only include patrol_id if we have a valid value
+          // This prevents overwriting existing patrol data with null from duplicate entries
+          const updateData: Record<string, unknown> = {
+            first_name: scout.firstName,
+            last_name: scout.lastName,
+            rank: scout.rank,
+            date_of_birth: scout.dateOfBirth,
+            current_position: scoutPositions.primary,
+            current_position_2: scoutPositions.secondary,
+            updated_at: new Date().toISOString(),
+          }
+
+          // Only update patrol_id if we have a valid value
+          if (patrolId) {
+            updateData.patrol_id = patrolId
+          }
+
           await adminSupabase
             .from('scouts')
-            .update({
-              first_name: scout.firstName,
-              last_name: scout.lastName,
-              rank: scout.rank,
-              date_of_birth: scout.dateOfBirth,
-              patrol_id: patrolId || null,
-              current_position: scoutPositions.primary,
-              current_position_2: scoutPositions.secondary,
-              updated_at: new Date().toISOString(),
-            })
+            .update(updateData)
             .eq('id', scoutId)
         }
       }
