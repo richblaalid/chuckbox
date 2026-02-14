@@ -887,10 +887,14 @@ export async function completeSetupWizard(): Promise<{ success: boolean; error?:
 
   // Mark setup as complete
   // Note: setup_completed_at column added by migration 20260118000000_unit_provisioning.sql
-  // Using type assertion since column doesn't exist in generated types yet
+  // Note: needs_setup column added by migration 20260213000001_add_unit_needs_setup.sql
+  // Using type assertion since columns may not exist in generated types yet
   const { error } = await adminSupabase
     .from('units')
-    .update({ setup_completed_at: new Date().toISOString() } as Record<string, unknown>)
+    .update({
+      setup_completed_at: new Date().toISOString(),
+      needs_setup: false,
+    } as Record<string, unknown>)
     .eq('id', membership.unit_id)
 
   if (error) {
