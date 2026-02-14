@@ -386,8 +386,13 @@ ALTER TABLE units ADD COLUMN IF NOT EXISTS sync_strategy TEXT DEFAULT 'additive'
 
 | Date | Task | Commit |
 |------|------|--------|
-| 2026-02-13 | 0.1.1 Fix parser DEN CHIEF section | 007ab06 |
-| 2026-02-13 | 0.1.2 Fix patrol_id overwrite | 007ab06 |
+| 2026-02-13 | 0.1.1 Fix parser DEN CHIEF section | e992280 |
+| 2026-02-13 | 0.1.2 Fix patrol_id overwrite | e992280 |
+| 2026-02-13 | 0.1.3 Fix council name parsing | 6c3985e |
+| 2026-02-13 | 0.1.4 Fix district name parsing | 4c94704 |
+| 2026-02-13 | 0.1.5 Add edge case tests | cd02ce6 |
+| 2026-02-13 | 0.2.1 Normalize council for comparison | 4fdd01c |
+| 2026-02-13 | 0.2.2 Soft warning for duplicate units | 679cff8 |
 | | | |
 
 ---
