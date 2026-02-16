@@ -380,8 +380,8 @@ flowchart TD
   - Test: Types include `expense_reimbursements` table, profiles has venmo_username
 
 #### 0.2 Core Types & Utilities
-- [ ] **0.2.1** Create expense types and constants
-  - Files: `src/lib/expenses/types.ts`, `src/lib/expenses/constants.ts`
+- [x] **0.2.1** Create expense types and constants
+  - Files: `src/lib/expenses/types.ts`, `src/lib/expenses/constants.ts`, `src/lib/expenses/index.ts`
   - Test: Enums and interfaces compile
 
 - [ ] **0.2.2** Create expense validation schemas (Zod)
@@ -654,7 +654,7 @@ RESEND_API_KEY=...
 
 | Phase | Total | Complete | Status |
 |-------|-------|----------|--------|
-| Phase 0: Foundation | 7 | 0 | ⬜ Not Started |
+| Phase 0: Foundation | 7 | 5 | 🔄 In Progress |
 | Phase 1: Expense Submission | 12 | 0 | ⬜ Not Started |
 | Phase 2: Approval Workflow | 7 | 0 | ⬜ Not Started |
 | Phase 3: Notifications | 5 | 0 | ⬜ Not Started |
@@ -670,7 +670,11 @@ RESEND_API_KEY=...
 
 | Task | Date | Commit | Notes |
 |------|------|--------|-------|
-| | | | |
+| 0.1.1 | 2026-02-16 | 3f6b28f | Add venmo_username to profiles |
+| 0.1.2 | 2026-02-16 | 60ba009 | Create expense_reimbursements table |
+| 0.1.3 | 2026-02-16 | c1d24f8 | Create expense-receipts storage bucket |
+| 0.1.4 | 2026-02-16 | c93ef8c | Regenerate TypeScript types |
+| 0.2.1 | 2026-02-16 | pending | Create expense types and constants |
 
 ---
 
