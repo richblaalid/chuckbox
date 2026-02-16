@@ -371,9 +371,9 @@ flowchart TD
   - Files: `supabase/migrations/20260216000001_expense_reimbursements.sql`
   - Test: `supabase db push` succeeds, table created
 
-- [ ] **0.1.3** Create Supabase Storage bucket for receipts
-  - Files: Migration or manual setup
-  - Test: `expense-receipts` bucket exists with public read
+- [x] **0.1.3** Create Supabase Storage bucket for receipts
+  - Files: `supabase/migrations/20260216000002_expense_receipts_storage.sql`
+  - Test: `expense-receipts` bucket exists with RLS policies
 
 - [ ] **0.1.4** Regenerate TypeScript types
   - Files: `src/types/database.ts`
