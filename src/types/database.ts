@@ -809,6 +809,126 @@ export type Database = {
           },
         ]
       }
+      expense_reimbursements: {
+        Row: {
+          ai_extracted: boolean | null
+          ai_extraction_data: Json | null
+          amount: number
+          category: Database["public"]["Enums"]["expense_category"]
+          created_at: string
+          description: string
+          expense_date: string
+          id: string
+          journal_entry_id: string | null
+          paid_at: string | null
+          paid_by: string | null
+          payment_method: string | null
+          payment_reference: string | null
+          receipt_filename: string | null
+          receipt_url: string | null
+          rejection_reason: string | null
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["expense_status"]
+          submitted_at: string | null
+          submitter_id: string
+          unit_id: string
+          updated_at: string
+          vendor: string | null
+        }
+        Insert: {
+          ai_extracted?: boolean | null
+          ai_extraction_data?: Json | null
+          amount: number
+          category?: Database["public"]["Enums"]["expense_category"]
+          created_at?: string
+          description: string
+          expense_date: string
+          id?: string
+          journal_entry_id?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          receipt_filename?: string | null
+          receipt_url?: string | null
+          rejection_reason?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["expense_status"]
+          submitted_at?: string | null
+          submitter_id: string
+          unit_id: string
+          updated_at?: string
+          vendor?: string | null
+        }
+        Update: {
+          ai_extracted?: boolean | null
+          ai_extraction_data?: Json | null
+          amount?: number
+          category?: Database["public"]["Enums"]["expense_category"]
+          created_at?: string
+          description?: string
+          expense_date?: string
+          id?: string
+          journal_entry_id?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          receipt_filename?: string | null
+          receipt_url?: string | null
+          rejection_reason?: string | null
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["expense_status"]
+          submitted_at?: string | null
+          submitter_id?: string
+          unit_id?: string
+          updated_at?: string
+          vendor?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_reimbursements_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_reimbursements_paid_by_fkey"
+            columns: ["paid_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_reimbursements_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_reimbursements_submitter_id_fkey"
+            columns: ["submitter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_reimbursements_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       extension_auth_tokens: {
         Row: {
           created_at: string | null
@@ -1764,6 +1884,7 @@ export type Database = {
           sync_session_id: string | null
           updated_at: string | null
           user_id: string | null
+          venmo_username: string | null
         }
         Insert: {
           address_city?: string | null
@@ -1798,6 +1919,7 @@ export type Database = {
           sync_session_id?: string | null
           updated_at?: string | null
           user_id?: string | null
+          venmo_username?: string | null
         }
         Update: {
           address_city?: string | null
@@ -1832,6 +1954,7 @@ export type Database = {
           sync_session_id?: string | null
           updated_at?: string | null
           user_id?: string | null
+          venmo_username?: string | null
         }
         Relationships: []
       }
@@ -2911,6 +3034,7 @@ export type Database = {
           parsed_adults: Json
           parsed_scouts: Json
           provisioning_token_id: string
+          section_unit_map: Json | null
           unit_metadata: Json | null
         }
         Insert: {
@@ -2919,6 +3043,7 @@ export type Database = {
           parsed_adults: Json
           parsed_scouts: Json
           provisioning_token_id: string
+          section_unit_map?: Json | null
           unit_metadata?: Json | null
         }
         Update: {
@@ -2927,6 +3052,7 @@ export type Database = {
           parsed_adults?: Json
           parsed_scouts?: Json
           provisioning_token_id?: string
+          section_unit_map?: Json | null
           unit_metadata?: Json | null
         }
         Relationships: [
@@ -3062,10 +3188,12 @@ export type Database = {
           bsa_member_id: string
           change_type: string
           changes: Json | null
+          conflicts: Json | null
           created_at: string | null
           existing_profile_id: string | null
           existing_scout_id: string | null
           expiration_date: string | null
+          field_resolutions: Json | null
           first_name: string
           full_name: string
           id: string
@@ -3089,10 +3217,12 @@ export type Database = {
           bsa_member_id: string
           change_type: string
           changes?: Json | null
+          conflicts?: Json | null
           created_at?: string | null
           existing_profile_id?: string | null
           existing_scout_id?: string | null
           expiration_date?: string | null
+          field_resolutions?: Json | null
           first_name: string
           full_name: string
           id?: string
@@ -3116,10 +3246,12 @@ export type Database = {
           bsa_member_id?: string
           change_type?: string
           changes?: Json | null
+          conflicts?: Json | null
           created_at?: string | null
           existing_profile_id?: string | null
           existing_scout_id?: string | null
           expiration_date?: string | null
+          field_resolutions?: Json | null
           first_name?: string
           full_name?: string
           id?: string
@@ -3391,12 +3523,15 @@ export type Database = {
           is_section: boolean | null
           logo_url: string | null
           name: string
+          needs_setup: boolean | null
           parent_unit_id: string | null
           pass_fees_to_payer: boolean | null
           processing_fee_fixed: number | null
           processing_fee_percent: number | null
           provisioning_status: string | null
+          section_identifier: string | null
           setup_completed_at: string | null
+          signup_path: string | null
           unit_gender: Database["public"]["Enums"]["unit_gender"] | null
           unit_number: string
           unit_type: Database["public"]["Enums"]["unit_type"]
@@ -3412,12 +3547,15 @@ export type Database = {
           is_section?: boolean | null
           logo_url?: string | null
           name: string
+          needs_setup?: boolean | null
           parent_unit_id?: string | null
           pass_fees_to_payer?: boolean | null
           processing_fee_fixed?: number | null
           processing_fee_percent?: number | null
           provisioning_status?: string | null
+          section_identifier?: string | null
           setup_completed_at?: string | null
+          signup_path?: string | null
           unit_gender?: Database["public"]["Enums"]["unit_gender"] | null
           unit_number: string
           unit_type: Database["public"]["Enums"]["unit_type"]
@@ -3433,12 +3571,15 @@ export type Database = {
           is_section?: boolean | null
           logo_url?: string | null
           name?: string
+          needs_setup?: boolean | null
           parent_unit_id?: string | null
           pass_fees_to_payer?: boolean | null
           processing_fee_fixed?: number | null
           processing_fee_percent?: number | null
           provisioning_status?: string | null
+          section_identifier?: string | null
           setup_completed_at?: string | null
+          signup_path?: string | null
           unit_gender?: Database["public"]["Enums"]["unit_gender"] | null
           unit_number?: string
           unit_type?: Database["public"]["Enums"]["unit_type"]
@@ -3670,6 +3811,8 @@ export type Database = {
         | "pending_approval"
         | "approved"
         | "awarded"
+      expense_category: "supplies" | "food" | "travel" | "other"
+      expense_status: "draft" | "submitted" | "approved" | "rejected" | "paid"
       gender: "male" | "female" | "other" | "prefer_not_to_say"
       journal_entry_type:
         | "billing"
@@ -3827,6 +3970,8 @@ export const Constants = {
         "approved",
         "awarded",
       ],
+      expense_category: ["supplies", "food", "travel", "other"],
+      expense_status: ["draft", "submitted", "approved", "rejected", "paid"],
       gender: ["male", "female", "other", "prefer_not_to_say"],
       journal_entry_type: [
         "billing",

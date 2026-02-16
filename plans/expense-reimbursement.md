@@ -375,7 +375,7 @@ flowchart TD
   - Files: `supabase/migrations/20260216000002_expense_receipts_storage.sql`
   - Test: `expense-receipts` bucket exists with RLS policies
 
-- [ ] **0.1.4** Regenerate TypeScript types
+- [x] **0.1.4** Regenerate TypeScript types
   - Files: `src/types/database.ts`
   - Test: Types include `expense_reimbursements` table, profiles has venmo_username
 
