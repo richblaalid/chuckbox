@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { ProfileForm } from '@/components/settings/profile-form'
 import { ContactForm } from '@/components/settings/contact-form'
+import { VenmoSettingsCard } from '@/components/settings/venmo-settings-card'
 import { DangerZone } from '@/components/settings/danger-zone'
 
 type Gender = 'male' | 'female' | 'other' | 'prefer_not_to_say'
@@ -55,6 +56,8 @@ export default async function ProfilePage() {
             phone_secondary: profile.phone_secondary,
           }}
         />
+
+        <VenmoSettingsCard venmoUsername={profile.venmo_username} />
 
         <DangerZone />
       </div>

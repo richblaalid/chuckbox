@@ -21,6 +21,7 @@ interface ProfileData {
   address_city?: string | null
   address_state?: string | null
   address_zip?: string | null
+  venmo_username?: string | null
 }
 
 // Get current user's profile
@@ -70,6 +71,7 @@ export async function updateProfile(data: ProfileData): Promise<ActionResult> {
   if ('address_city' in data) updateData.address_city = data.address_city
   if ('address_state' in data) updateData.address_state = data.address_state
   if ('address_zip' in data) updateData.address_zip = data.address_zip
+  if ('venmo_username' in data) updateData.venmo_username = data.venmo_username
 
   // Update full_name for backward compatibility if name fields are provided
   if ('first_name' in data || 'last_name' in data) {

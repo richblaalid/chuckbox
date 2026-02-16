@@ -389,8 +389,8 @@ flowchart TD
   - Test: Schema validates sample data
 
 #### 0.3 User Payment Info (for Phase 4)
-- [ ] **0.3.1** Add Venmo settings to user profile page
-  - Files: `src/app/(dashboard)/settings/profile/page.tsx`
+- [x] **0.3.1** Add Venmo settings to user profile page
+  - Files: `src/components/settings/venmo-settings-card.tsx`, `src/app/(dashboard)/profile/page.tsx`, `src/app/actions/profile.ts`
   - Test: User can view/edit their Venmo username
   - Note: Used in Phase 4 for cost sharing - optional for Phase 1-3
 
@@ -654,7 +654,7 @@ RESEND_API_KEY=...
 
 | Phase | Total | Complete | Status |
 |-------|-------|----------|--------|
-| Phase 0: Foundation | 7 | 5 | 🔄 In Progress |
+| Phase 0: Foundation | 7 | 7 | ✅ Complete |
 | Phase 1: Expense Submission | 12 | 0 | ⬜ Not Started |
 | Phase 2: Approval Workflow | 7 | 0 | ⬜ Not Started |
 | Phase 3: Notifications | 5 | 0 | ⬜ Not Started |
@@ -675,6 +675,8 @@ RESEND_API_KEY=...
 | 0.1.3 | 2026-02-16 | c1d24f8 | Create expense-receipts storage bucket |
 | 0.1.4 | 2026-02-16 | c93ef8c | Regenerate TypeScript types |
 | 0.2.1 | 2026-02-16 | 0a5787e | Create expense types and constants |
+| 0.2.2 | 2026-02-16 | 347fa5e | Create Zod validation schemas |
+| 0.3.1 | 2026-02-16 | pending | Add Venmo settings to profile page |
 
 ---
 
