@@ -367,8 +367,8 @@ flowchart TD
   - Files: `supabase/migrations/20260216000000_add_venmo_to_profiles.sql`
   - Test: Column exists on profiles table
 
-- [ ] **0.1.2** Create expense_reimbursements migration
-  - Files: `supabase/migrations/20260215000001_expense_reimbursements.sql`
+- [x] **0.1.2** Create expense_reimbursements migration
+  - Files: `supabase/migrations/20260216000001_expense_reimbursements.sql`
   - Test: `supabase db push` succeeds, table created
 
 - [ ] **0.1.3** Create Supabase Storage bucket for receipts
