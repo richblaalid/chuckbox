@@ -384,7 +384,7 @@ flowchart TD
   - Files: `src/lib/expenses/types.ts`, `src/lib/expenses/constants.ts`, `src/lib/expenses/index.ts`
   - Test: Enums and interfaces compile
 
-- [ ] **0.2.2** Create expense validation schemas (Zod)
+- [x] **0.2.2** Create expense validation schemas (Zod)
   - Files: `src/lib/expenses/schemas.ts`
   - Test: Schema validates sample data
 
@@ -674,7 +674,7 @@ RESEND_API_KEY=...
 | 0.1.2 | 2026-02-16 | 60ba009 | Create expense_reimbursements table |
 | 0.1.3 | 2026-02-16 | c1d24f8 | Create expense-receipts storage bucket |
 | 0.1.4 | 2026-02-16 | c93ef8c | Regenerate TypeScript types |
-| 0.2.1 | 2026-02-16 | pending | Create expense types and constants |
+| 0.2.1 | 2026-02-16 | 0a5787e | Create expense types and constants |
 
 ---
 
