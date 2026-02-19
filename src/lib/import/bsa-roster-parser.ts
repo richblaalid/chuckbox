@@ -68,6 +68,8 @@ export interface ParsedScout {
   patrol: string | null
   positions: string[]
   guardians: ParsedGuardian[]
+  /** Section identifier from CSV, e.g., "9297B" or "7297G" - used for linked troops */
+  sectionIdentifier: string | null
 }
 
 export interface UnitMetadata {
@@ -493,6 +495,16 @@ export function parseRosterCSV(content: string): ParsedRoster {
           const patrolRaw = getVal('Patrol')
           const patrol = patrolRaw ? patrolRaw.replace(/^\s+/, '').trim() : null
 
+          // Extract section identifier from Unit column (e.g., "Troop 9297 B" -> "9297B")
+          const unitStr = getVal('Unit')
+          let sectionIdentifier: string | null = null
+          if (unitStr) {
+            const { number, suffix } = parseUnitNumberAndSuffix(unitStr)
+            if (number) {
+              sectionIdentifier = suffix ? `${number}${suffix}` : number
+            }
+          }
+
           const scout: ParsedScout = {
             firstName: getVal('First Name'),
             lastName: getVal('Last Name'),
@@ -509,6 +521,7 @@ export function parseRosterCSV(content: string): ParsedRoster {
             patrol,
             positions,
             guardians,
+            sectionIdentifier,
           }
 
           if (scout.firstName && scout.lastName) {
@@ -763,4 +776,143 @@ export function parseRosterWithMetadata(content: string): ParsedRoster {
     ...roster,
     unitMetadata,
   }
+}
+
+// ============================================
+// Linked Troops Detection
+// ============================================
+
+export interface DetectedSection {
+  /** Section identifier like "9297B" or "7297G" */
+  identifier: string
+  /** Number of scouts in this section */
+  scoutCount: number
+  /** Inferred gender based on suffix: B=boys, G=girls */
+  inferredGender: 'boys' | 'girls' | null
+}
+
+export interface LinkedTroopInfo {
+  /** Whether multiple sections were detected */
+  isLinkedTroop: boolean
+  /** The detected sections (empty if single unit) */
+  sections: DetectedSection[]
+  /** Suggested parent unit number (e.g., "297" from "7297" and "9297") */
+  suggestedParentNumber: string | null
+}
+
+/**
+ * Detect if a parsed roster contains multiple troops (linked troop scenario)
+ *
+ * Linked troops occur when a single CSV contains scouts from multiple sections,
+ * e.g., "Troop 7297 G" (girls) and "Troop 9297 B" (boys) that share leadership.
+ *
+ * The pattern for linked troops is typically:
+ * - Numbers like 7297 and 9297 share the base "297"
+ * - Suffixes B/G indicate boys/girls sections
+ */
+export function detectLinkedTroops(roster: ParsedRoster): LinkedTroopInfo {
+  // Count scouts by section identifier
+  const sectionCounts = new Map<string, number>()
+
+  for (const scout of roster.scouts) {
+    if (scout.sectionIdentifier) {
+      const count = sectionCounts.get(scout.sectionIdentifier) || 0
+      sectionCounts.set(scout.sectionIdentifier, count + 1)
+    }
+  }
+
+  // If no section identifiers or only one, not a linked troop
+  if (sectionCounts.size <= 1) {
+    return {
+      isLinkedTroop: false,
+      sections: [],
+      suggestedParentNumber: null,
+    }
+  }
+
+  // Build section info
+  const sections: DetectedSection[] = []
+  for (const [identifier, scoutCount] of sectionCounts) {
+    // Infer gender from suffix (last character)
+    const lastChar = identifier.slice(-1).toUpperCase()
+    let inferredGender: 'boys' | 'girls' | null = null
+    if (lastChar === 'B') inferredGender = 'boys'
+    else if (lastChar === 'G') inferredGender = 'girls'
+
+    sections.push({ identifier, scoutCount, inferredGender })
+  }
+
+  // Sort by scout count (largest first)
+  sections.sort((a, b) => b.scoutCount - a.scoutCount)
+
+  // Try to find common parent number
+  const suggestedParentNumber = suggestParentUnitNumber(sections.map(s => s.identifier))
+
+  return {
+    isLinkedTroop: true,
+    sections,
+    suggestedParentNumber,
+  }
+}
+
+/**
+ * Suggest a parent unit number from section identifiers
+ *
+ * For linked troops like "7297G" and "9297B", the pattern is:
+ * - First digit is a prefix (7 for girls, 9 for boys is common but not universal)
+ * - Remaining digits are the actual unit number
+ *
+ * This function tries to find the common suffix that would be the parent unit number.
+ *
+ * @example
+ * suggestParentUnitNumber(["7297G", "9297B"]) // returns "297"
+ * suggestParentUnitNumber(["7297", "9297"])   // returns "297"
+ * suggestParentUnitNumber(["123B", "456G"])   // returns null (no common pattern)
+ */
+export function suggestParentUnitNumber(sectionIdentifiers: string[]): string | null {
+  if (sectionIdentifiers.length < 2) return null
+
+  // Extract just the numeric parts (remove suffix letters)
+  const numbers = sectionIdentifiers.map(id => id.replace(/[A-Z]$/i, ''))
+
+  // Common pattern: numbers like "7297" and "9297" share "297"
+  // Try removing the first digit and see if the rest matches
+  const withoutFirstDigit = numbers.map(n => n.slice(1))
+
+  if (withoutFirstDigit.length > 0) {
+    const first = withoutFirstDigit[0]
+    if (first && withoutFirstDigit.every(n => n === first)) {
+      return first
+    }
+  }
+
+  // Alternative pattern: look for longest common suffix
+  const longestCommonSuffix = findLongestCommonSuffix(numbers)
+  if (longestCommonSuffix && longestCommonSuffix.length >= 2) {
+    return longestCommonSuffix
+  }
+
+  return null
+}
+
+/**
+ * Find the longest common suffix among strings
+ */
+function findLongestCommonSuffix(strings: string[]): string {
+  if (strings.length === 0) return ''
+  if (strings.length === 1) return strings[0]
+
+  const reversed = strings.map(s => s.split('').reverse().join(''))
+  let commonPrefix = ''
+
+  for (let i = 0; i < reversed[0].length; i++) {
+    const char = reversed[0][i]
+    if (reversed.every(s => s[i] === char)) {
+      commonPrefix += char
+    } else {
+      break
+    }
+  }
+
+  return commonPrefix.split('').reverse().join('')
 }

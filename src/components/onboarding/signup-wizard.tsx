@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { Upload, FileText, X, Users, Building2, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
+import { Upload, FileText, X, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { TrailMarker } from '@/components/ui/trail-marker'
 import { FadeIn } from '@/components/ui/page-transition'
@@ -99,6 +99,7 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
       setUnitMetadata(result.unitMetadata)
       setRosterSummary(result.rosterSummary || null)
       setParsedRoster(result.roster)
+
       // Pre-populate editable form from CSV data
       setManualUnitInfo({
         unitType: result.unitMetadata.unitType || 'troop',

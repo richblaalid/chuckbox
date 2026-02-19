@@ -31,10 +31,33 @@ export {
   stageRosterMembers,
   getStagedMembers,
   updateStagedSelection,
+  updateFieldResolution,
   confirmStagedImport,
   cancelStaging,
 } from './import';
 export type { ImportResult, StagingResult, StagedMember } from './import';
+
+// Advancement import functions
+export {
+  stageRankRequirements,
+  stageMeritBadgeRequirements,
+  getStagedAdvancement,
+  updateStagedAdvancementSelection,
+  confirmAdvancementImport,
+} from './advancement-import';
+export type {
+  StagedAdvancement,
+  AdvancementStagingResult,
+  AdvancementImportResult,
+} from './advancement-import';
+
+// Requirement mapping
+export {
+  mapRankRequirements,
+  mapMeritBadgeRequirements,
+  normalizeRankCode,
+  normalizeBadgeCode,
+} from './requirement-mapper';
 
 // Browser client (for advanced usage)
 export {
@@ -60,6 +83,23 @@ export {
   isYouthProfilePage,
 } from './parsers/profile';
 
+// Advancement parsers (regex-based - used by extension sync)
+export {
+  parseRankDetailsFromSnapshot,
+  parseMeritBadgeDetailsFromSnapshot,
+} from './parsers/advancement';
+
+// AI-powered parsers (optional fallback - not used by default)
+export {
+  parseRankDetailsWithAI,
+  parseMeritBadgeDetailsWithAI,
+} from './parsers/advancement';
+export type {
+  MeritBadgeDetail,
+  MeritBadgeRequirement,
+  ScoutAdvancementData,
+} from './parsers/advancement';
+
 // Types
 export type {
   RosterMember,
@@ -78,6 +118,11 @@ export type {
   SyncProgressCallback,
   AgentBrowserSnapshot,
   SnapshotRef,
+  // Conflict resolution types
+  ConflictResolution,
+  FieldConflict,
+  ConflictReason,
+  ConflictField,
 } from './types';
 
-export { DEFAULT_SYNC_OPTIONS } from './types';
+export { DEFAULT_SYNC_OPTIONS, CONFLICT_FIELDS } from './types';

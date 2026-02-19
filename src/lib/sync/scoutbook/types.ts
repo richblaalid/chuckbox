@@ -186,3 +186,53 @@ export const DEFAULT_SYNC_OPTIONS: Required<Omit<SyncOptions, 'onProgress'>> = {
   loginTimeout: 120000, // 2 minutes
   rateLimitDelay: 1000, // 1 second
 };
+
+// ============================================================================
+// Conflict Resolution Types
+// ============================================================================
+
+/**
+ * Resolution strategy for a field conflict
+ * - 'chuckbox': Keep the existing Chuckbox value (default for conflicts)
+ * - 'scoutbook': Use the new Scoutbook value
+ */
+export type ConflictResolution = 'chuckbox' | 'scoutbook';
+
+/**
+ * Conflict detection criteria for sync operations
+ *
+ * A conflict occurs when we would NOT automatically apply the Scoutbook value:
+ * - rank: Scoutbook rank is lower than Chuckbox rank (would be a downgrade)
+ * - patrol: Scoutbook value is null but Chuckbox has a valid patrol
+ * - position/position_2: Scoutbook value is null but Chuckbox has a value
+ *
+ * By default, Chuckbox values "win" in conflicts. Users can override to use
+ * Scoutbook values per-field.
+ */
+export interface FieldConflict {
+  field: string;
+  chuckboxValue: string | null;
+  scoutbookValue: string | null;
+  reason: ConflictReason;
+  resolution: ConflictResolution;
+}
+
+/**
+ * Why Chuckbox would win for this field
+ */
+export type ConflictReason =
+  | 'rank_downgrade'       // Scoutbook rank is lower
+  | 'null_overwrite'       // Scoutbook value is null, Chuckbox has value
+  | 'user_modified';       // User has modified this field in Chuckbox (future)
+
+/**
+ * Fields that can have conflicts during sync
+ */
+export const CONFLICT_FIELDS = [
+  'rank',
+  'patrol',
+  'position',
+  'position_2',
+] as const;
+
+export type ConflictField = typeof CONFLICT_FIELDS[number];

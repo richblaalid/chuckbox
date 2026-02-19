@@ -3699,6 +3699,12 @@ export type Database = {
           girls_section_id: string
         }[]
       }
+      create_expense_journal_entry: {
+        Args: {
+          p_expense_id: string
+        }
+        Returns: Json
+      }
       credit_fundraising_to_scout: {
         Args: {
           p_amount: number

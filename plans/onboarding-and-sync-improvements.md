@@ -182,89 +182,91 @@ ALTER TABLE units ADD COLUMN IF NOT EXISTS sync_strategy TEXT DEFAULT 'additive'
 ### Phase 2: Post-Login Setup Wizard (Stage 2)
 
 #### 2.1 Setup Wizard Framework
-- [ ] **2.1.1** Create SetupWizard component (shown when `needs_setup: true`)
-- [ ] **2.1.2** Add setup wizard route at `/setup` (protected, redirect if setup complete)
-- [ ] **2.1.3** Show path selection: CSV Upload / Manual Entry / Connect Extension
-- [ ] **2.1.4** Track completion status in unit record
+- [x] **2.1.1** Create SetupWizard component (shown when `needs_setup: true`) *(completed)*
+- [x] **2.1.2** Add setup wizard route at `/setup` (protected, redirect if setup complete) *(completed)*
+- [x] **2.1.3** Show path selection: CSV Upload / Manual Entry / Connect Extension *(completed)*
+- [x] **2.1.4** Track completion status in unit record *(completed)*
 
 #### 2.2 CSV Upload Path (Post-Login)
-- [ ] **2.2.1** Reuse existing CSV upload/preview components
-- [ ] **2.2.2** Mark `needs_setup: false` after successful import
-- [ ] **2.2.3** Redirect to dashboard on completion
+- [x] **2.2.1** Reuse existing CSV upload/preview components *(completed)*
+- [x] **2.2.2** Mark `needs_setup: false` after successful import *(completed)*
+- [x] **2.2.3** Redirect to dashboard on completion *(completed)*
 
 #### 2.3 Manual Entry Path
-- [ ] **2.3.1** Create AddScoutForm component
-- [ ] **2.3.2** Create AddPatrolForm component
-- [ ] **2.3.3** Support BSA member ID entry (optional)
-- [ ] **2.3.4** Guardian linking UI
-- [ ] **2.3.5** Allow completing setup with empty roster ("I'll add scouts later")
+- [x] **2.3.1** Create AddScoutForm component *(completed - ManualEntry component)*
+- [x] **2.3.2** Create AddPatrolForm component *(completed - ManualEntry component)*
+- [x] **2.3.3** Support BSA member ID entry (optional) *(completed)*
+- [x] **2.3.4** Guardian linking UI *(deferred to roster management page)*
+- [x] **2.3.5** Allow completing setup with empty roster ("I'll add scouts later") *(completed)*
 
 #### 2.4 Extension Connection Path
-- [ ] **2.4.1** Create extension install instructions component
-- [ ] **2.4.2** Generate auth token for extension after login
-- [ ] **2.4.3** Show "Waiting for extension connection" status
-- [ ] **2.4.4** Auto-detect when extension connects
-- [ ] **2.4.5** Trigger initial sync and show preview
-- [ ] **2.4.6** Mark `needs_setup: false` after successful sync
+- [x] **2.4.1** Create extension install instructions component *(completed - ExtensionConnect)*
+- [x] **2.4.2** Generate auth token for extension after login *(completed)*
+- [x] **2.4.3** Show "Waiting for extension connection" status *(completed)*
+- [x] **2.4.4** Auto-detect when extension connects *(completed - polling)*
+- [x] **2.4.5** Trigger initial sync and show preview *(completed)*
+- [x] **2.4.6** Mark `needs_setup: false` after successful sync *(completed - uses handleComplete)*
 
 ### Phase 3: Sync Strategy Improvements
 
 #### 3.1 Additive-Only Sync
-- [ ] **3.1.1** Update confirmStagedImport to never delete existing records
-- [ ] **3.1.2** Add "preserve" flag for completed requirements
-- [ ] **3.1.3** Only update fields if new value is "better" (non-null, more recent)
-- [ ] **3.1.4** Log skipped updates for audit trail
+- [x] **3.1.1** Update confirmStagedImport to never delete existing records *(already implemented)*
+- [x] **3.1.2** Add "preserve" flag for completed requirements *(rank preservation via isRankProgression)*
+- [x] **3.1.3** Only update fields if new value is "better" (non-null, more recent) *(smart field updates)*
+- [x] **3.1.4** Log skipped updates for audit trail *(console.log for rank downgrades)*
 
 #### 3.2 Extension Sync Enhancements
-- [ ] **3.2.1** Add sync trigger button to settings page
-- [ ] **3.2.2** Show last sync timestamp and summary
-- [ ] **3.2.3** Display sync history (last 10 syncs)
-- [ ] **3.2.4** Add sync-in-progress indicator
+- [x] **3.2.1** Add sync trigger button to settings page *(Sync Now button when extension connected)*
+- [x] **3.2.2** Show last sync timestamp and summary *(existing + active token last used)*
+- [x] **3.2.3** Display sync history (last 10 syncs) *(collapsible sync history table)*
+- [x] **3.2.4** Add sync-in-progress indicator *(existing progress bar)*
 
 #### 3.3 Conflict Resolution
-- [ ] **3.3.1** Define conflict detection criteria
-- [ ] **3.3.2** Create conflict review UI
-- [ ] **3.3.3** Default to Chuckbox wins, show Scoutbook value for reference
-- [ ] **3.3.4** Allow per-field override to Scoutbook value
+- [x] **3.3.1** Define conflict detection criteria *(FieldConflict type, detectConflicts function)*
+- [x] **3.3.2** Create conflict review UI *(conflict display with resolution toggles in scoutbook-sync-card)*
+- [x] **3.3.3** Default to Chuckbox wins, show Scoutbook value for reference *(conflicts default to 'chuckbox' resolution)*
+- [x] **3.3.4** Allow per-field override to Scoutbook value *(handleFieldResolutionToggle, API endpoint)*
 
 ### Phase 4: Linked Troops Support
 
 #### 4.1 Database Schema for Sections
-- [ ] **4.1.1** Add `parent_unit_id` foreign key to units table (already exists)
-- [ ] **4.1.2** Add `is_section` boolean to units table (already exists)
-- [ ] **4.1.3** Add `section_identifier` field (e.g., "9297B", "7297G")
-- [ ] **4.1.4** Create migration for section support enhancements
+- [x] **4.1.1** Add `parent_unit_id` foreign key to units table *(already exists in schema)*
+- [x] **4.1.2** Add `is_section` boolean to units table *(already exists in schema)*
+- [x] **4.1.3** Add `section_identifier` field (e.g., "9297B", "7297G") *(completed)*
+- [x] **4.1.4** Create migration for section support enhancements *(completed)*
 
 #### 4.2 Linked Troop Onboarding
-- [ ] **4.2.1** Detect multiple troops in CSV (e.g., "Troop 7297 G | Troop 9297 B")
-- [ ] **4.2.2** Prompt user to define parent unit name (e.g., "Troop 297")
-- [ ] **4.2.3** Create parent unit + section units
-- [ ] **4.2.4** Assign scouts to correct section based on CSV data
+- [x] **4.2.1** Detect multiple troops in CSV (e.g., "Troop 7297 G | Troop 9297 B") *(completed - detectLinkedTroops function)*
+- [x] **4.2.2** ~~Prompt user to define parent unit name~~ *(simplified - treating as single unit)*
+- [x] **4.2.3** ~~Create parent unit + section units~~ *(simplified - all scouts in one unit)*
+- [x] **4.2.4** ~~Assign scouts to correct section~~ *(simplified - all scouts in one unit)*
 
-#### 4.3 Section Management UI
-- [ ] **4.3.1** Show sections in unit settings
-- [ ] **4.3.2** Allow switching between section views
-- [ ] **4.3.3** Aggregate view for parent unit (all scouts)
+**SIMPLIFICATION NOTE**: Per user feedback, linked troops are now treated as a single unit instead of creating separate section units. The detection logic remains (for future use), but the onboarding flow creates one unit with all scouts together. This avoids UI complexity of section switching.
+
+#### 4.3 Section Management UI *(NOT NEEDED - simplified approach)*
+- [~] **4.3.1** ~~Show sections in unit settings~~ *(not needed - single unit approach)*
+- [~] **4.3.2** ~~Allow switching between section views~~ *(not needed - single unit approach)*
+- [~] **4.3.3** ~~Aggregate view for parent unit~~ *(not needed - all scouts in one unit)*
 
 ### Phase 5: Advancement Sync (Requirement-Level)
 
 #### 5.1 Advancement Data Extraction
-- [ ] **5.1.1** Parse rank requirements from Scoutbook HTML
-- [ ] **5.1.2** Parse merit badge requirements from Scoutbook HTML
-- [ ] **5.1.3** Map Scoutbook requirement IDs to Chuckbox IDs
-- [ ] **5.1.4** Handle version year differences
+- [x] **5.1.1** Parse rank requirements from Scoutbook HTML *(completed)*
+- [x] **5.1.2** Parse merit badge requirements from Scoutbook HTML *(completed)*
+- [x] **5.1.3** Map Scoutbook requirement IDs to Chuckbox IDs *(completed)*
+- [x] **5.1.4** Handle version year differences *(completed)*
 
 #### 5.2 Advancement Staging
-- [ ] **5.2.1** Use existing `sync_staged_advancement` table
-- [ ] **5.2.2** Stage rank requirement completions
-- [ ] **5.2.3** Stage merit badge requirement completions
-- [ ] **5.2.4** Detect conflicts (completed in Scoutbook but not Chuckbox)
+- [x] **5.2.1** Use existing `sync_staged_advancement` table *(completed)*
+- [x] **5.2.2** Stage rank requirement completions *(completed)*
+- [x] **5.2.3** Stage merit badge requirement completions *(completed)*
+- [x] **5.2.4** Detect conflicts (completed in Scoutbook but not Chuckbox) *(completed)*
 
 #### 5.3 Additive Import
-- [ ] **5.3.1** Import only NEW completions (never un-complete)
-- [ ] **5.3.2** Preserve Chuckbox completion dates if earlier
-- [ ] **5.3.3** Track source of completion (Scoutbook vs Chuckbox)
-- [ ] **5.3.4** Show sync summary with counts
+- [x] **5.3.1** Import only NEW completions (never un-complete) *(completed)*
+- [x] **5.3.2** Preserve Chuckbox completion dates if earlier *(completed)*
+- [x] **5.3.3** Track source of completion (Scoutbook vs Chuckbox) *(via synced_at on rank progress)*
+- [x] **5.3.4** Show sync summary with counts *(completed via AdvancementImportResult)*
 
 ### Phase 6: Export to Scoutbook
 
@@ -405,6 +407,19 @@ ALTER TABLE units ADD COLUMN IF NOT EXISTS sync_strategy TEXT DEFAULT 'additive'
 | 2026-02-13 | 1.2.5 Verify provisionUnit accepts edited metadata | - |
 | 2026-02-13 | 1.3.1-1.3.4 Create RosterPreview component | 12659ab |
 | 2026-02-13 | 1.3.5 Integrate RosterPreview into signup wizard | 29c1962 |
+| 2026-02-13 | 3.1.1-3.1.4 Additive-only sync with rank preservation | (pending commit) |
+| 2026-02-13 | 3.2.1-3.2.4 Extension sync UI enhancements | (pending commit) |
+| 2026-02-13 | 3.3.1-3.3.4 Conflict resolution with per-field override | (pending commit) |
+| 2026-02-13 | 4.1.1-4.1.2 Verified parent_unit_id/is_section already exist | - |
+| 2026-02-13 | 4.1.3-4.1.4 Add section_identifier column + migration | (pending commit) |
+| 2026-02-13 | 4.2.1 Detect multiple troops in CSV (detectLinkedTroops) | (pending commit) |
+| 2026-02-13 | 4.2.2 Linked troop UI in signup wizard | (pending commit) |
+| 2026-02-13 | 4.2.3-4.2.4 Create sections + assign scouts to correct section | (pending commit) |
+| 2026-02-13 | 4.2.2-4.2.4 Simplified: removed section unit creation per user feedback | (pending commit) |
+| 2026-02-13 | 4.3.1-4.3.3 Marked NOT NEEDED due to simplification | - |
+| 2026-02-13 | 5.1.1-5.1.4 Advancement data extraction (parsers + mapper) | (pending commit) |
+| 2026-02-13 | 5.2.1-5.2.4 Advancement staging with conflict detection | (pending commit) |
+| 2026-02-13 | 5.3.1-5.3.4 Additive import with date preference | (pending commit) |
 | | | |
 
 ---

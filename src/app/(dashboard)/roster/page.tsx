@@ -1,8 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { AccessDenied } from '@/components/ui/access-denied'
-import { canAccessPage, canPerformAction } from '@/lib/roles'
+import { canAccessPage, canPerformAction, hasFilteredView } from '@/lib/roles'
 import { RosterTabs } from '@/components/roster/roster-tabs'
+import Link from 'next/link'
+import { Receipt } from 'lucide-react'
 
 export default async function RosterPage() {
   const supabase = await createClient()
@@ -204,11 +207,21 @@ export default async function RosterPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-stone-900 dark:text-stone-100">Roster</h1>
-        <p className="mt-1 text-stone-600 dark:text-stone-300">
-          {isParent ? 'Your linked scouts' : 'Manage your unit\'s roster'}
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-stone-900 dark:text-stone-100">Roster</h1>
+          <p className="mt-1 text-stone-600 dark:text-stone-300">
+            {isParent ? 'Your linked scouts' : 'Manage your unit\'s roster'}
+          </p>
+        </div>
+        {hasFilteredView(membership.role) && (
+          <Button asChild variant="outline" className="gap-2">
+            <Link href="/expenses/new">
+              <Receipt className="h-4 w-4" />
+              Submit Expense
+            </Link>
+          </Button>
+        )}
       </div>
 
       <Card>

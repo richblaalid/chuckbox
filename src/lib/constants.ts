@@ -37,6 +37,58 @@ export const SCOUT_RANKS = [
 export type ScoutRank = typeof SCOUT_RANKS[number]
 
 /**
+ * Get the numeric index of a rank (higher = more advanced)
+ * Returns -1 for unknown ranks
+ */
+export function getRankIndex(rank: string | null | undefined): number {
+  if (!rank) return -1
+  const index = SCOUT_RANKS.findIndex(
+    (r) => r.toLowerCase() === rank.toLowerCase()
+  )
+  return index
+}
+
+/**
+ * Check if newRank is higher than oldRank in the progression
+ * Returns true if newRank is a progression from oldRank
+ * Returns false if newRank is lower, equal, or unknown
+ */
+export function isRankProgression(
+  oldRank: string | null | undefined,
+  newRank: string | null | undefined
+): boolean {
+  const oldIndex = getRankIndex(oldRank)
+  const newIndex = getRankIndex(newRank)
+
+  // If new rank is unknown, don't treat it as progression
+  if (newIndex === -1) return false
+
+  // If old rank is unknown, any valid new rank is acceptable
+  if (oldIndex === -1) return newIndex >= 0
+
+  // Only return true if new rank is strictly higher
+  return newIndex > oldIndex
+}
+
+/**
+ * Get the higher of two ranks (for merge operations)
+ * Returns the rank that is further along in progression
+ */
+export function getHigherRank(
+  rank1: string | null | undefined,
+  rank2: string | null | undefined
+): string | null {
+  const index1 = getRankIndex(rank1)
+  const index2 = getRankIndex(rank2)
+
+  if (index1 === -1 && index2 === -1) return null
+  if (index1 === -1) return rank2 || null
+  if (index2 === -1) return rank1 || null
+
+  return index1 >= index2 ? rank1! : rank2!
+}
+
+/**
  * Payment methods for manual payment entry
  */
 export const PAYMENT_METHODS = [

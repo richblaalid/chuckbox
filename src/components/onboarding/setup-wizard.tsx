@@ -8,6 +8,10 @@ import { FadeIn } from '@/components/ui/page-transition'
 import { Button } from '@/components/ui/button'
 import { completeSetupWizard } from '@/app/actions/onboarding'
 import { Users, Building2, ArrowRight, Loader2, CheckCircle, Upload, UserPlus, Puzzle } from 'lucide-react'
+import { CSVUploader } from './csv-uploader'
+import { ManualEntry } from './manual-entry'
+import { ExtensionConnect } from './extension-connect'
+import type { ParsedRoster } from '@/lib/import/bsa-roster-parser'
 
 // Steps for units that already have roster (CSV uploaded during signup)
 const STEPS_WITH_ROSTER = [
@@ -52,6 +56,9 @@ export function SetupWizard({
   const [isCompleting, setIsCompleting] = useState(false)
   const [showCelebration, setShowCelebration] = useState(false)
   const [selectedPath, setSelectedPath] = useState<SetupPath>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
+  const [parsedRoster, setParsedRoster] = useState<ParsedRoster | null>(null)
 
   // Determine which flow to show:
   // - If needsSetup is true and no roster: show path selection
@@ -72,6 +79,42 @@ export function SetupWizard({
 
   const handleGoToDashboard = () => {
     router.push('/dashboard')
+  }
+
+  const handleRosterParsed = (roster: ParsedRoster) => {
+    setParsedRoster(roster)
+    setImportError(null)
+  }
+
+  const handleRosterImport = async (roster: ParsedRoster) => {
+    setIsImporting(true)
+    setImportError(null)
+
+    try {
+      const response = await fetch('/api/import/roster', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adults: roster.adults,
+          scouts: roster.scouts,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        const errorMessage = result.errors?.join(', ') || 'Import failed'
+        setImportError(errorMessage)
+        setIsImporting(false)
+        return
+      }
+
+      // Import succeeded - complete the wizard
+      await handleComplete()
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Import failed')
+      setIsImporting(false)
+    }
   }
 
   // ============================================
@@ -202,120 +245,52 @@ export function SetupWizard({
             </p>
           </div>
 
-          <div className="bg-stone-50 dark:bg-stone-800 rounded-lg p-6 text-center">
-            <p className="text-stone-500 dark:text-stone-400">
-              CSV upload component will be integrated here.
-            </p>
-            <p className="text-sm text-stone-400 dark:text-stone-500 mt-2">
-              (Task 2.2.1 - Reuse existing CSV upload/preview components)
-            </p>
-          </div>
+          {importError && (
+            <div className="rounded-lg bg-error-light dark:bg-error/10 border border-error/20 p-4">
+              <p className="text-sm text-error-dark dark:text-error">{importError}</p>
+            </div>
+          )}
 
-          <div className="flex justify-between items-center pt-4">
-            <Button variant="outline" onClick={() => { setSelectedPath(null); setCurrentStep(0) }}>
-              Back
-            </Button>
-            <Button onClick={handleComplete} disabled={isCompleting} size="lg">
-              {isCompleting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Completing...
-                </>
-              ) : (
-                <>
-                  Complete Setup
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </>
-              )}
-            </Button>
-          </div>
+          <CSVUploader
+            onParsed={handleRosterParsed}
+            onImport={handleRosterImport}
+            onCancel={() => {
+              setParsedRoster(null)
+              setImportError(null)
+            }}
+            importing={isImporting}
+          />
+
+          {!parsedRoster && (
+            <div className="flex justify-start pt-4">
+              <Button variant="outline" onClick={() => { setSelectedPath(null); setCurrentStep(0) }}>
+                Back
+              </Button>
+            </div>
+          )}
         </FadeIn>
       )
     }
 
     if (selectedPath === 'manual') {
       return (
-        <FadeIn className="space-y-6">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-forest-800 dark:text-forest-200 mb-2">
-              Add Your Roster
-            </h2>
-            <p className="text-stone-600 dark:text-stone-300">
-              You can add scouts and adults now, or skip and add them later from the Roster page.
-            </p>
-          </div>
-
-          <div className="bg-stone-50 dark:bg-stone-800 rounded-lg p-6 text-center">
-            <p className="text-stone-500 dark:text-stone-400">
-              Manual entry forms will be integrated here.
-            </p>
-            <p className="text-sm text-stone-400 dark:text-stone-500 mt-2">
-              (Tasks 2.3.1-2.3.5 - Create AddScoutForm, AddPatrolForm, etc.)
-            </p>
-          </div>
-
-          <div className="flex justify-between items-center pt-4">
-            <Button variant="outline" onClick={() => { setSelectedPath(null); setCurrentStep(0) }}>
-              Back
-            </Button>
-            <Button onClick={handleComplete} disabled={isCompleting} size="lg">
-              {isCompleting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Completing...
-                </>
-              ) : (
-                <>
-                  Complete Setup
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </>
-              )}
-            </Button>
-          </div>
-        </FadeIn>
+        <ManualEntry
+          unitId={unitId}
+          onComplete={handleComplete}
+          onBack={() => { setSelectedPath(null); setCurrentStep(0) }}
+          isCompleting={isCompleting}
+        />
       )
     }
 
     if (selectedPath === 'extension') {
       return (
-        <FadeIn className="space-y-6">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-forest-800 dark:text-forest-200 mb-2">
-              Connect Browser Extension
-            </h2>
-            <p className="text-stone-600 dark:text-stone-300">
-              Install our Chrome extension to sync data directly from Scoutbook.
-            </p>
-          </div>
-
-          <div className="bg-stone-50 dark:bg-stone-800 rounded-lg p-6 text-center">
-            <p className="text-stone-500 dark:text-stone-400">
-              Extension installation and sync UI will be integrated here.
-            </p>
-            <p className="text-sm text-stone-400 dark:text-stone-500 mt-2">
-              (Tasks 2.4.1-2.4.6 - Extension connection flow)
-            </p>
-          </div>
-
-          <div className="flex justify-between items-center pt-4">
-            <Button variant="outline" onClick={() => { setSelectedPath(null); setCurrentStep(0) }}>
-              Back
-            </Button>
-            <Button onClick={handleComplete} disabled={isCompleting} size="lg">
-              {isCompleting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Completing...
-                </>
-              ) : (
-                <>
-                  Complete Setup
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </>
-              )}
-            </Button>
-          </div>
-        </FadeIn>
+        <ExtensionConnect
+          unitId={unitId}
+          onComplete={handleComplete}
+          onBack={() => { setSelectedPath(null); setCurrentStep(0) }}
+          isCompleting={isCompleting}
+        />
       )
     }
 

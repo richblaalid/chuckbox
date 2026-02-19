@@ -295,24 +295,18 @@ export async function provisionUnit(input: ProvisionUnitInput, ipAddress: string
     // Set needs_setup=true for manual path (no CSV uploaded)
     const needsSetup = input.signupPath === 'manual'
 
-    // Build insert data - needs_setup column added by migration 20260213000001
-    const unitInsertData = {
-      name: unitName,
-      unit_number: unitMetadata.unitNumber,
-      unit_type: unitMetadata.unitType,
-      council: unitMetadata.council,
-      district: unitMetadata.district,
-    }
-    // Add needs_setup and signup_path fields (columns may not be in generated types yet)
-    const unitInsertWithExtras = {
-      ...unitInsertData,
-      needs_setup: needsSetup,
-      signup_path: input.signupPath || 'csv',
-    }
-
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: unit, error: unitError } = await adminSupabase
       .from('units')
-      .insert(unitInsertWithExtras as typeof unitInsertData)
+      .insert({
+        name: unitName,
+        unit_number: unitMetadata.unitNumber,
+        unit_type: unitMetadata.unitType,
+        council: unitMetadata.council,
+        district: unitMetadata.district,
+        needs_setup: needsSetup,
+        signup_path: input.signupPath || 'csv',
+      } as any)
       .select('id')
       .single()
 
@@ -383,12 +377,13 @@ export async function provisionUnit(input: ProvisionUnitInput, ipAddress: string
     }
 
     // 5. Stage the roster data for later import
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: stageError } = await adminSupabase.from('staged_roster_imports').insert({
       provisioning_token_id: provisioningToken.id,
       parsed_adults: parsedAdults as unknown as Json,
       parsed_scouts: parsedScouts as unknown as Json,
       unit_metadata: unitMetadata as unknown as Json,
-    })
+    } as any)
 
     if (stageError) {
       console.error('Error staging roster data:', stageError)
@@ -730,6 +725,7 @@ async function importRosterData(
       let scoutId: string | null = null
 
       if (scout.bsaMemberId) {
+        // Check for existing scout by BSA member ID
         const { data: existingScout } = await adminSupabase
           .from('scouts')
           .select('id')
@@ -793,10 +789,10 @@ async function importRosterData(
           scoutId = newScout.id
           scoutsImported++
 
-          // Create scout account
+          // Create scout account (always in parent unit for billing)
           await adminSupabase.from('scout_accounts').insert({
             scout_id: scoutId,
-            unit_id: unitId,
+            unit_id: unitId, // Parent unit for billing purposes
             billing_balance: 0,
             funds_balance: 0,
           })

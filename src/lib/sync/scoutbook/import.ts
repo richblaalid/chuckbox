@@ -7,7 +7,8 @@
 
 import { SupabaseClient } from '@supabase/supabase-js'
 import { Database } from '@/types/database'
-import { RosterMember } from './types'
+import { RosterMember, FieldConflict, ConflictResolution } from './types'
+import { isRankProgression, getHigherRank } from '@/lib/constants'
 
 /**
  * Determine if a member is active based on their BSA renewal status.
@@ -69,6 +70,79 @@ export interface StagedMember {
   existingProfileId: string | null
   matchedProfileId: string | null
   matchType: 'bsa_id' | 'name_exact' | 'name_fuzzy' | 'none' | null
+  // Conflict resolution fields
+  conflicts: FieldConflict[] | null
+  fieldResolutions: Record<string, ConflictResolution> | null
+}
+
+/**
+ * Detect conflicts between existing Chuckbox data and incoming Scoutbook data
+ * Returns conflicts where Chuckbox would "win" by default
+ */
+function detectConflicts(
+  existing: {
+    rank?: string | null
+    patrol_id?: string | null
+    current_position?: string | null
+    current_position_2?: string | null
+  },
+  incoming: {
+    rank: string | null
+    patrol: string | null
+    position: string | null
+    position_2: string | null
+  }
+): FieldConflict[] {
+  const conflicts: FieldConflict[] = []
+
+  // Rank conflict: Scoutbook rank would be a downgrade
+  if (existing.rank && incoming.rank && existing.rank !== incoming.rank) {
+    if (!isRankProgression(existing.rank, incoming.rank)) {
+      conflicts.push({
+        field: 'rank',
+        chuckboxValue: existing.rank,
+        scoutbookValue: incoming.rank,
+        reason: 'rank_downgrade',
+        resolution: 'chuckbox',
+      })
+    }
+  }
+
+  // Patrol conflict: Scoutbook value is null but Chuckbox has a patrol
+  // Note: We compare against incoming patrol string, not the resolved patrol_id
+  if (existing.patrol_id && (incoming.patrol === null || incoming.patrol === 'unassigned')) {
+    conflicts.push({
+      field: 'patrol',
+      chuckboxValue: '(existing patrol)',
+      scoutbookValue: incoming.patrol || '(empty)',
+      reason: 'null_overwrite',
+      resolution: 'chuckbox',
+    })
+  }
+
+  // Position conflict: Scoutbook value is null but Chuckbox has a position
+  if (existing.current_position && incoming.position === null) {
+    conflicts.push({
+      field: 'position',
+      chuckboxValue: existing.current_position,
+      scoutbookValue: incoming.position,
+      reason: 'null_overwrite',
+      resolution: 'chuckbox',
+    })
+  }
+
+  // Position 2 conflict: Scoutbook value is null but Chuckbox has a position
+  if (existing.current_position_2 && incoming.position_2 === null) {
+    conflicts.push({
+      field: 'position_2',
+      chuckboxValue: existing.current_position_2,
+      scoutbookValue: incoming.position_2,
+      reason: 'null_overwrite',
+      resolution: 'chuckbox',
+    })
+  }
+
+  return conflicts
 }
 
 /**
@@ -396,6 +470,22 @@ export async function stageRosterMembers(
 
       const hasChanges = Object.keys(changes).length > 0
 
+      // Detect conflicts (fields where Chuckbox would "win" by default)
+      const conflicts = hasChanges
+        ? detectConflicts(existingScout, {
+            rank: member.lastRankApproved,
+            patrol: member.patrol,
+            position: member.position,
+            position_2: member.position2,
+          })
+        : []
+
+      // Build default field resolutions (all conflicts default to 'chuckbox')
+      const fieldResolutions: Record<string, ConflictResolution> = {}
+      for (const conflict of conflicts) {
+        fieldResolutions[conflict.field] = 'chuckbox'
+      }
+
       stagedRows.push({
         session_id: sessionId,
         unit_id: unitId,
@@ -419,7 +509,9 @@ export async function stageRosterMembers(
         changes: hasChanges ? changes : null,
         skip_reason: hasChanges ? null : 'no_changes',
         is_selected: hasChanges, // Auto-select updates
-      })
+        conflicts: conflicts.length > 0 ? conflicts : null,
+        field_resolutions: Object.keys(fieldResolutions).length > 0 ? fieldResolutions : null,
+      } as Database['public']['Tables']['sync_staged_members']['Insert'])
 
       if (hasChanges) {
         toUpdate++
@@ -523,6 +615,9 @@ export async function getStagedMembers(
     existingProfileId: row.existing_profile_id,
     matchedProfileId: row.matched_profile_id,
     matchType: row.match_type as 'bsa_id' | 'name_exact' | 'name_fuzzy' | 'none' | null,
+    // Conflict resolution fields
+    conflicts: (row as unknown as { conflicts: FieldConflict[] | null }).conflicts ?? null,
+    fieldResolutions: (row as unknown as { field_resolutions: Record<string, ConflictResolution> | null }).field_resolutions ?? null,
   }))
 }
 
@@ -544,6 +639,44 @@ export async function updateStagedSelection(
     if (error) {
       throw new Error(`Failed to update selection: ${error.message}`)
     }
+  }
+}
+
+/**
+ * Update field resolution for a staged member
+ * Allows user to override "chuckbox wins" default for specific fields
+ */
+export async function updateFieldResolution(
+  supabase: SupabaseClient<Database>,
+  sessionId: string,
+  memberId: string,
+  field: string,
+  resolution: ConflictResolution
+): Promise<void> {
+  // Get current resolutions
+  const { data: member, error: fetchError } = await supabase
+    .from('sync_staged_members')
+    .select('field_resolutions')
+    .eq('id', memberId)
+    .eq('session_id', sessionId)
+    .single()
+
+  if (fetchError) {
+    throw new Error(`Failed to fetch member: ${fetchError.message}`)
+  }
+
+  // Update the resolution for this field
+  const currentResolutions = (member as unknown as { field_resolutions: Record<string, ConflictResolution> | null }).field_resolutions || {}
+  const newResolutions = { ...currentResolutions, [field]: resolution }
+
+  const { error: updateError } = await supabase
+    .from('sync_staged_members')
+    .update({ field_resolutions: newResolutions } as unknown as Database['public']['Tables']['sync_staged_members']['Update'])
+    .eq('id', memberId)
+    .eq('session_id', sessionId)
+
+  if (updateError) {
+    throw new Error(`Failed to update field resolution: ${updateError.message}`)
   }
 }
 
@@ -632,20 +765,80 @@ export async function confirmStagedImport(
         result.created++
       }
     } else if (member.change_type === 'update' && member.existing_scout_id) {
+      // Fetch current scout data to make smart update decisions
+      const { data: currentScout } = await supabase
+        .from('scouts')
+        .select('rank, patrol_id, current_position, current_position_2')
+        .eq('id', member.existing_scout_id)
+        .single()
+
+      // Get field resolutions (user overrides for conflict resolution)
+      const fieldResolutions = (member as unknown as { field_resolutions: Record<string, ConflictResolution> | null }).field_resolutions || {}
+
+      // Helper to check if user wants to use Scoutbook value for a field
+      const useScoutbookValue = (field: string): boolean => {
+        return fieldResolutions[field] === 'scoutbook'
+      }
+
+      // Build update object with smart field preservation
+      // Rule: Only update if new value is "better" (non-null, or progression for rank)
+      // Exception: If user explicitly chose 'scoutbook' resolution, apply Scoutbook value
+      const updateData: Record<string, unknown> = {
+        // Always update name fields (these come from official Scoutbook data)
+        first_name: member.first_name,
+        last_name: member.last_name,
+        // Always update renewal/expiration (status info from Scoutbook)
+        renewal_status: member.renewal_status,
+        expiration_date: member.expiration_date,
+        is_active: isRenewalStatusActive(member.renewal_status),
+        updated_at: new Date().toISOString(),
+      }
+
+      // Rank: Only update if it's a progression (never downgrade) - unless user overrode
+      const currentRank = currentScout?.rank
+      if (useScoutbookValue('rank')) {
+        // User explicitly chose to use Scoutbook rank (even if downgrade)
+        updateData.rank = member.rank
+        console.log(
+          `[Sync] User override: applying rank "${member.rank}" for ${member.full_name} ` +
+          `(was "${currentRank}")`
+        )
+      } else if (isRankProgression(currentRank, member.rank)) {
+        updateData.rank = member.rank
+      } else if (member.rank && currentRank !== member.rank) {
+        // Log skipped rank downgrade for audit trail
+        console.log(
+          `[Sync] Skipping rank downgrade for ${member.full_name}: ` +
+          `keeping "${currentRank}" (Scoutbook has "${member.rank}")`
+        )
+      }
+
+      // Patrol: Only update if new value is non-null (don't clear existing patrol) - unless user overrode
+      if (useScoutbookValue('patrol')) {
+        // User explicitly chose to use Scoutbook patrol (even if null)
+        updateData.patrol_id = patrolId // May be null
+      } else if (patrolId !== null) {
+        updateData.patrol_id = patrolId
+      }
+
+      // Position: Only update if new value is non-null (preserve existing) - unless user overrode
+      if (useScoutbookValue('position')) {
+        // User explicitly chose to use Scoutbook position (even if null)
+        updateData.current_position = member.position // May be null
+      } else if (member.position !== null) {
+        updateData.current_position = member.position
+      }
+
+      if (useScoutbookValue('position_2')) {
+        // User explicitly chose to use Scoutbook position_2 (even if null)
+        updateData.current_position_2 = member.position_2 // May be null
+      } else if (member.position_2 !== null) {
+        updateData.current_position_2 = member.position_2
+      }
+
       const { error: updateError } = await supabase
         .from('scouts')
-        .update({
-          first_name: member.first_name,
-          last_name: member.last_name,
-          rank: member.rank,
-          patrol_id: patrolId,
-          current_position: member.position,
-          current_position_2: member.position_2,
-          renewal_status: member.renewal_status,
-          expiration_date: member.expiration_date,
-          is_active: isRenewalStatusActive(member.renewal_status),
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', member.existing_scout_id)
 
       if (updateError) {

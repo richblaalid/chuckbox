@@ -29,7 +29,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
-import { SyncProgress } from '@/lib/sync/scoutbook/types'
+import { SyncProgress, FieldConflict, ConflictResolution } from '@/lib/sync/scoutbook/types'
 import { StagedMember } from '@/lib/sync/scoutbook'
 
 interface SyncResultDisplay {
@@ -96,16 +96,132 @@ export function ScoutbookSyncCard({
   const [tokenExpiresAt, setTokenExpiresAt] = useState<string | null>(null)
   const [isGeneratingToken, setIsGeneratingToken] = useState(false)
   const [tokenCopied, setTokenCopied] = useState(false)
+  const [activeTokens, setActiveTokens] = useState<Array<{
+    id: string
+    expiresAt: string
+    lastUsedAt: string | null
+  }>>([])
+
+  // Sync history state
+  const [syncHistory, setSyncHistory] = useState<Array<{
+    id: string
+    status: string
+    syncSource: string | null
+    recordsExtracted: number | null
+    completedAt: string | null
+    startedAt: string | null
+  }>>([])
+  const [showSyncHistory, setShowSyncHistory] = useState(false)
 
   // Selection state for partial acceptance
   const [selectedScoutIds, setSelectedScoutIds] = useState<Set<string>>(new Set())
   const [selectedAdultIds, setSelectedAdultIds] = useState<Set<string>>(new Set())
 
-  // Check CLI status and pending syncs on mount
+  // Track field resolution updates (optimistic UI)
+  const [fieldResolutionUpdates, setFieldResolutionUpdates] = useState<
+    Record<string, Record<string, ConflictResolution>>
+  >({})
+
+  // Handler to toggle field resolution
+  async function handleFieldResolutionToggle(
+    memberId: string,
+    field: string,
+    newResolution: ConflictResolution
+  ) {
+    if (!sessionId) return
+
+    // Optimistic update
+    setFieldResolutionUpdates((prev) => ({
+      ...prev,
+      [memberId]: {
+        ...(prev[memberId] || {}),
+        [field]: newResolution,
+      },
+    }))
+
+    try {
+      const response = await fetch('/api/scoutbook/sync/resolution', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          memberId,
+          field,
+          resolution: newResolution,
+        }),
+      })
+
+      if (!response.ok) {
+        // Revert on error
+        setFieldResolutionUpdates((prev) => {
+          const updated = { ...prev }
+          if (updated[memberId]) {
+            delete updated[memberId][field]
+            if (Object.keys(updated[memberId]).length === 0) {
+              delete updated[memberId]
+            }
+          }
+          return updated
+        })
+        const data = await response.json()
+        setError(data.error || 'Failed to update resolution')
+      }
+    } catch {
+      // Revert on error
+      setFieldResolutionUpdates((prev) => {
+        const updated = { ...prev }
+        if (updated[memberId]) {
+          delete updated[memberId][field]
+        }
+        return updated
+      })
+    }
+  }
+
+  // Get effective resolution for a field (considers optimistic updates)
+  function getEffectiveResolution(
+    member: StagedMember,
+    field: string
+  ): ConflictResolution {
+    // Check optimistic updates first
+    if (fieldResolutionUpdates[member.id]?.[field]) {
+      return fieldResolutionUpdates[member.id][field]
+    }
+    // Fall back to stored value
+    return member.fieldResolutions?.[field] || 'chuckbox'
+  }
+
+  // Check CLI status, pending syncs, active tokens, and sync history on mount
   useEffect(() => {
     checkCliStatus()
     checkPendingSync()
+    fetchActiveTokens()
+    fetchSyncHistory()
   }, [])
+
+  async function fetchActiveTokens() {
+    try {
+      const response = await fetch('/api/scoutbook/extension-auth')
+      const data = await response.json()
+      if (data.tokens) {
+        setActiveTokens(data.tokens)
+      }
+    } catch {
+      // Ignore errors - just means no tokens
+    }
+  }
+
+  async function fetchSyncHistory() {
+    try {
+      const response = await fetch('/api/scoutbook/sync/history')
+      const data = await response.json()
+      if (data.history) {
+        setSyncHistory(data.history)
+      }
+    } catch {
+      // Ignore errors - just means no history
+    }
+  }
 
   // Initialize selections when staging data loads
   useEffect(() => {
@@ -801,15 +917,70 @@ export function ScoutbookSyncCard({
                                   </div>
                                 )}
                                 {member.changeType === 'update' && member.changes && (
-                                  <div className="space-y-0.5">
-                                    {Object.entries(member.changes).map(([field, change]) => (
-                                      <div key={field} className="flex gap-1">
-                                        <span className="font-medium text-stone-600 dark:text-stone-300">{field}:</span>
-                                        <span className="text-stone-400">{change.old || '(empty)'}</span>
-                                        <span className="text-stone-400 dark:text-stone-500">&rarr;</span>
-                                        <span className="text-stone-700 dark:text-stone-200">{change.new || '(empty)'}</span>
-                                      </div>
-                                    ))}
+                                  <div className="space-y-1">
+                                    {Object.entries(member.changes).map(([field, change]) => {
+                                      // Check if this field has a conflict
+                                      const conflict = member.conflicts?.find((c) => c.field === field)
+                                      const resolution = getEffectiveResolution(member, field)
+                                      const isConflict = !!conflict
+                                      const willUseChuckbox = isConflict && resolution === 'chuckbox'
+
+                                      return (
+                                        <div key={field} className={`flex items-start gap-1 ${isConflict ? 'bg-warning-light/50 rounded px-1 py-0.5 -mx-1' : ''}`}>
+                                          <span className="font-medium text-stone-600 dark:text-stone-300 shrink-0">{field}:</span>
+                                          {isConflict ? (
+                                            // Conflict display with toggle
+                                            <div className="flex flex-col gap-0.5">
+                                              <div className="flex items-center gap-1 flex-wrap">
+                                                <span
+                                                  className={`${
+                                                    willUseChuckbox
+                                                      ? 'text-stone-700 dark:text-stone-200 font-medium'
+                                                      : 'text-stone-400 line-through'
+                                                  }`}
+                                                  title="Current Chuckbox value"
+                                                >
+                                                  {change.old || '(empty)'}
+                                                </span>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleFieldResolutionToggle(
+                                                    member.id,
+                                                    field,
+                                                    resolution === 'chuckbox' ? 'scoutbook' : 'chuckbox'
+                                                  )}
+                                                  className="px-1 py-0.5 text-[10px] font-medium rounded bg-warning text-white hover:bg-warning-dark transition-colors"
+                                                  title={`Click to use ${resolution === 'chuckbox' ? 'Scoutbook' : 'Chuckbox'} value`}
+                                                >
+                                                  {willUseChuckbox ? 'Keep' : 'Use'}
+                                                </button>
+                                                <span
+                                                  className={`${
+                                                    !willUseChuckbox
+                                                      ? 'text-stone-700 dark:text-stone-200 font-medium'
+                                                      : 'text-stone-400 line-through'
+                                                  }`}
+                                                  title="Scoutbook value"
+                                                >
+                                                  {change.new || '(empty)'}
+                                                </span>
+                                              </div>
+                                              <span className="text-[10px] text-warning-dark">
+                                                {conflict.reason === 'rank_downgrade' && '⚠️ Rank downgrade prevented'}
+                                                {conflict.reason === 'null_overwrite' && '⚠️ Empty value blocked'}
+                                              </span>
+                                            </div>
+                                          ) : (
+                                            // Normal change display (no conflict)
+                                            <>
+                                              <span className="text-stone-400">{change.old || '(empty)'}</span>
+                                              <span className="text-stone-400 dark:text-stone-500">&rarr;</span>
+                                              <span className="text-stone-700 dark:text-stone-200">{change.new || '(empty)'}</span>
+                                            </>
+                                          )}
+                                        </div>
+                                      )
+                                    })}
                                   </div>
                                 )}
                                 {member.changeType === 'update' && (!member.changes || Object.keys(member.changes).length === 0) && (
@@ -1140,6 +1311,71 @@ export function ScoutbookSyncCard({
           </div>
         )}
 
+        {/* Sync History */}
+        {!hasStaging && syncHistory.length > 0 && (
+          <div className="mt-4">
+            <button
+              onClick={() => setShowSyncHistory(!showSyncHistory)}
+              className="flex items-center gap-2 text-xs text-stone-500 hover:text-stone-700"
+            >
+              <svg
+                className={`h-4 w-4 transition-transform ${showSyncHistory ? 'rotate-90' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+              Sync History ({syncHistory.length} recent syncs)
+            </button>
+            {showSyncHistory && (
+              <div className="mt-2 rounded-md border border-stone-200 overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-stone-50 dark:bg-stone-900">
+                    <tr>
+                      <th className="text-left p-2 font-medium text-stone-600 dark:text-stone-300">Date</th>
+                      <th className="text-left p-2 font-medium text-stone-600 dark:text-stone-300">Source</th>
+                      <th className="text-left p-2 font-medium text-stone-600 dark:text-stone-300">Members</th>
+                      <th className="text-left p-2 font-medium text-stone-600 dark:text-stone-300">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {syncHistory.map((sync) => (
+                      <tr key={sync.id} className="border-t border-stone-100 dark:border-stone-700">
+                        <td className="p-2 text-stone-600">
+                          {sync.completedAt ? formatDate(sync.completedAt) : formatDate(sync.startedAt)}
+                        </td>
+                        <td className="p-2 text-stone-600 capitalize">
+                          {sync.syncSource || 'Unknown'}
+                        </td>
+                        <td className="p-2 text-stone-600">
+                          {sync.recordsExtracted ?? '-'}
+                        </td>
+                        <td className="p-2">
+                          {sync.status === 'completed' ? (
+                            <span className="inline-flex items-center rounded-full bg-success-light px-1.5 py-0.5 text-[10px] font-medium text-success">
+                              Completed
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full bg-error-light px-1.5 py-0.5 text-[10px] font-medium text-error">
+                              Failed
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Progress */}
         {progress && (
           <div className="space-y-2">
@@ -1264,6 +1500,63 @@ export function ScoutbookSyncCard({
                         <Button size="sm" variant="ghost" onClick={() => { setExtensionToken(null); setTokenExpiresAt(null) }} className="h-7 text-xs">
                           Done
                         </Button>
+                      </div>
+                    ) : activeTokens.length > 0 ? (
+                      // Show active token status with Sync Now button
+                      <div className="mt-3 space-y-2">
+                        <div className="rounded-md bg-success-light/50 border border-success/20 p-2">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs font-medium text-success">Extension Connected</p>
+                              <p className="text-xs text-success/70">
+                                {activeTokens[0].lastUsedAt ? (
+                                  <>Last used: {new Date(activeTokens[0].lastUsedAt).toLocaleDateString('en-US', {
+                                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                  })}</>
+                                ) : (
+                                  <>Token created, not yet used</>
+                                )}
+                              </p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="h-7 text-xs"
+                              onClick={() => window.open('https://advancements.scouting.org/myroster', '_blank')}
+                            >
+                              Sync Now
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="sm" variant="ghost" disabled={isGeneratingToken} className="h-7 text-xs">
+                                {isGeneratingToken ? 'Generating...' : 'New Token'}
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Generate New Token</AlertDialogTitle>
+                                <AlertDialogDescription asChild>
+                                  <div className="space-y-3 text-left">
+                                    <p>This will revoke your current token and create a new one.</p>
+                                    <div className="rounded-md border border-warning/30 bg-warning-light p-3 text-xs">
+                                      <p className="font-medium text-warning-dark">Warning</p>
+                                      <p className="mt-1 text-warning-dark">
+                                        You will need to update the token in your browser extension after generating a new one.
+                                      </p>
+                                    </div>
+                                  </div>
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleGenerateToken}>Generate New Token</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </div>
                     ) : (
                       <div className="flex items-center gap-2 mt-2">
