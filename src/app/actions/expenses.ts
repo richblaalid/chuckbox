@@ -654,7 +654,7 @@ export async function approveExpenseReimbursement(
     .single()
 
   if (submitter?.email) {
-    sendExpenseApprovalEmail({
+    await sendExpenseApprovalEmail({
       submitterEmail: submitter.email,
       submitterName: submitter.full_name || submitter.email,
       unitName: unit?.name || 'Your unit',
@@ -772,7 +772,7 @@ export async function rejectExpenseReimbursement(
     .single()
 
   if (submitter?.email) {
-    sendExpenseRejectionEmail({
+    await sendExpenseRejectionEmail({
       submitterEmail: submitter.email,
       submitterName: submitter.full_name || submitter.email,
       unitName: unit?.name || 'Your unit',
