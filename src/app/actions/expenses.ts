@@ -4,8 +4,15 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import {
   expenseSubmissionSchema,
+  expenseApprovalSchema,
+  expenseRejectionSchema,
+  expensePaymentSchema,
   type ExpenseSubmissionInput,
+  type ExpenseApprovalInput,
+  type ExpenseRejectionInput,
+  type ExpensePaymentInput,
 } from '@/lib/expenses/schemas'
+import { sendExpenseApprovalEmail, sendExpenseRejectionEmail } from '@/lib/email/send-expense-notifications'
 import type {
   ExpenseCategory,
   ExpenseReimbursementWithSubmitter,
@@ -530,4 +537,316 @@ export async function getExpenseReimbursement(
     success: true,
     data: expense as ExpenseReimbursementWithSubmitter,
   }
+}
+
+/**
+ * Approve an expense reimbursement (admin/treasurer only)
+ */
+export async function approveExpenseReimbursement(
+  data: ExpenseApprovalInput
+): Promise<ActionResult> {
+  // Validate input
+  const validationResult = expenseApprovalSchema.safeParse(data)
+  if (!validationResult.success) {
+    return {
+      success: false,
+      error: validationResult.error.issues[0]?.message || 'Invalid input',
+    }
+  }
+
+  const validData = validationResult.data
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', user.id)
+    .single()
+
+  if (!profile) {
+    return { success: false, error: 'Profile not found' }
+  }
+
+  // Fetch the expense with submitter and unit info for email notification
+  const { data: expense, error: fetchError } = await supabase
+    .from('expense_reimbursements')
+    .select(`
+      id, status, unit_id, description, amount, expense_date,
+      submitter:profiles!expense_reimbursements_submitter_id_fkey(
+        id, full_name, email
+      ),
+      unit:units!expense_reimbursements_unit_id_fkey(name)
+    `)
+    .eq('id', validData.expense_id)
+    .single()
+
+  if (fetchError || !expense) {
+    return { success: false, error: 'Expense not found' }
+  }
+
+  // Check user has financial role in the unit
+  const { data: membership } = await supabase
+    .from('unit_memberships')
+    .select('role')
+    .eq('profile_id', profile.id)
+    .eq('unit_id', expense.unit_id)
+    .eq('status', 'active')
+    .single()
+
+  if (!membership) {
+    return { success: false, error: 'Not a member of this unit' }
+  }
+
+  const isFinancialRole = ['admin', 'treasurer'].includes(membership.role)
+  if (!isFinancialRole) {
+    return { success: false, error: 'Only admins and treasurers can approve expenses' }
+  }
+
+  // Can only approve submitted expenses
+  if (expense.status !== 'submitted') {
+    return { success: false, error: 'Only submitted expenses can be approved' }
+  }
+
+  // Update the expense
+  const { error: updateError } = await supabase
+    .from('expense_reimbursements')
+    .update({
+      status: 'approved',
+      reviewed_by: profile.id,
+      reviewed_at: new Date().toISOString(),
+      review_notes: validData.review_notes || null,
+    })
+    .eq('id', validData.expense_id)
+
+  if (updateError) {
+    console.error('Approve expense error:', updateError)
+    return { success: false, error: 'Failed to approve expense' }
+  }
+
+  // Create journal entry for the approved expense
+  const { data: journalResult, error: journalError } = await supabase.rpc(
+    'create_expense_journal_entry',
+    { p_expense_id: validData.expense_id }
+  )
+
+  if (journalError) {
+    console.error('Create journal entry error:', journalError)
+    // Don't fail the approval, just log the error - can be fixed manually
+  } else {
+    const result = journalResult as { success: boolean; error?: string }
+    if (!result.success) {
+      console.error('Journal entry creation failed:', result.error)
+    }
+  }
+
+  // Send approval notification email (fire-and-forget)
+  const submitter = expense.submitter as { id: string; full_name: string | null; email: string | null } | null
+  const unit = expense.unit as { name: string } | null
+  const { data: reviewerProfile } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', profile.id)
+    .single()
+
+  if (submitter?.email) {
+    sendExpenseApprovalEmail({
+      submitterEmail: submitter.email,
+      submitterName: submitter.full_name || submitter.email,
+      unitName: unit?.name || 'Your unit',
+      description: expense.description,
+      amount: Number(expense.amount),
+      expenseDate: expense.expense_date,
+      reviewerName: reviewerProfile?.full_name || 'A reviewer',
+      reviewNotes: validData.review_notes || null,
+      expenseId: expense.id,
+    })
+  }
+
+  revalidatePath('/expenses')
+  revalidatePath(`/expenses/${validData.expense_id}`)
+  revalidatePath('/finances')
+  return { success: true }
+}
+
+/**
+ * Reject an expense reimbursement (admin/treasurer only)
+ */
+export async function rejectExpenseReimbursement(
+  data: ExpenseRejectionInput
+): Promise<ActionResult> {
+  // Validate input
+  const validationResult = expenseRejectionSchema.safeParse(data)
+  if (!validationResult.success) {
+    return {
+      success: false,
+      error: validationResult.error.issues[0]?.message || 'Invalid input',
+    }
+  }
+
+  const validData = validationResult.data
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', user.id)
+    .single()
+
+  if (!profile) {
+    return { success: false, error: 'Profile not found' }
+  }
+
+  // Fetch the expense
+  const { data: expense, error: fetchError } = await supabase
+    .from('expense_reimbursements')
+    .select('id, status, unit_id')
+    .eq('id', validData.expense_id)
+    .single()
+
+  if (fetchError || !expense) {
+    return { success: false, error: 'Expense not found' }
+  }
+
+  // Check user has financial role in the unit
+  const { data: membership } = await supabase
+    .from('unit_memberships')
+    .select('role')
+    .eq('profile_id', profile.id)
+    .eq('unit_id', expense.unit_id)
+    .eq('status', 'active')
+    .single()
+
+  if (!membership) {
+    return { success: false, error: 'Not a member of this unit' }
+  }
+
+  const isFinancialRole = ['admin', 'treasurer'].includes(membership.role)
+  if (!isFinancialRole) {
+    return { success: false, error: 'Only admins and treasurers can reject expenses' }
+  }
+
+  // Can only reject submitted expenses
+  if (expense.status !== 'submitted') {
+    return { success: false, error: 'Only submitted expenses can be rejected' }
+  }
+
+  // Update the expense
+  const { error: updateError } = await supabase
+    .from('expense_reimbursements')
+    .update({
+      status: 'rejected',
+      reviewed_by: profile.id,
+      reviewed_at: new Date().toISOString(),
+      rejection_reason: validData.rejection_reason,
+    })
+    .eq('id', validData.expense_id)
+
+  if (updateError) {
+    console.error('Reject expense error:', updateError)
+    return { success: false, error: 'Failed to reject expense' }
+  }
+
+  revalidatePath('/expenses')
+  revalidatePath(`/expenses/${validData.expense_id}`)
+  return { success: true }
+}
+
+/**
+ * Mark an approved expense as paid (admin/treasurer only)
+ */
+export async function markExpensePaid(
+  data: ExpensePaymentInput
+): Promise<ActionResult> {
+  // Validate input
+  const validationResult = expensePaymentSchema.safeParse(data)
+  if (!validationResult.success) {
+    return {
+      success: false,
+      error: validationResult.error.issues[0]?.message || 'Invalid input',
+    }
+  }
+
+  const validData = validationResult.data
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', user.id)
+    .single()
+
+  if (!profile) {
+    return { success: false, error: 'Profile not found' }
+  }
+
+  // Fetch the expense
+  const { data: expense, error: fetchError } = await supabase
+    .from('expense_reimbursements')
+    .select('id, status, unit_id')
+    .eq('id', validData.expense_id)
+    .single()
+
+  if (fetchError || !expense) {
+    return { success: false, error: 'Expense not found' }
+  }
+
+  // Check user has financial role in the unit
+  const { data: membership } = await supabase
+    .from('unit_memberships')
+    .select('role')
+    .eq('profile_id', profile.id)
+    .eq('unit_id', expense.unit_id)
+    .eq('status', 'active')
+    .single()
+
+  if (!membership) {
+    return { success: false, error: 'Not a member of this unit' }
+  }
+
+  const isFinancialRole = ['admin', 'treasurer'].includes(membership.role)
+  if (!isFinancialRole) {
+    return { success: false, error: 'Only admins and treasurers can mark expenses as paid' }
+  }
+
+  // Can only pay approved expenses
+  if (expense.status !== 'approved') {
+    return { success: false, error: 'Only approved expenses can be marked as paid' }
+  }
+
+  // Update the expense
+  const { error: updateError } = await supabase
+    .from('expense_reimbursements')
+    .update({
+      status: 'paid',
+      paid_at: new Date().toISOString(),
+      paid_by: profile.id,
+      payment_method: validData.payment_method,
+      payment_reference: validData.payment_reference || null,
+    })
+    .eq('id', validData.expense_id)
+
+  if (updateError) {
+    console.error('Mark expense paid error:', updateError)
+    return { success: false, error: 'Failed to mark expense as paid' }
+  }
+
+  revalidatePath('/expenses')
+  revalidatePath(`/expenses/${validData.expense_id}`)
+  revalidatePath('/finances')
+  return { success: true }
 }
