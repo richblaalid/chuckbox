@@ -399,54 +399,54 @@ flowchart TD
 ### Phase 1: Expense Submission
 
 #### 1.1 Receipt Upload
-- [ ] **1.1.1** Create receipt upload API route
+- [x] **1.1.1** Create receipt upload API route
   - Files: `src/app/api/expenses/receipt/route.ts`
   - Test: POST uploads file to Supabase Storage
 
-- [ ] **1.1.2** Create ReceiptUploader component
+- [x] **1.1.2** Create ReceiptUploader component
   - Files: `src/components/expenses/receipt-uploader.tsx`
   - Test: Drag-drop uploads, shows preview
 
-- [ ] **1.1.3** Create ReceiptViewer component
+- [x] **1.1.3** Create ReceiptViewer component
   - Files: `src/components/expenses/receipt-viewer.tsx`
   - Test: Displays images and PDFs
 
 #### 1.2 Receipt OCR (Optional)
-- [ ] **1.2.1** Create receipt extraction API route
+- [x] **1.2.1** Create receipt extraction API route
   - Files: `src/app/api/expenses/extract/route.ts`
   - Test: POST with image returns extracted data
 
-- [ ] **1.2.2** Integrate Claude Vision for OCR
+- [x] **1.2.2** Integrate Claude Vision for OCR
   - Files: `src/lib/expenses/receipt-ocr.ts`
   - Test: Extracts amount, vendor, date from test receipt
 
 #### 1.3 Expense Form
-- [ ] **1.3.1** Create expense submission server actions
+- [x] **1.3.1** Create expense submission server actions
   - Files: `src/app/actions/expenses.ts`
   - Test: createExpense, updateExpense work
 
-- [ ] **1.3.2** Create ExpenseReimbursementForm component
+- [x] **1.3.2** Create ExpenseReimbursementForm component
   - Files: `src/components/expenses/expense-form.tsx`
   - Test: Form submits, creates database record
 
-- [ ] **1.3.3** Create expense submission page
+- [x] **1.3.3** Create expense submission page
   - Files: `src/app/(dashboard)/expenses/new/page.tsx`
   - Test: Page renders, form works
 
 #### 1.4 Expense List & Status
-- [ ] **1.4.1** Create expense list server action
+- [x] **1.4.1** Create expense list server action
   - Files: `src/app/actions/expenses.ts` (getExpenses)
   - Test: Returns filtered expenses for unit
 
-- [ ] **1.4.2** Create ExpenseReimbursementCard component
+- [x] **1.4.2** Create ExpenseReimbursementCard component
   - Files: `src/components/expenses/expense-card.tsx`
   - Test: Displays expense with status badge
 
-- [ ] **1.4.3** Create ExpenseReimbursementList component
+- [x] **1.4.3** Create ExpenseReimbursementList component
   - Files: `src/components/expenses/expense-list.tsx`
   - Test: Lists expenses with status filters
 
-- [ ] **1.4.4** Create expenses page
+- [x] **1.4.4** Create expenses page
   - Files: `src/app/(dashboard)/expenses/page.tsx`
   - Test: Page shows user's expenses
 
@@ -455,34 +455,34 @@ flowchart TD
 ### Phase 2: Approval Workflow
 
 #### 2.1 Treasurer Review
-- [ ] **2.1.1** Create approval server actions
+- [x] **2.1.1** Create approval server actions
   - Files: `src/app/actions/expenses.ts` (approve, reject)
   - Test: Status updates, reviewed_by set
 
-- [ ] **2.1.2** Create ExpenseApprovalDialog component
-  - Files: `src/components/expenses/approval-dialog.tsx`
+- [x] **2.1.2** Create ExpenseApprovalDialog component
+  - Files: `src/components/expenses/expense-approval-dialog.tsx`
   - Test: Shows expense details, approve/reject buttons
 
-- [ ] **2.1.3** Add treasurer view to expenses page
+- [x] **2.1.3** Add treasurer view to expenses page
   - Files: `src/app/(dashboard)/expenses/page.tsx`
   - Test: Treasurer sees all unit expenses
 
 #### 2.2 Journal Entry Integration
-- [ ] **2.2.1** Create expense journal entry RPC function
-  - Files: `supabase/migrations/20260215000003_expense_journal_rpc.sql`
+- [x] **2.2.1** Create expense journal entry RPC function
+  - Files: `supabase/migrations/20260216000002_expense_journal_rpc.sql`
   - Test: Creates proper debit/credit entries
 
-- [ ] **2.2.2** Integrate journal entry on approval
+- [x] **2.2.2** Integrate journal entry on approval
   - Files: `src/app/actions/expenses.ts`
   - Test: Approved expense has journal_entry_id
 
 #### 2.3 Payment Tracking
-- [ ] **2.3.1** Create mark-paid server action
+- [x] **2.3.1** Create mark-paid server action
   - Files: `src/app/actions/expenses.ts` (markPaid)
   - Test: Updates paid_at, paid_by, payment_method, payment_reference
 
-- [ ] **2.3.2** Create ExpensePaymentDialog component
-  - Files: `src/components/expenses/payment-dialog.tsx`
+- [x] **2.3.2** Create ExpensePaymentDialog component
+  - Files: `src/components/expenses/expense-payment-dialog.tsx`
   - Test: Records payment method (check/Zelle/other) and reference number
 
 ---
@@ -490,24 +490,24 @@ flowchart TD
 ### Phase 3: Notifications & Resubmission
 
 #### 3.1 Email Notifications
-- [ ] **3.1.1** Create expense email templates
+- [x] **3.1.1** Create expense email templates
   - Files: `src/lib/email/templates/expense-*.ts`
   - Test: Templates render correctly
 
-- [ ] **3.1.2** Send notification on approval
+- [x] **3.1.2** Send notification on approval
   - Files: `src/app/actions/expenses.ts`
   - Test: Email sent to submitter
 
-- [ ] **3.1.3** Send notification on rejection
+- [x] **3.1.3** Send notification on rejection
   - Files: `src/app/actions/expenses.ts`
   - Test: Email includes rejection reason
 
 #### 3.2 Resubmission
-- [ ] **3.2.1** Enable edit on rejected expenses
+- [x] **3.2.1** Enable edit on rejected expenses
   - Files: `src/app/(dashboard)/expenses/[id]/edit/page.tsx`
   - Test: Can edit and resubmit rejected expense
 
-- [ ] **3.2.2** Clear rejection state on resubmit
+- [x] **3.2.2** Clear rejection state on resubmit
   - Files: `src/app/actions/expenses.ts`
   - Test: Resubmit sets status back to submitted
 
@@ -655,11 +655,11 @@ RESEND_API_KEY=...
 | Phase | Total | Complete | Status |
 |-------|-------|----------|--------|
 | Phase 0: Foundation | 7 | 7 | ✅ Complete |
-| Phase 1: Expense Submission | 12 | 0 | ⬜ Not Started |
-| Phase 2: Approval Workflow | 7 | 0 | ⬜ Not Started |
-| Phase 3: Notifications | 5 | 0 | ⬜ Not Started |
+| Phase 1: Expense Submission | 12 | 12 | ✅ Complete |
+| Phase 2: Approval Workflow | 7 | 7 | ✅ Complete |
+| Phase 3: Notifications | 5 | 5 | ✅ Complete |
 | Phase 4: Cost Sharing (Post-MVP) | 7 | 0 | ⬜ Not Started |
-| **Total** | **38** | **0** | |
+| **Total** | **38** | **31** | |
 
 **MVP Boundary:** Phases 0-3 (31 tasks) = Expense submission, approval, journal entry, notifications
 **Post-MVP:** Phase 4 (7 tasks) = Parent-to-parent Venmo cost sharing
@@ -676,7 +676,36 @@ RESEND_API_KEY=...
 | 0.1.4 | 2026-02-16 | c93ef8c | Regenerate TypeScript types |
 | 0.2.1 | 2026-02-16 | 0a5787e | Create expense types and constants |
 | 0.2.2 | 2026-02-16 | 347fa5e | Create Zod validation schemas |
-| 0.3.1 | 2026-02-16 | pending | Add Venmo settings to profile page |
+| 0.3.1 | 2026-02-16 | 022961c | Add Venmo settings to profile page |
+| 1.1.1 | 2026-02-16 | 3239bcc | Create receipt upload API route |
+| 1.1.2 | 2026-02-16 | 3239bcc | Create ReceiptUploader component |
+| 1.1.3 | 2026-02-16 | 3239bcc | Create ReceiptViewer component |
+| 1.2.1 | 2026-02-16 | 3239bcc | Create receipt extraction API route |
+| 1.2.2 | 2026-02-16 | 3239bcc | Integrate Claude Vision for OCR |
+| 1.3.1 | 2026-02-16 | 016788b | Create expense submission server actions |
+| 1.3.2 | 2026-02-16 | 016788b | Create ExpenseReimbursementForm component |
+| 1.3.3 | 2026-02-16 | 016788b | Create expense submission page |
+| 1.4.1 | 2026-02-16 | 016788b | Create expense list server action (in 1.3.1) |
+| 1.4.2 | 2026-02-16 | 016788b | Create ExpenseReimbursementCard component |
+| 1.4.3 | 2026-02-16 | b2642e3 | Create ExpenseReimbursementList component |
+| 1.4.4 | 2026-02-16 | b2642e3 | Create expenses page |
+| 2.1.1 | 2026-02-17 | — | Approve/reject server actions |
+| 2.1.2 | 2026-02-17 | — | ExpenseApprovalDialog component |
+| 2.1.3 | 2026-02-17 | — | Treasurer view (financial role sees all unit expenses) |
+| 2.2.1 | 2026-02-17 | — | Expense journal entry RPC function |
+| 2.2.2 | 2026-02-17 | — | Journal entry created on approval |
+| 2.3.1 | 2026-02-17 | — | Mark-paid server action |
+| 2.3.2 | 2026-02-17 | — | ExpensePaymentDialog component |
+| — | 2026-02-17 | — | UI updates: dashboard quick action, profile expenses tab, finance subnav, roster button |
+| — | 2026-02-18 | — | Fix: storage bucket RLS + public bucket, receipt upload via admin client |
+| — | 2026-02-18 | — | Fix: RLS policies (auth.uid vs profile.id mismatch) |
+| — | 2026-02-18 | — | Fix: ANTHROPIC_API_KEY uncommented, PDF OCR support added |
+| — | 2026-02-18 | — | Create expense detail page (/expenses/[id]) |
+| 3.1.1 | 2026-02-18 | 6634c30 | Expense approved/rejected email templates |
+| 3.1.2 | 2026-02-18 | e5f9f37 | Send approval notification email |
+| 3.1.3 | 2026-02-18 | af0c74e | Send rejection notification email |
+| 3.2.1 | 2026-02-18 | f2a4318 | Edit page for rejected expenses |
+| 3.2.2 | 2026-02-18 | 6b3d372 | Clear rejection state on resubmit |
 
 ---
 
