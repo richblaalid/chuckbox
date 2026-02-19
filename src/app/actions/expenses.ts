@@ -706,10 +706,16 @@ export async function rejectExpenseReimbursement(
     return { success: false, error: 'Profile not found' }
   }
 
-  // Fetch the expense
+  // Fetch the expense with submitter and unit info for email notification
   const { data: expense, error: fetchError } = await supabase
     .from('expense_reimbursements')
-    .select('id, status, unit_id')
+    .select(`
+      id, status, unit_id, description, amount, expense_date,
+      submitter:profiles!expense_reimbursements_submitter_id_fkey(
+        id, full_name, email
+      ),
+      unit:units!expense_reimbursements_unit_id_fkey(name)
+    `)
     .eq('id', validData.expense_id)
     .single()
 
@@ -754,6 +760,29 @@ export async function rejectExpenseReimbursement(
   if (updateError) {
     console.error('Reject expense error:', updateError)
     return { success: false, error: 'Failed to reject expense' }
+  }
+
+  // Send rejection notification email (fire-and-forget)
+  const submitter = expense.submitter as { id: string; full_name: string | null; email: string | null } | null
+  const unit = expense.unit as { name: string } | null
+  const { data: reviewerProfile } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', profile.id)
+    .single()
+
+  if (submitter?.email) {
+    sendExpenseRejectionEmail({
+      submitterEmail: submitter.email,
+      submitterName: submitter.full_name || submitter.email,
+      unitName: unit?.name || 'Your unit',
+      description: expense.description,
+      amount: Number(expense.amount),
+      expenseDate: expense.expense_date,
+      reviewerName: reviewerProfile?.full_name || 'A reviewer',
+      rejectionReason: validData.rejection_reason,
+      expenseId: expense.id,
+    })
   }
 
   revalidatePath('/expenses')
