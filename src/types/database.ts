@@ -809,6 +809,82 @@ export type Database = {
           },
         ]
       }
+      expense_cost_shares: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          organizer_id: string
+          organizer_venmo: string | null
+          paid_at: string | null
+          participant_id: string
+          per_scout_amount: number
+          scout_count: number
+          share_amount: number
+          status: Database["public"]["Enums"]["cost_share_status"]
+          total_amount: number
+          total_scouts: number
+          unit_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          organizer_id: string
+          organizer_venmo?: string | null
+          paid_at?: string | null
+          participant_id: string
+          per_scout_amount: number
+          scout_count: number
+          share_amount: number
+          status?: Database["public"]["Enums"]["cost_share_status"]
+          total_amount: number
+          total_scouts: number
+          unit_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          organizer_id?: string
+          organizer_venmo?: string | null
+          paid_at?: string | null
+          participant_id?: string
+          per_scout_amount?: number
+          scout_count?: number
+          share_amount?: number
+          status?: Database["public"]["Enums"]["cost_share_status"]
+          total_amount?: number
+          total_scouts?: number
+          unit_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_cost_shares_organizer_id_fkey"
+            columns: ["organizer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_cost_shares_participant_id_fkey"
+            columns: ["participant_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_cost_shares_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expense_reimbursements: {
         Row: {
           ai_extracted: boolean | null
@@ -3677,6 +3753,12 @@ export type Database = {
         Args: { p_unit_id: string }
         Returns: undefined
       }
+      create_expense_journal_entry: {
+        Args: {
+          p_expense_id: string
+        }
+        Returns: Json
+      }
       create_refund_journal_entry: {
         Args: {
           p_original_square_payment_id: string
@@ -3698,12 +3780,6 @@ export type Database = {
           boys_section_id: string
           girls_section_id: string
         }[]
-      }
-      create_expense_journal_entry: {
-        Args: {
-          p_expense_id: string
-        }
-        Returns: Json
       }
       credit_fundraising_to_scout: {
         Args: {
@@ -3817,6 +3893,7 @@ export type Database = {
         | "pending_approval"
         | "approved"
         | "awarded"
+      cost_share_status: "pending" | "paid" | "declined"
       expense_category: "supplies" | "food" | "travel" | "other"
       expense_status: "draft" | "submitted" | "approved" | "rejected" | "paid"
       gender: "male" | "female" | "other" | "prefer_not_to_say"
@@ -3976,6 +4053,7 @@ export const Constants = {
         "approved",
         "awarded",
       ],
+      cost_share_status: ["pending", "paid", "declined"],
       expense_category: ["supplies", "food", "travel", "other"],
       expense_status: ["draft", "submitted", "approved", "rejected", "paid"],
       gender: ["male", "female", "other", "prefer_not_to_say"],
