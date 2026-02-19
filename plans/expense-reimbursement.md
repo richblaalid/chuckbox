@@ -518,25 +518,25 @@ flowchart TD
 ### Phase 4: Cost Sharing (Post-MVP)
 
 #### 4.1 Cost Sharing Database
-- [ ] **4.1.1** Create cost sharing migration
-  - Files: `supabase/migrations/20260215000002_expense_cost_sharing.sql`
+- [x] **4.1.1** Create cost sharing migration
+  - Files: `supabase/migrations/20260218000001_expense_cost_sharing.sql`
   - Test: Table created with RLS
 
 #### 4.2 Venmo Integration
-- [ ] **4.2.1** Create Venmo link generation utility
+- [x] **4.2.1** Create Venmo link generation utility
   - Files: `src/lib/expenses/venmo.ts`
   - Test: Generates correct URL with username/amount/note
 
-- [ ] **4.2.2** Create VenmoPromptDialog for missing usernames
+- [x] **4.2.2** Create VenmoPromptDialog for missing usernames
   - Files: `src/components/expenses/venmo-prompt-dialog.tsx`
   - Test: Prompts for username, saves to profile on confirm
 
 #### 4.3 Cost Sharing UI
-- [ ] **4.3.1** Create CostSharingForm component
-  - Files: `src/components/expenses/cost-sharing-form.tsx`
+- [x] **4.3.1** Create CostSharingForm component
+  - Files: `src/components/expenses/cost-sharing-form.tsx`, `src/lib/expenses/cost-sharing.ts`
   - Test: Select attendees, enter total, calculate per-person split
 
-- [ ] **4.3.2** Create cost sharing server actions
+- [x] **4.3.2** Create cost sharing server actions
   - Files: `src/app/actions/cost-sharing.ts`
   - Test: Creates share records for each participant
 
@@ -658,8 +658,8 @@ RESEND_API_KEY=...
 | Phase 1: Expense Submission | 12 | 12 | ✅ Complete |
 | Phase 2: Approval Workflow | 7 | 7 | ✅ Complete |
 | Phase 3: Notifications | 5 | 5 | ✅ Complete |
-| Phase 4: Cost Sharing (Post-MVP) | 7 | 0 | ⬜ Not Started |
-| **Total** | **38** | **31** | |
+| Phase 4: Cost Sharing (Post-MVP) | 7 | 5 | 🔄 In Progress |
+| **Total** | **38** | **36** | |
 
 **MVP Boundary:** Phases 0-3 (31 tasks) = Expense submission, approval, journal entry, notifications
 **Post-MVP:** Phase 4 (7 tasks) = Parent-to-parent Venmo cost sharing
@@ -706,6 +706,11 @@ RESEND_API_KEY=...
 | 3.1.3 | 2026-02-18 | af0c74e | Send rejection notification email |
 | 3.2.1 | 2026-02-18 | f2a4318 | Edit page for rejected expenses |
 | 3.2.2 | 2026-02-18 | 6b3d372 | Clear rejection state on resubmit |
+| 4.1.1 | 2026-02-18 | 1881516 | Cost sharing migration + types |
+| 4.2.1 | 2026-02-18 | f07e605 | Venmo link generation utility (6 tests) |
+| 4.2.2 | 2026-02-18 | 5580c17 | VenmoPromptDialog (8 tests) |
+| 4.3.1 | 2026-02-18 | aa994b0 | CostSharingForm + calculation logic (8 tests) |
+| 4.3.2 | 2026-02-18 | 9b1459f | Cost sharing server actions (5 tests) |
 
 ---
 
