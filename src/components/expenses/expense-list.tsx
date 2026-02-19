@@ -156,6 +156,7 @@ export function ExpenseReimbursementList({
               key={expense.id}
               expense={expense}
               showSubmitter={showSubmitter}
+              isFinancialRole={isFinancialRole}
             />
           ))}
         </div>
@@ -205,6 +206,7 @@ export function PendingExpensesList({
             key={expense.id}
             expense={expense}
             showSubmitter={true}
+            isFinancialRole={true}
           />
         ))}
       </div>

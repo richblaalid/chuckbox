@@ -1,15 +1,19 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ReceiptViewerInline } from './receipt-viewer'
+import { ExpenseApprovalDialog } from './expense-approval-dialog'
+import { ExpensePaymentDialog } from './expense-payment-dialog'
 import { EXPENSE_STATUSES, EXPENSE_CATEGORIES } from '@/lib/expenses/constants'
 import type { ExpenseReimbursementWithSubmitter, ExpenseStatus } from '@/lib/expenses/types'
 
 interface ExpenseCardProps {
   expense: ExpenseReimbursementWithSubmitter
   showSubmitter?: boolean
+  isFinancialRole?: boolean
   actions?: React.ReactNode
 }
 
@@ -24,13 +28,38 @@ const statusColorMap: Record<ExpenseStatus, string> = {
 export function ExpenseReimbursementCard({
   expense,
   showSubmitter = false,
+  isFinancialRole = false,
   actions,
 }: ExpenseCardProps) {
+  const [approvalMode, setApprovalMode] = useState<'approve' | 'reject' | null>(null)
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const statusInfo = EXPENSE_STATUSES[expense.status]
   const categoryInfo = EXPENSE_CATEGORIES[expense.category]
   const statusColor = statusColorMap[expense.status]
 
+  const canReview = isFinancialRole && expense.status === 'submitted'
+  const canMarkPaid = isFinancialRole && expense.status === 'approved'
+
   return (
+    <>
+      {/* Approval Dialog */}
+      {approvalMode && (
+        <ExpenseApprovalDialog
+          expense={expense}
+          mode={approvalMode}
+          open={!!approvalMode}
+          onOpenChange={(open) => !open && setApprovalMode(null)}
+        />
+      )}
+
+      {/* Payment Dialog */}
+      {showPaymentDialog && (
+        <ExpensePaymentDialog
+          expense={expense}
+          open={showPaymentDialog}
+          onOpenChange={setShowPaymentDialog}
+        />
+      )}
     <div className="rounded-lg border border-stone-200 bg-white shadow-sm hover:border-stone-300 hover:shadow-md transition-all duration-200">
       <div className="p-4">
         {/* Header: Status, Category, Amount */}
@@ -95,6 +124,36 @@ export function ExpenseReimbursementCard({
           {/* Actions */}
           {actions || (
             <div className="flex items-center gap-2">
+              {canReview && (
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800"
+                    onClick={() => setApprovalMode('approve')}
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+                    onClick={() => setApprovalMode('reject')}
+                  >
+                    Reject
+                  </Button>
+                </>
+              )}
+              {canMarkPaid && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                  onClick={() => setShowPaymentDialog(true)}
+                >
+                  Mark Paid
+                </Button>
+              )}
               {expense.status === 'draft' && (
                 <Button variant="outline" size="sm" asChild>
                   <Link href={`/expenses/${expense.id}/edit`}>Edit</Link>
@@ -143,6 +202,7 @@ export function ExpenseReimbursementCard({
         </div>
       </div>
     </div>
+    </>
   )
 }
 

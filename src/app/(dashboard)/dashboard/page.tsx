@@ -1,12 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import { isFinancialRole, isManagementRole, hasFilteredView } from '@/lib/roles'
 import { getSquareEnvironment } from '@/lib/square/client'
 import { SquareEnvironment } from 'square'
 import Link from 'next/link'
-import { RefreshCw, Mail, CalendarCheck, Award } from 'lucide-react'
+import { RefreshCw, Mail, CalendarCheck, Award, Receipt } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { QuickPaymentDialog } from '@/components/payments/quick-payment-dialog'
 import { PendingSignoffsCard } from '@/components/dashboard/pending-signoffs-card'
@@ -223,6 +223,15 @@ export default async function DashboardPage() {
     }
   }
 
+  // Get user's open expenses (all statuses except 'paid')
+  const { data: openExpenses } = await supabase
+    .from('expense_reimbursements')
+    .select('id, description, amount, status, expense_date, submitted_at, category')
+    .eq('submitter_id', profile.id)
+    .neq('status', 'paid')
+    .order('created_at', { ascending: false })
+    .limit(5)
+
   // Scout Dashboard - Simple view with their own account
   if (isScout) {
     const myAccount = scoutAccounts?.[0]
@@ -436,6 +445,13 @@ export default async function DashboardPage() {
                 </Link>
               </Button>
             )}
+            {/* Submit Expense */}
+            <Button asChild variant="outline" className="gap-2">
+              <Link href="/expenses/new">
+                <Receipt className="h-4 w-4" />
+                Submit Expense
+              </Link>
+            </Button>
             {/* Advancement Tracking */}
             <Button asChild variant="accent" className="gap-2">
               <Link href="/advancement?tab=summary">
@@ -477,6 +493,64 @@ export default async function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* My Open Expenses */}
+      {openExpenses && openExpenses.length > 0 && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>My Expenses</CardTitle>
+              <CardDescription>Your open expense submissions</CardDescription>
+            </div>
+            <Link
+              href="/profile?tab=expenses"
+              className="text-sm text-forest-600 hover:text-forest-800 hover:underline"
+            >
+              View all →
+            </Link>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {openExpenses.map((expense) => {
+                const statusColors: Record<string, string> = {
+                  draft: 'bg-stone-100 text-stone-700',
+                  submitted: 'bg-blue-100 text-blue-700',
+                  approved: 'bg-green-100 text-green-700',
+                  rejected: 'bg-red-100 text-red-700',
+                }
+                const statusLabels: Record<string, string> = {
+                  draft: 'Draft',
+                  submitted: 'Submitted',
+                  approved: 'Approved',
+                  rejected: 'Rejected',
+                }
+                return (
+                  <Link
+                    key={expense.id}
+                    href={`/expenses/${expense.id}`}
+                    className="flex items-center justify-between rounded-lg border border-stone-200 p-3 transition-colors hover:bg-stone-50"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-stone-900 truncate">{expense.description}</p>
+                      <div className="mt-1 flex items-center gap-2">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[expense.status] || ''}`}>
+                          {statusLabels[expense.status] || expense.status}
+                        </span>
+                        <span className="text-xs text-stone-500">
+                          {formatDate(expense.expense_date)}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="ml-3 font-semibold text-stone-900">
+                      {formatCurrency(Number(expense.amount))}
+                    </span>
+                  </Link>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Pending Sign-offs + Recent Transactions side by side */}
       <div className="grid gap-4 lg:grid-cols-2">

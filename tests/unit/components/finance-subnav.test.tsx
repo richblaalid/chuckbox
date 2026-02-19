@@ -8,11 +8,12 @@ vi.mock('next/navigation', () => ({
 }))
 
 describe('FinanceSubnav', () => {
-  it('renders exactly 3 tabs: Overview, Scout Accounts, Reports', () => {
+  it('renders exactly 4 tabs: Overview, Scout Accounts, Expenses, Reports', () => {
     render(<FinanceSubnav />)
 
     expect(screen.getByRole('link', { name: /overview/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /scout accounts/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /expenses/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /reports/i })).toBeInTheDocument()
   })
 
@@ -30,12 +31,13 @@ describe('FinanceSubnav', () => {
 
     expect(screen.getByRole('link', { name: /overview/i })).toHaveAttribute('href', '/finances')
     expect(screen.getByRole('link', { name: /scout accounts/i })).toHaveAttribute('href', '/finances/accounts')
+    expect(screen.getByRole('link', { name: /expenses/i })).toHaveAttribute('href', '/expenses')
     expect(screen.getByRole('link', { name: /reports/i })).toHaveAttribute('href', '/finances/reports')
   })
 
-  it('renders only 3 links total', () => {
+  it('renders only 4 links total', () => {
     render(<FinanceSubnav />)
     const links = screen.getAllByRole('link')
-    expect(links.length).toBe(3)
+    expect(links.length).toBe(4)
   })
 })

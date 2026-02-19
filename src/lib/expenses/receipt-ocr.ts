@@ -46,12 +46,12 @@ Set confidence to:
 Never include markdown formatting, explanations, or additional text. Return only the JSON object.`
 
 /**
- * Fetch an image from URL and convert to base64
+ * Fetch a file from URL and convert to base64
  */
-async function fetchImageAsBase64(url: string): Promise<{ base64: string; mediaType: string }> {
+async function fetchFileAsBase64(url: string): Promise<{ base64: string; mediaType: string }> {
   const response = await fetch(url)
   if (!response.ok) {
-    throw new Error(`Failed to fetch image: ${response.statusText}`)
+    throw new Error(`Failed to fetch file: ${response.statusText}`)
   }
 
   const contentType = response.headers.get('content-type') || 'image/jpeg'
@@ -84,26 +84,39 @@ export async function extractReceiptData(
   }
 
   try {
-    // Fetch and convert image to base64
-    const { base64, mediaType } = await fetchImageAsBase64(imageUrl)
+    // Fetch and convert file to base64
+    const { base64, mediaType } = await fetchFileAsBase64(imageUrl)
 
-    // Validate media type
-    const supportedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-    if (!supportedTypes.includes(mediaType)) {
-      // For PDFs and other unsupported types, return a helpful message
-      if (mediaType === 'application/pdf') {
-        return {
-          success: false,
-          error: 'PDF receipt extraction is not supported. Please enter details manually.',
-        }
-      }
+    const supportedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    const isPDF = mediaType === 'application/pdf'
+
+    if (!supportedImageTypes.includes(mediaType) && !isPDF) {
       return {
         success: false,
-        error: `Unsupported image type: ${mediaType}. Please use JPEG, PNG, or WebP.`,
+        error: `Unsupported file type: ${mediaType}. Please use JPEG, PNG, WebP, or PDF.`,
       }
     }
 
     const anthropic = new Anthropic({ apiKey })
+
+    // Build content block based on file type
+    const fileContent: Anthropic.Messages.ContentBlockParam = isPDF
+      ? {
+          type: 'document',
+          source: {
+            type: 'base64',
+            media_type: 'application/pdf',
+            data: base64,
+          },
+        }
+      : {
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+            data: base64,
+          },
+        }
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
@@ -113,17 +126,12 @@ export async function extractReceiptData(
         {
           role: 'user',
           content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
-                data: base64,
-              },
-            },
+            fileContent,
             {
               type: 'text',
-              text: 'Extract the receipt information from this image.',
+              text: isPDF
+                ? 'Extract the receipt information from this PDF document.'
+                : 'Extract the receipt information from this image.',
             },
           ],
         },

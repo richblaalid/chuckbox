@@ -19,6 +19,7 @@ export type AppPage =
   | 'payments'
   | 'reports'
   | 'finances'
+  | 'expenses'
   | 'advancement'
 
 // Actions that can be performed
@@ -45,6 +46,7 @@ const PAGE_ACCESS: Record<AppPage, MemberRole[]> = {
   payments: ['admin', 'treasurer'],
   reports: ['admin', 'treasurer', 'leader'],
   finances: ['admin', 'treasurer'], // Only financial roles can access
+  expenses: ['admin', 'treasurer', 'leader', 'parent', 'scout'], // All roles can submit expenses
   advancement: ['admin', 'treasurer', 'leader'], // Feature flag controlled
 }
 
