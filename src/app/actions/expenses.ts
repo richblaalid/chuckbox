@@ -211,7 +211,7 @@ export async function updateExpenseReimbursement(
       vendor: validData.vendor || null,
       receipt_url: validData.receipt_url || null,
       receipt_filename: validData.receipt_filename || null,
-      status: shouldSubmit ? 'submitted' : expense.status === 'rejected' && shouldSubmit ? 'submitted' : 'draft',
+      status: shouldSubmit ? 'submitted' : 'draft',
       submitted_at: shouldSubmit ? new Date().toISOString() : null,
       // Clear rejection fields if resubmitting
       ...(shouldSubmit && expense.status === 'rejected'
