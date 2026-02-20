@@ -106,3 +106,82 @@ export function calculateCostShares(
     shares,
   }
 }
+
+// --- Cost Share Tracker Types & Helpers ---
+
+export interface CostShareRow {
+  id: string
+  description: string
+  total_amount: number
+  total_scouts: number
+  per_scout_amount: number
+  share_amount: number
+  scout_count: number
+  status: string
+  organizer_venmo: string | null
+  created_at: string
+  participant: {
+    id: string
+    full_name: string | null
+    email: string | null
+    venmo_username: string | null
+  }
+}
+
+export interface CostShareEventGroup {
+  description: string
+  totalAmount: number
+  totalScouts: number
+  perScoutAmount: number
+  organizerVenmo: string | null
+  createdAt: string
+  shares: CostShareRow[]
+  totalShares: number
+  paidCount: number
+  pendingCount: number
+  totalCollected: number
+  totalPending: number
+}
+
+export function groupCostSharesByEvent(
+  rows: CostShareRow[]
+): CostShareEventGroup[] {
+  if (rows.length === 0) return []
+
+  const groupMap = new Map<string, CostShareRow[]>()
+
+  for (const row of rows) {
+    const key = row.description
+    const existing = groupMap.get(key)
+    if (existing) {
+      existing.push(row)
+    } else {
+      groupMap.set(key, [row])
+    }
+  }
+
+  return Array.from(groupMap.entries()).map(([description, shares]) => {
+    const first = shares[0]
+    const paidShares = shares.filter((s) => s.status === 'paid')
+    const pendingShares = shares.filter((s) => s.status === 'pending')
+
+    return {
+      description,
+      totalAmount: first.total_amount,
+      totalScouts: first.total_scouts,
+      perScoutAmount: first.per_scout_amount,
+      organizerVenmo: first.organizer_venmo,
+      createdAt: first.created_at,
+      shares,
+      totalShares: shares.length,
+      paidCount: paidShares.length,
+      pendingCount: pendingShares.length,
+      totalCollected: roundCents(
+        paidShares.reduce((sum, s) => sum + s.share_amount, 0)
+      ),
+      totalPending: roundCents(
+        pendingShares.reduce((sum, s) => sum + s.share_amount, 0)
+      ),
+    }
+  })
+}

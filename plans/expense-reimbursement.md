@@ -544,7 +544,7 @@ flowchart TD
   - Files: Uses `src/lib/expenses/venmo.ts`
   - Test: Generates personalized Venmo links for each participant
 
-- [ ] **4.3.4** Create CostShareTracker component
+- [x] **4.3.4** Create CostShareTracker component
   - Files: `src/components/expenses/cost-share-tracker.tsx`
   - Test: Shows who has paid, allows marking shares as paid
 
@@ -711,6 +711,8 @@ RESEND_API_KEY=...
 | 4.2.2 | 2026-02-18 | 5580c17 | VenmoPromptDialog (8 tests) |
 | 4.3.1 | 2026-02-18 | aa994b0 | CostSharingForm + calculation logic (8 tests) |
 | 4.3.2 | 2026-02-18 | 9b1459f | Cost sharing server actions (5 tests) |
+| 4.3.3 | 2026-02-19 | 8e0f302 | Payment request link generation (5 tests) |
+| 4.3.4 | 2026-02-19 | — | CostShareTracker component + grouping logic (4 tests) |
 
 ---
 
