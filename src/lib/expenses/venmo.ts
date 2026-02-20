@@ -23,3 +23,43 @@ export function generateVenmoPaymentLink(params: VenmoLinkParams): string {
 export function generateVenmoRequestLink(params: VenmoLinkParams): string {
   return buildVenmoUrl(params, 'charge')
 }
+
+export interface CostShareVenmoLink {
+  participantId: string
+  venmoUrl: string
+}
+
+interface GenerateCostShareVenmoLinksParams {
+  shares: Array<{
+    participantId: string
+    scoutCount: number
+    shareAmount: number
+  }>
+  organizerVenmo: string | null
+  description: string
+}
+
+/** Generate Venmo payment links for each cost share participant */
+export function generateCostShareVenmoLinks(
+  params: GenerateCostShareVenmoLinksParams
+): CostShareVenmoLink[] {
+  const { shares, organizerVenmo, description } = params
+
+  if (!organizerVenmo || shares.length === 0) {
+    return []
+  }
+
+  return shares.map((share) => {
+    const scoutText = share.scoutCount === 1 ? '1 scout' : `${share.scoutCount} scouts`
+    const note = `${description} (${scoutText})`
+
+    return {
+      participantId: share.participantId,
+      venmoUrl: generateVenmoPaymentLink({
+        username: organizerVenmo,
+        amount: share.shareAmount,
+        note,
+      }),
+    }
+  })
+}
