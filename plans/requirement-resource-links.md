@@ -162,14 +162,15 @@ flowchart TD
   - Test: Verify resource count aligns with 1,297 requirements that have `Resources:` text
 
 #### 0.2 Canonical Data Update
-- [ ] **0.2.1** Merge scraped resource URLs into canonical normalized JSON
+- [x] **0.2.1** Merge scraped resource URLs into canonical normalized JSON
   - Files: `scripts/merge-resource-links.ts`, `data/bsa-data-canonical-normalized.json`
   - Details: Match scraped URLs to requirements by badge+version+requirement_number, add `resources` array, strip `Resources:` text from descriptions
   - Test: Validate canonical JSON still passes `npm run db:validate`
 
-- [ ] **0.2.2** Update canonical data stats to track resource counts
+- [x] **0.2.2** Update canonical data stats to track resource counts
   - Files: `data/bsa-data-canonical-normalized.json` (stats section)
   - Test: Stats reflect new resource counts
+  - Note: Folded into 0.2.1 — merge script auto-updates stats
 
 ### Phase 1: Database & Seeder
 
@@ -307,7 +308,7 @@ flowchart TD
 
 | Phase | Total | Complete | Status |
 |-------|-------|----------|--------|
-| Phase 0 | 4 | 1 | In Progress |
+| Phase 0 | 4 | 3 | In Progress (0.1.2 needs scrape run) |
 | Phase 1 | 3 | 0 | Not Started |
 | Phase 2 | 6 | 0 | Not Started |
 | Phase 3 | 2 | 0 | Not Started |
@@ -318,7 +319,9 @@ flowchart TD
 
 | Task | Date | Commit | Notes |
 |------|------|--------|-------|
-| 0.1.1 | 2026-02-21 | — | Built scraper based on existing scrape-all-merit-badges.ts architecture |
+| 0.1.1 | 2026-02-21 | 23a23b4 | Built scraper based on existing scrape-all-merit-badges.ts architecture |
+| 0.2.1 | 2026-02-21 | — | Merge script with dry-run support, strips Resources: text, updates stats |
+| 0.2.2 | 2026-02-21 | — | Folded into 0.2.1 — merge script auto-updates stats |
 
 ---
 
