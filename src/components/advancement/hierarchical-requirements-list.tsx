@@ -650,7 +650,16 @@ const RequirementNodeView = memo(function RequirementNodeView({
       {/* Expanded Content */}
       {!isCollapsed && (
         <div className="border-t border-stone-100 px-2 pb-2 pt-1">
-          <RequirementResources resources={req.resources} />
+          <RequirementResources resources={(() => {
+            // Filter out parent resources that already appear on children
+            // to avoid duplication (children render their own resources)
+            if (!req.resources || node.children.length === 0) return req.resources
+            const childUrls = new Set(
+              node.children.flatMap(c => c.requirement.resources?.map(r => r.url) ?? [])
+            )
+            const unique = req.resources.filter(r => !childUrls.has(r.url))
+            return unique.length > 0 ? unique : null
+          })()} />
           <div className="space-y-0.5">
             {node.children.map((child) => {
               // Get tier styling for the child's left border
