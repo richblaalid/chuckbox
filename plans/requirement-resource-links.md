@@ -181,7 +181,7 @@ flowchart TD
   - Test: `supabase db push` succeeds on dev
 
 #### 1.2 Types & Seeder
-- [ ] **1.2.1** Update TypeScript database types for new tables
+- [x] **1.2.1** Update TypeScript database types for new tables
   - Files: `src/types/database.ts`
   - Test: Types compile without errors
 
@@ -324,7 +324,8 @@ flowchart TD
 | 0.2.1 | 2026-02-21 | — | Merge script with dry-run support, strips Resources: text, updates stats |
 | 0.2.2 | 2026-02-21 | — | Folded into 0.2.1 — merge script auto-updates stats |
 | 0.1.2 | 2026-02-21 | d18cb12 | 75 badges scraped (2,266 links), merge applied: 2,429 reqs with 7,931 resource links, 1,501 descriptions cleaned |
-| 1.1.1 | 2026-02-21 | — | Migration pushed to dev: bsa_requirement_resources + bsa_rank_requirement_resources tables with RLS |
+| 1.1.1 | 2026-02-21 | 750573c | Migration pushed to dev: bsa_requirement_resources + bsa_rank_requirement_resources tables with RLS |
+| 1.2.1 | 2026-02-21 | — | Added Row/Insert/Update/Relationships types for both resource tables |
 
 ---
 

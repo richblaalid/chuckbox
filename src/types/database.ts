@@ -494,6 +494,44 @@ export type Database = {
           },
         ]
       }
+      bsa_requirement_resources: {
+        Row: {
+          created_at: string | null
+          display_order: number
+          id: string
+          name: string
+          requirement_id: string
+          resource_type: string
+          url: string
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number
+          id?: string
+          name: string
+          requirement_id: string
+          resource_type: string
+          url: string
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number
+          id?: string
+          name?: string
+          requirement_id?: string
+          resource_type?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bsa_requirement_resources_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "bsa_merit_badge_requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bsa_merit_badge_versions: {
         Row: {
           created_at: string | null
@@ -642,6 +680,44 @@ export type Database = {
             columns: ["rank_id"]
             isOneToOne: false
             referencedRelation: "bsa_ranks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bsa_rank_requirement_resources: {
+        Row: {
+          created_at: string | null
+          display_order: number
+          id: string
+          name: string
+          requirement_id: string
+          resource_type: string
+          url: string
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number
+          id?: string
+          name: string
+          requirement_id: string
+          resource_type: string
+          url: string
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number
+          id?: string
+          name?: string
+          requirement_id?: string
+          resource_type?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bsa_rank_requirement_resources_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "bsa_rank_requirements"
             referencedColumns: ["id"]
           },
         ]
