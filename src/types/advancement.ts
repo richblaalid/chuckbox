@@ -62,6 +62,14 @@ export interface BsaMeritBadge {
   requirement_version_year?: number | null
 }
 
+export interface BsaRequirementResource {
+  id: string
+  name: string
+  url: string
+  resource_type: string
+  display_order: number
+}
+
 export interface BsaMeritBadgeRequirement {
   id: string
   version_year: number | null
@@ -78,6 +86,8 @@ export interface BsaMeritBadgeRequirement {
   required_count: number | null
   // Header support - headers are description-only, not approvable
   is_header: boolean | null
+  // Resource links (videos, websites, PDFs)
+  bsa_requirement_resources?: BsaRequirementResource[]
 }
 
 export interface BsaLeadershipPosition {

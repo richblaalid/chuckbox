@@ -25,6 +25,8 @@ interface Requirement {
   requiredCount?: number | null
   // Header support - headers are description-only, not approvable
   isHeader?: boolean | null
+  // Resource links (videos, websites, PDFs)
+  resources?: Array<{ name: string; url: string; resource_type: string }> | null
 }
 
 interface HierarchicalRequirementsListProps {

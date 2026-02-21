@@ -204,7 +204,7 @@ flowchart TD
   - Test: Unit test with mock resource data
 
 #### 2.2 Integration
-- [ ] **2.2.1** Update data fetching to include resources when loading requirements
+- [x] **2.2.1** Update data fetching to include resources when loading requirements
   - Files: Server actions / queries that fetch `bsa_merit_badge_requirements`
   - Details: Join or separate query for resources per requirement
   - Test: Resources appear in fetched data
@@ -328,7 +328,8 @@ flowchart TD
 | 1.2.1 | 2026-02-21 | 2d068dd | Added Row/Insert/Update/Relationships types for both resource tables |
 | 1.2.2 | 2026-02-21 | d07a05f | Seeder imports 7,931 resources; wired into db:fresh and standalone CLI |
 | 2.1.1 | 2026-02-21 | 046cad6 | LinkifiedText with 8 unit tests; handles http/https/www, excludes emails |
-| 2.1.2 | 2026-02-21 | — | RequirementResources with 6 unit tests; video/website/PDF icons, opens in new tab |
+| 2.1.2 | 2026-02-21 | 5a829f4 | RequirementResources with 6 unit tests; video/website/PDF icons, opens in new tab |
+| 2.2.1 | 2026-02-21 | — | Query joins bsa_requirement_resources; type + interface + formatters updated |
 
 ---
 

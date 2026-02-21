@@ -93,6 +93,7 @@ export function UnitMeritBadgePanel({
         nestingDepth: req.nesting_depth,
         requiredCount: req.required_count,
         isHeader: req.is_header,
+        resources: req.bsa_requirement_resources || null,
       }))
   }, [requirements])
 

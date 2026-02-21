@@ -602,7 +602,14 @@ export async function getMeritBadgeRequirements(meritBadgeId: string, versionYea
       alternatives_group,
       nesting_depth,
       required_count,
-      is_header
+      is_header,
+      bsa_requirement_resources (
+        id,
+        name,
+        url,
+        resource_type,
+        display_order
+      )
     `)
     .eq('merit_badge_id', meritBadgeId)
     .eq('version_year', effectiveVersionYear)
@@ -627,6 +634,13 @@ export async function getMeritBadgeRequirements(meritBadgeId: string, versionYea
     nesting_depth: number | null
     required_count: number | null
     is_header: boolean | null
+    bsa_requirement_resources: Array<{
+      id: string
+      name: string
+      url: string
+      resource_type: string
+      display_order: number
+    }>
   }>
 }
 
