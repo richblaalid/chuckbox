@@ -157,9 +157,10 @@ flowchart TD
   - Details: Visit each badge page on Scoutbook, navigate through all versions, extract `<a>` tags from resource sections, match to requirement numbers, output structured JSON
   - Test: Run scraper on 5 badges, verify URLs are valid
 
-- [ ] **0.1.2** Run full scrape across all 141 merit badges and store results
+- [x] **0.1.2** Run full scrape across all 141 merit badges and store results
   - Files: `data/requirement-resources-scraped.json`
   - Test: Verify resource count aligns with 1,297 requirements that have `Resources:` text
+  - Result: 75 badge versions scraped, 2,266 resource links, 0 errors
 
 #### 0.2 Canonical Data Update
 - [x] **0.2.1** Merge scraped resource URLs into canonical normalized JSON
@@ -308,7 +309,7 @@ flowchart TD
 
 | Phase | Total | Complete | Status |
 |-------|-------|----------|--------|
-| Phase 0 | 4 | 3 | In Progress (0.1.2 needs scrape run) |
+| Phase 0 | 4 | 4 | Complete |
 | Phase 1 | 3 | 0 | Not Started |
 | Phase 2 | 6 | 0 | Not Started |
 | Phase 3 | 2 | 0 | Not Started |
@@ -322,6 +323,7 @@ flowchart TD
 | 0.1.1 | 2026-02-21 | 23a23b4 | Built scraper based on existing scrape-all-merit-badges.ts architecture |
 | 0.2.1 | 2026-02-21 | — | Merge script with dry-run support, strips Resources: text, updates stats |
 | 0.2.2 | 2026-02-21 | — | Folded into 0.2.1 — merge script auto-updates stats |
+| 0.1.2 | 2026-02-21 | — | 75 badges scraped (2,266 links), merge applied: 2,429 reqs with 7,931 resource links, 1,501 descriptions cleaned |
 
 ---
 

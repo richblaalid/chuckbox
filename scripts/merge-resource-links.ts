@@ -186,20 +186,82 @@ function findMatchingScrapedVersion(
 }
 
 /**
+ * Normalize a resource name for fuzzy matching.
+ * Strips (video)/(website)/(pdf) suffixes, extra whitespace, and lowercases.
+ */
+function normalizeResourceName(name: string): string {
+  return name
+    .replace(/\s*\((video|website|pdf|PDF)\)\s*/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+}
+
+/**
+ * Extract the parent requirement number from a sub-requirement.
+ * e.g., "1a" -> "1", "4b" -> "4", "3a(1)" -> "3"
+ */
+function getParentReqNumber(reqNum: string): string | null {
+  const match = reqNum.match(/^(\d+)/)
+  return match ? match[1] : null
+}
+
+/**
  * Match scraped resources to a canonical requirement by requirement number.
+ *
+ * Strategy:
+ * 1. Direct match by requirement number (e.g., scraped "1a" matches canonical "1a")
+ * 2. If no direct match, look at the parent panel (e.g., scraped "1" for canonical "1a")
+ *    and match individual resources by name against the extracted resource names
  */
 function findResourcesForRequirement(
   scrapedReqs: ScrapedRequirementResources[],
   canonicalReqNum: string,
+  extractedResourceNames: string[],
 ): ResourceLink[] | null {
   const normalized = normalizeReqNumber(canonicalReqNum)
 
-  // Direct match
+  // Strategy 1: Direct match by requirement number
   const direct = scrapedReqs.find(
     sr => normalizeReqNumber(sr.requirementNumber) === normalized
   )
   if (direct && direct.resources.length > 0) {
     return direct.resources
+  }
+
+  // Strategy 2: Match against parent panel's resources by resource name
+  if (extractedResourceNames.length > 0) {
+    const normalizedNames = extractedResourceNames.map(normalizeResourceName)
+
+    const matchByName = (resources: ResourceLink[]): ResourceLink[] => {
+      return resources.filter(r => {
+        const rName = normalizeResourceName(r.name)
+        return normalizedNames.some(n =>
+          rName.includes(n) || n.includes(rName) ||
+          // Handle partial matches (first 20 chars)
+          (n.length > 15 && rName.substring(0, 20) === n.substring(0, 20))
+        )
+      })
+    }
+
+    // 2a: Check the parent panel first (most common case)
+    const parentNum = getParentReqNumber(canonicalReqNum)
+    if (parentNum && parentNum !== canonicalReqNum) {
+      const parentScraped = scrapedReqs.find(
+        sr => normalizeReqNumber(sr.requirementNumber) === parentNum
+      )
+      if (parentScraped && parentScraped.resources.length > 0) {
+        const matched = matchByName(parentScraped.resources)
+        if (matched.length > 0) return matched
+      }
+    }
+
+    // 2b: Search ALL panels for this badge (resources may be under a different panel)
+    const allResources = scrapedReqs.flatMap(sr => sr.resources)
+    if (allResources.length > 0) {
+      const matched = matchByName(allResources)
+      if (matched.length > 0) return matched
+    }
   }
 
   return null
@@ -250,6 +312,7 @@ function mergeResources(
           const resources = findResourcesForRequirement(
             scrapedVersion.requirements,
             req.requirement_number,
+            extractedResourceNames,
           )
 
           if (resources && resources.length > 0) {
