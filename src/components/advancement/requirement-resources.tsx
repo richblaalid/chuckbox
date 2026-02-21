@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Video, Globe, FileText } from 'lucide-react'
+import { FileText, Globe, Video } from 'lucide-react'
 
 interface Resource {
   name: string
@@ -11,14 +11,16 @@ interface RequirementResourcesProps {
   resources: Resource[] | undefined | null
 }
 
+const ICON_CLASS = 'h-3.5 w-3.5 shrink-0'
+
 function ResourceIcon({ type }: { type: string }): ReactNode {
   switch (type) {
     case 'video':
-      return <Video className="h-3.5 w-3.5 shrink-0" />
+      return <Video className={ICON_CLASS} />
     case 'pdf':
-      return <FileText className="h-3.5 w-3.5 shrink-0" />
+      return <FileText className={ICON_CLASS} />
     default:
-      return <Globe className="h-3.5 w-3.5 shrink-0" />
+      return <Globe className={ICON_CLASS} />
   }
 }
 
@@ -27,9 +29,9 @@ export function RequirementResources({ resources }: RequirementResourcesProps): 
 
   return (
     <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
-      {resources.map((resource, i) => (
+      {resources.map((resource) => (
         <a
-          key={i}
+          key={resource.url}
           href={resource.url}
           target="_blank"
           rel="noopener noreferrer"

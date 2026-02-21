@@ -27,6 +27,7 @@ import { markRequirementComplete, updateRequirementNotes, markRequirementComplet
 import { RequirementCompletionDialog } from './requirement-completion-dialog'
 import { RequirementUndoDialog } from './requirement-undo-dialog'
 import { parseNotes, formatNoteTimestamp, getNoteTypeLabel, type RequirementNote } from '@/lib/notes-utils'
+import { RequirementResources } from './requirement-resources'
 import type { AdvancementStatus } from '@/types/advancement'
 
 interface RequirementApprovalRowProps {
@@ -63,6 +64,8 @@ interface RequirementApprovalRowProps {
     meritBadgeId: string
     meritBadgeProgressId: string
   }
+  // Resource links (videos, websites, PDFs)
+  resources?: Array<{ name: string; url: string; resource_type: string }> | null
 }
 
 export const RequirementApprovalRow = memo(function RequirementApprovalRow({
@@ -87,6 +90,7 @@ export const RequirementApprovalRow = memo(function RequirementApprovalRow({
   initData,
   isMeritBadge = false,
   meritBadgeInitData,
+  resources,
 }: RequirementApprovalRowProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
@@ -368,6 +372,7 @@ export const RequirementApprovalRow = memo(function RequirementApprovalRow({
                 </span>
                 {description}
               </p>
+              <RequirementResources resources={resources} />
 
               {/* Metadata Row */}
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs sm:mt-2 sm:gap-2">

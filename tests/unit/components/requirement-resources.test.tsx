@@ -13,6 +13,11 @@ describe('RequirementResources', () => {
     expect(container.innerHTML).toBe('')
   })
 
+  it('renders nothing when resources is null', () => {
+    const { container } = render(<RequirementResources resources={null} />)
+    expect(container.innerHTML).toBe('')
+  })
+
   it('renders a video resource as a clickable link', () => {
     render(
       <RequirementResources

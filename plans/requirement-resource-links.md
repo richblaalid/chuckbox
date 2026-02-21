@@ -209,7 +209,7 @@ flowchart TD
   - Details: Join or separate query for resources per requirement
   - Test: Resources appear in fetched data
 
-- [ ] **2.2.2** Integrate `RequirementResources` into `HierarchicalRequirementsList`
+- [x] **2.2.2** Integrate `RequirementResources` into `HierarchicalRequirementsList`
   - Files: `src/components/advancement/hierarchical-requirements-list.tsx`
   - Details: Show resources below requirement description when expanded
   - Test: Resources visible in UI for badges that have them

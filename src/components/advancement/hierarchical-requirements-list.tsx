@@ -3,6 +3,7 @@
 import { useMemo, useState, useRef, memo, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { RequirementApprovalRow } from './requirement-approval-row'
+import { RequirementResources } from './requirement-resources'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ChevronDown, ChevronRight, Check } from 'lucide-react'
 import type { AdvancementStatus } from '@/types/advancement'
@@ -488,6 +489,7 @@ const RequirementNodeView = memo(function RequirementNodeView({
         isMultiSelectMode={isMultiSelectMode}
         isSelected={selectedIds?.has(req.id) ?? false}
         onSelectionChange={onSelectionChange ? () => onSelectionChange(req.id) : undefined}
+        resources={req.resources}
       />
     )
   }
@@ -647,6 +649,7 @@ const RequirementNodeView = memo(function RequirementNodeView({
       {/* Expanded Content */}
       {!isCollapsed && (
         <div className="border-t border-stone-100 px-2 pb-2 pt-1">
+          <RequirementResources resources={req.resources} />
           <div className="space-y-0.5">
             {node.children.map((child) => {
               // Get tier styling for the child's left border
