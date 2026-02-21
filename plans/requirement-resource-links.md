@@ -176,7 +176,7 @@ flowchart TD
 ### Phase 1: Database & Seeder
 
 #### 1.1 Migration
-- [ ] **1.1.1** Create migration for `bsa_requirement_resources` and `bsa_rank_requirement_resources` tables
+- [x] **1.1.1** Create migration for `bsa_requirement_resources` and `bsa_rank_requirement_resources` tables
   - Files: `supabase/migrations/20260221000001_add_requirement_resources.sql`
   - Test: `supabase db push` succeeds on dev
 
@@ -323,7 +323,8 @@ flowchart TD
 | 0.1.1 | 2026-02-21 | 23a23b4 | Built scraper based on existing scrape-all-merit-badges.ts architecture |
 | 0.2.1 | 2026-02-21 | — | Merge script with dry-run support, strips Resources: text, updates stats |
 | 0.2.2 | 2026-02-21 | — | Folded into 0.2.1 — merge script auto-updates stats |
-| 0.1.2 | 2026-02-21 | — | 75 badges scraped (2,266 links), merge applied: 2,429 reqs with 7,931 resource links, 1,501 descriptions cleaned |
+| 0.1.2 | 2026-02-21 | d18cb12 | 75 badges scraped (2,266 links), merge applied: 2,429 reqs with 7,931 resource links, 1,501 descriptions cleaned |
+| 1.1.1 | 2026-02-21 | — | Migration pushed to dev: bsa_requirement_resources + bsa_rank_requirement_resources tables with RLS |
 
 ---
 
