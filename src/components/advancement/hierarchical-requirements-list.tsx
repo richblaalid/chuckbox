@@ -593,16 +593,14 @@ const RequirementNodeView = memo(function RequirementNodeView({
 
         {/* Title/Description */}
         <span className={cn(
-          'flex-1 line-clamp-1',
+          'flex-1',
           isHeader && !isCollapsedParent
             ? 'font-semibold text-stone-600 italic'  // Header text styling
             : isComplete && (!isHeader || isCollapsedParent)
               ? 'font-medium text-emerald-700'
               : 'font-medium text-stone-700'
         )}>
-          {req.description.length > 80
-            ? req.description.slice(0, 80) + '...'
-            : req.description}
+          {req.description}
         </span>
 
         {/* Alternatives indicator */}
