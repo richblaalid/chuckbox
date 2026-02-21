@@ -18,7 +18,7 @@ describe('RequirementResources', () => {
     expect(container.innerHTML).toBe('')
   })
 
-  it('renders a video resource as a clickable link', () => {
+  it('renders a video resource as a clickable link with Resources label', () => {
     render(
       <RequirementResources
         resources={[
@@ -26,6 +26,7 @@ describe('RequirementResources', () => {
         ]}
       />
     )
+    screen.getByText('Resources') // label is present
     const link = screen.getByRole('link', { name: /How to Tie Knots/i })
     expect(link).toHaveAttribute('href', 'https://youtube.com/watch?v=123')
     expect(link).toHaveAttribute('target', '_blank')

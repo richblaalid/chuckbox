@@ -28,19 +28,24 @@ export function RequirementResources({ resources }: RequirementResourcesProps): 
   if (!resources || resources.length === 0) return null
 
   return (
-    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
-      {resources.map((resource) => (
-        <a
-          key={resource.url}
-          href={resource.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
-        >
-          <ResourceIcon type={resource.resource_type} />
-          {resource.name}
-        </a>
-      ))}
+    <div className="mt-2 rounded-md bg-stone-50 px-2.5 py-1.5">
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+        Resources
+      </span>
+      <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-1">
+        {resources.map((resource) => (
+          <a
+            key={resource.url}
+            href={resource.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+          >
+            <ResourceIcon type={resource.resource_type} />
+            {resource.name}
+          </a>
+        ))}
+      </div>
     </div>
   )
 }
