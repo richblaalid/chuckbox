@@ -21,12 +21,11 @@ import {
   CheckCircle,
   Circle,
   Clock,
-  FileText,
-  ExternalLink,
   Check,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { LinkifiedText } from '@/components/ui/linkified-text'
+import { PamphletLink } from './pamphlet-link'
 
 interface MeritBadge {
   id: string
@@ -218,20 +217,7 @@ export function MeritBadgeDetailSheet({
             )}
 
             {/* Pamphlet Link */}
-            {badge.pamphlet_url && (
-              <div className="mt-4">
-                <a
-                  href={badge.pamphlet_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-lg border border-pine-200 bg-pine-50 px-3 py-2 text-sm font-medium text-pine-700 transition-colors hover:bg-pine-100"
-                >
-                  <FileText className="h-4 w-4" />
-                  Download Merit Badge Pamphlet
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </div>
-            )}
+            <PamphletLink url={badge.pamphlet_url} />
           </SheetHeader>
 
           {/* Stats */}

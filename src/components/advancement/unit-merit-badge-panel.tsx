@@ -13,6 +13,7 @@ import { ArrowLeft, Award, Star, Loader2 } from 'lucide-react'
 import { VersionYearBadge } from '@/components/ui/version-year-badge'
 import { bulkSignOffForScouts } from '@/app/actions/advancement'
 import { useRouter } from 'next/navigation'
+import { PamphletLink } from './pamphlet-link'
 import type { BsaMeritBadge, BsaMeritBadgeRequirement } from '@/types/advancement'
 
 
@@ -239,6 +240,7 @@ export function UnitMeritBadgePanel({
               <p className="mt-2 text-sm text-stone-600">
                 {totalRequirements} requirements • Select to sign off for scouts
               </p>
+              <PamphletLink url={badge.pamphlet_url} />
             </div>
           </div>
         </CardHeader>

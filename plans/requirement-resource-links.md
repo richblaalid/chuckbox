@@ -219,7 +219,7 @@ flowchart TD
   - Details: Replace plain text rendering of descriptions with `LinkifiedText`
   - Test: Geocaching/Cyber Chip inline URLs render as clickable links
 
-- [ ] **2.2.4** Surface pamphlet PDF link in badge detail UI
+- [x] **2.2.4** Surface pamphlet PDF link in badge detail UI
   - Files: `src/components/advancement/merit-badge-detail-sheet.tsx` or equivalent
   - Details: Add "Official BSA Pamphlet" link using existing `pamphlet_url` from `bsa_merit_badges`
   - Test: Pamphlet link visible on badge detail view
@@ -311,7 +311,7 @@ flowchart TD
 |-------|-------|----------|--------|
 | Phase 0 | 4 | 4 | Complete |
 | Phase 1 | 3 | 3 | Complete |
-| Phase 2 | 6 | 0 | Not Started |
+| Phase 2 | 6 | 6 | Complete |
 | Phase 3 | 2 | 0 | Not Started |
 
 ---
@@ -330,6 +330,9 @@ flowchart TD
 | 2.1.1 | 2026-02-21 | 046cad6 | LinkifiedText with 8 unit tests; handles http/https/www, excludes emails |
 | 2.1.2 | 2026-02-21 | 5a829f4 | RequirementResources with 6 unit tests; video/website/PDF icons, opens in new tab |
 | 2.2.1 | 2026-02-21 | — | Query joins bsa_requirement_resources; type + interface + formatters updated |
+| 2.2.2 | 2026-02-21 | 645ccbf | Integrated RequirementResources into requirement views (leaf + parent nodes) |
+| 2.2.3 | 2026-02-21 | bb98139 | LinkifiedText for all requirement descriptions (3 files) |
+| 2.2.4 | 2026-02-21 | — | PamphletLink component; fixed pine→forest colors; added to detail sheet + unit panel |
 
 ---
 
