@@ -185,7 +185,7 @@ flowchart TD
   - Files: `src/types/database.ts`
   - Test: Types compile without errors
 
-- [ ] **1.2.2** Update seeder to populate requirement resources from canonical data
+- [x] **1.2.2** Update seeder to populate requirement resources from canonical data
   - Files: `scripts/bsa-reference-data.ts`
   - Details: After inserting requirements, insert resource records linked by requirement ID
   - Test: `npm run db:fresh` succeeds, resource count validated
@@ -310,7 +310,7 @@ flowchart TD
 | Phase | Total | Complete | Status |
 |-------|-------|----------|--------|
 | Phase 0 | 4 | 4 | Complete |
-| Phase 1 | 3 | 0 | Not Started |
+| Phase 1 | 3 | 3 | Complete |
 | Phase 2 | 6 | 0 | Not Started |
 | Phase 3 | 2 | 0 | Not Started |
 
@@ -325,7 +325,8 @@ flowchart TD
 | 0.2.2 | 2026-02-21 | — | Folded into 0.2.1 — merge script auto-updates stats |
 | 0.1.2 | 2026-02-21 | d18cb12 | 75 badges scraped (2,266 links), merge applied: 2,429 reqs with 7,931 resource links, 1,501 descriptions cleaned |
 | 1.1.1 | 2026-02-21 | 750573c | Migration pushed to dev: bsa_requirement_resources + bsa_rank_requirement_resources tables with RLS |
-| 1.2.1 | 2026-02-21 | — | Added Row/Insert/Update/Relationships types for both resource tables |
+| 1.2.1 | 2026-02-21 | 2d068dd | Added Row/Insert/Update/Relationships types for both resource tables |
+| 1.2.2 | 2026-02-21 | — | Seeder imports 7,931 resources; wired into db:fresh and standalone CLI |
 
 ---
 

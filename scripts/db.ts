@@ -38,6 +38,7 @@ import * as path from 'path';
 import {
   importAll as importBsaReferenceData,
   importCanonicalMeritBadgeRequirements,
+  importRequirementResources,
   validateSeedData,
 } from './bsa-reference-data';
 
@@ -1479,6 +1480,8 @@ async function main(): Promise<void> {
       await importBsaReferenceData();
       console.log('\n📚 Seeding Merit Badge Requirements from Canonical Data...');
       await importCanonicalMeritBadgeRequirements();
+      console.log('\n📚 Seeding Requirement Resources...');
+      await importRequirementResources();
       // Validate seeded data integrity
       const bsaValidation = await validateSeedData();
       if (!bsaValidation.valid) {
@@ -1493,6 +1496,8 @@ async function main(): Promise<void> {
       await importBsaReferenceData();
       console.log('\n📚 Seeding Merit Badge Requirements from Canonical Data...');
       await importCanonicalMeritBadgeRequirements();
+      console.log('\n📚 Seeding Requirement Resources...');
+      await importRequirementResources();
       // Validate seeded data integrity
       const allValidation = await validateSeedData();
       if (!allValidation.valid) {

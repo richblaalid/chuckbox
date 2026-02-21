@@ -78,6 +78,12 @@ interface LeadershipFile {
 }
 
 // Types for canonical data file (bsa-data-canonical-normalized.json)
+interface CanonicalResourceLink {
+  name: string
+  url: string
+  type: string
+}
+
 interface CanonicalRequirement {
   requirement_number: string
   scoutbook_id: string
@@ -85,6 +91,7 @@ interface CanonicalRequirement {
   is_header: boolean
   nesting_depth?: number
   display_order: number
+  resources?: CanonicalResourceLink[]
   children: CanonicalRequirement[]
 }
 
@@ -743,6 +750,167 @@ async function importCanonicalMeritBadgeRequirements(filename?: string) {
 }
 
 /**
+ * Import requirement resources from canonical data.
+ * Must run AFTER importCanonicalMeritBadgeRequirements() so requirement IDs exist.
+ *
+ * Reads the `resources` array from each canonical requirement and inserts records
+ * into bsa_requirement_resources linked by requirement_id.
+ */
+async function importRequirementResources(filename?: string) {
+  const file = filename || 'bsa-data-canonical-normalized.json'
+  console.log('\n=== Importing Requirement Resources ===')
+  console.log(`  File: ${file}`)
+
+  const data = readJsonFile<CanonicalDataFile>(file)
+  const startTime = Date.now()
+
+  // Collect all resources with their requirement lookup keys
+  type ResourceEntry = {
+    badgeCode: string
+    versionYear: number
+    requirementNumber: string
+    resources: CanonicalResourceLink[]
+  }
+
+  const entries: ResourceEntry[] = []
+
+  function collectResources(
+    reqs: CanonicalRequirement[],
+    badgeCode: string,
+    versionYear: number
+  ) {
+    for (const req of reqs) {
+      if (req.resources?.length) {
+        entries.push({
+          badgeCode,
+          versionYear,
+          requirementNumber: req.requirement_number,
+          resources: req.resources,
+        })
+      }
+      if (req.children) {
+        collectResources(req.children, badgeCode, versionYear)
+      }
+    }
+  }
+
+  for (const badge of data.merit_badges) {
+    for (const version of badge.versions) {
+      collectResources(version.requirements, badge.code, version.version_year)
+    }
+  }
+
+  const totalResources = entries.reduce((sum, e) => sum + e.resources.length, 0)
+  console.log(`  Requirements with resources: ${entries.length}`)
+  console.log(`  Total resource links: ${totalResources}`)
+
+  if (entries.length === 0) {
+    console.log('  No resources to import')
+    return
+  }
+
+  // Get badge code -> ID map
+  const { data: badges, error: badgesError } = await supabase
+    .from('bsa_merit_badges')
+    .select('id, code')
+
+  if (badgesError || !badges) {
+    console.error('Error fetching badges:', badgesError)
+    return
+  }
+
+  const badgeCodeToId = new Map(badges.map(b => [b.code, b.id]))
+
+  // Fetch all requirement IDs in batches (same pagination pattern as importCanonicalMeritBadgeRequirements)
+  const reqIdMap = new Map<string, string>()
+  const pageSize = 1000
+  let offset = 0
+  while (true) {
+    const { data: reqs } = await supabase
+      .from('bsa_merit_badge_requirements')
+      .select('id, merit_badge_id, version_year, requirement_number')
+      .range(offset, offset + pageSize - 1)
+
+    if (!reqs || reqs.length === 0) break
+
+    for (const row of reqs) {
+      reqIdMap.set(`${row.merit_badge_id}:${row.version_year}:${row.requirement_number}`, row.id)
+    }
+
+    if (reqs.length < pageSize) break
+    offset += pageSize
+  }
+  console.log(`  Fetched ${reqIdMap.size} requirement IDs`)
+
+  // Clear existing resources (idempotent - neq trick deletes all rows)
+  const { error: deleteError } = await supabase
+    .from('bsa_requirement_resources')
+    .delete()
+    .neq('id', '00000000-0000-0000-0000-000000000000')
+
+  if (deleteError) {
+    console.error('Error clearing existing resources:', deleteError)
+    return
+  }
+
+  // Build insert records by resolving badge codes and requirement numbers to database IDs
+  const records: {
+    requirement_id: string
+    name: string
+    url: string
+    resource_type: string
+    display_order: number
+  }[] = []
+  let unmatched = 0
+
+  for (const entry of entries) {
+    const badgeId = badgeCodeToId.get(entry.badgeCode)
+    if (!badgeId) {
+      unmatched++
+      continue
+    }
+
+    const reqId = reqIdMap.get(`${badgeId}:${entry.versionYear}:${entry.requirementNumber}`)
+    if (!reqId) {
+      unmatched++
+      continue
+    }
+
+    entry.resources.forEach((res, i) => {
+      records.push({
+        requirement_id: reqId,
+        name: res.name,
+        url: res.url,
+        resource_type: res.type,
+        display_order: i,
+      })
+    })
+  }
+
+  console.log(`  Records to insert: ${records.length}`)
+  if (unmatched > 0) {
+    console.log(`  Unmatched requirements: ${unmatched}`)
+  }
+
+  // Insert in batches
+  let inserted = 0
+  for (const batch of chunk(records, batchSize)) {
+    const { error } = await supabase
+      .from('bsa_requirement_resources')
+      .insert(batch)
+    if (error) {
+      console.error('Error inserting resources:', error.message)
+    } else {
+      inserted += batch.length
+    }
+  }
+
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(2)
+  console.log(`  Inserted ${inserted} resource records in ${elapsed}s`)
+  console.log('\n=== Requirement Resources Import Complete ===')
+}
+
+/**
  * Validate seeded BSA reference data integrity.
  * Throws an error if critical data is missing or incomplete.
  *
@@ -858,6 +1026,7 @@ export {
   importCanonicalRanks,                     // Uses bsa-data-canonical-normalized.json
   importLeadershipPositions,
   importCanonicalMeritBadgeRequirements,    // Uses bsa-data-canonical-normalized.json
+  importRequirementResources,               // Uses bsa-data-canonical-normalized.json
   importAll,
   validateSeedData,
 }
@@ -890,6 +1059,10 @@ if (isMainModule) {
       importCanonicalMeritBadgeRequirements(arg1)
       break
 
+    case 'import-resources':
+      importRequirementResources(arg1)
+      break
+
     default:
       console.log(`
 BSA Reference Data Management CLI
@@ -902,6 +1075,7 @@ Commands:
   import-canonical-ranks [file]    Import ranks from bsa-data-canonical-normalized.json
   import-canonical-reqs [file]     Import merit badge requirements from canonical data
   import-positions [filename]      Import leadership positions
+  import-resources [file]          Import requirement resources from canonical data
 
 Options:
   --prod                           Use production database (.env.prod)
