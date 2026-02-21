@@ -198,7 +198,7 @@ flowchart TD
   - Details: Regex-detect `http://`, `https://`, `www.` patterns in text, render as `<a target="_blank" rel="noopener noreferrer">`
   - Test: Unit test with various URL patterns
 
-- [ ] **2.1.2** Create `RequirementResources` component for structured resource links
+- [x] **2.1.2** Create `RequirementResources` component for structured resource links
   - Files: `src/components/advancement/requirement-resources.tsx`
   - Details: Render list of resources with type icons (video/website/PDF), each opens in new tab
   - Test: Unit test with mock resource data
@@ -327,7 +327,8 @@ flowchart TD
 | 1.1.1 | 2026-02-21 | 750573c | Migration pushed to dev: bsa_requirement_resources + bsa_rank_requirement_resources tables with RLS |
 | 1.2.1 | 2026-02-21 | 2d068dd | Added Row/Insert/Update/Relationships types for both resource tables |
 | 1.2.2 | 2026-02-21 | d07a05f | Seeder imports 7,931 resources; wired into db:fresh and standalone CLI |
-| 2.1.1 | 2026-02-21 | — | LinkifiedText with 8 unit tests; handles http/https/www, excludes emails |
+| 2.1.1 | 2026-02-21 | 046cad6 | LinkifiedText with 8 unit tests; handles http/https/www, excludes emails |
+| 2.1.2 | 2026-02-21 | — | RequirementResources with 6 unit tests; video/website/PDF icons, opens in new tab |
 
 ---
 
