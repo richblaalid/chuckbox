@@ -28,6 +28,7 @@ import { RequirementCompletionDialog } from './requirement-completion-dialog'
 import { RequirementUndoDialog } from './requirement-undo-dialog'
 import { parseNotes, formatNoteTimestamp, getNoteTypeLabel, type RequirementNote } from '@/lib/notes-utils'
 import { RequirementResources } from './requirement-resources'
+import { LinkifiedText } from '@/components/ui/linkified-text'
 import type { AdvancementStatus } from '@/types/advancement'
 
 interface RequirementApprovalRowProps {
@@ -370,7 +371,7 @@ export const RequirementApprovalRow = memo(function RequirementApprovalRow({
                 )}>
                   {displayLabel ?? requirementNumber}
                 </span>
-                {description}
+                <LinkifiedText text={description} />
               </p>
               <RequirementResources resources={resources} />
 

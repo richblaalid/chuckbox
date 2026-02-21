@@ -26,6 +26,7 @@ import {
   Check,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { LinkifiedText } from '@/components/ui/linkified-text'
 
 interface MeritBadge {
   id: string
@@ -213,7 +214,7 @@ export function MeritBadgeDetailSheet({
 
             {/* Description */}
             {badge.description && (
-              <p className="mt-4 text-sm text-stone-600">{badge.description}</p>
+              <p className="mt-4 text-sm text-stone-600"><LinkifiedText text={badge.description} /></p>
             )}
 
             {/* Pamphlet Link */}
@@ -365,7 +366,7 @@ export function MeritBadgeDetailSheet({
                               </span>
                             )}
                           </div>
-                          <p className="mt-2 text-sm text-stone-900">{mainReq.description}</p>
+                          <p className="mt-2 text-sm text-stone-900"><LinkifiedText text={mainReq.description} /></p>
                         </div>
                         {canEdit && scoutsTracking.length > 0 && subReqs.length === 0 && !mainReq.is_header && (
                           <Button
@@ -403,7 +404,7 @@ export function MeritBadgeDetailSheet({
                                       )}
                                     </div>
                                     <p className="mt-1 text-xs text-stone-600">
-                                      {subReq.description}
+                                      <LinkifiedText text={subReq.description} />
                                     </p>
                                   </div>
                                   {canEdit && scoutsTracking.length > 0 && !subReq.is_header && (

@@ -4,6 +4,7 @@ import { useMemo, useState, useRef, memo, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { RequirementApprovalRow } from './requirement-approval-row'
 import { RequirementResources } from './requirement-resources'
+import { LinkifiedText } from '@/components/ui/linkified-text'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ChevronDown, ChevronRight, Check } from 'lucide-react'
 import type { AdvancementStatus } from '@/types/advancement'
@@ -604,7 +605,7 @@ const RequirementNodeView = memo(function RequirementNodeView({
               ? 'font-medium text-emerald-700'
               : 'font-medium text-stone-700'
         )}>
-          {req.description}
+          <LinkifiedText text={req.description} />
         </span>
 
         {/* Alternatives indicator */}

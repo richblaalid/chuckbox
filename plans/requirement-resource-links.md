@@ -214,7 +214,7 @@ flowchart TD
   - Details: Show resources below requirement description when expanded
   - Test: Resources visible in UI for badges that have them
 
-- [ ] **2.2.3** Integrate `LinkifiedText` for all requirement descriptions
+- [x] **2.2.3** Integrate `LinkifiedText` for all requirement descriptions
   - Files: `src/components/advancement/hierarchical-requirements-list.tsx`, `src/components/advancement/requirement-approval-row.tsx`, `src/components/advancement/merit-badge-detail-sheet.tsx`
   - Details: Replace plain text rendering of descriptions with `LinkifiedText`
   - Test: Geocaching/Cyber Chip inline URLs render as clickable links
