@@ -109,6 +109,10 @@ interface LazyRankBrowserProps {
   currentUserName?: string
   // Prefetched data is no longer used - we always load per-rank
   prefetchedData?: unknown
+  /** Rank code from URL search param — drives selection state */
+  selectedRankCode?: string | null
+  /** Callback to update URL when rank selection changes */
+  onRankChange?: (rankCode: string | null) => void
 }
 
 function RankSelectorSkeleton() {
@@ -153,14 +157,16 @@ export function LazyRankBrowser({
   unitId,
   canEdit,
   currentUserName = 'Leader',
+  selectedRankCode: selectedRankCodeProp,
+  onRankChange,
 }: LazyRankBrowserProps) {
   // State for ranks list (loaded once)
   const [ranks, setRanks] = useState<Rank[]>([])
   const [ranksLoading, setRanksLoading] = useState(true)
   const [ranksError, setRanksError] = useState<string | null>(null)
 
-  // State for selected rank - null until ranks load, then defaults to first rank
-  const [selectedRankCode, setSelectedRankCode] = useState<string | null>(null)
+  // Internal selected rank state — controlled by URL prop when provided
+  const [activeRankCode, setActiveRankCode] = useState<string | null>(null)
   const [rankDataLoading, setRankDataLoading] = useState(false)
 
   // Refresh key - increment to force re-fetch of current rank data
@@ -199,19 +205,27 @@ export function LazyRankBrowser({
     loadRanks()
   }, [])
 
-  // Set default rank when ranks load (first rank in sorted list)
+  // Set default rank when ranks load — use URL prop if provided, otherwise first rank
   useEffect(() => {
-    if (ranks.length > 0 && selectedRankCode === null) {
-      setSelectedRankCode(ranks[0].code)
+    if (ranks.length > 0 && activeRankCode === null) {
+      const initial = selectedRankCodeProp || ranks[0].code
+      setActiveRankCode(initial)
     }
-  }, [ranks, selectedRankCode])
+  }, [ranks, activeRankCode, selectedRankCodeProp])
+
+  // Sync URL prop changes (e.g., browser Back changes ?rank= param)
+  useEffect(() => {
+    if (selectedRankCodeProp == null) return // no URL override
+    if (selectedRankCodeProp === activeRankCode) return // already in sync
+    setActiveRankCode(selectedRankCodeProp)
+  }, [selectedRankCodeProp, activeRankCode])
 
   // Load rank data when selection changes
   // Inlined to avoid dependency on callback that changes with unitId
   useEffect(() => {
-    if (ranks.length === 0 || selectedRankCode === null) return
+    if (ranks.length === 0 || activeRankCode === null) return
 
-    const selectedRank = ranks.find(r => r.code === selectedRankCode)
+    const selectedRank = ranks.find(r => r.code === activeRankCode)
     if (!selectedRank) return
 
     // Capture rank ID before async function to satisfy TypeScript
@@ -272,25 +286,26 @@ export function LazyRankBrowser({
     return () => {
       cancelled = true
     }
-  }, [selectedRankCode, ranks, unitId, refreshKey, loadedRankId])
+  }, [activeRankCode, ranks, unitId, refreshKey, loadedRankId])
 
-  // Handle rank selection
+  // Handle rank selection — update internal state and notify parent for URL sync
   const handleRankSelect = useCallback((code: string) => {
-    setSelectedRankCode(code)
-  }, [])
+    setActiveRankCode(code)
+    onRankChange?.(code)
+  }, [onRankChange])
 
   // Handle data change (called after sign-off to invalidate cache)
   const handleDataChange = useCallback(() => {
     // Clear the cache for the current rank so fresh data is fetched
-    if (selectedRankCode) {
-      const selectedRank = ranks.find(r => r.code === selectedRankCode)
+    if (activeRankCode) {
+      const selectedRank = ranks.find(r => r.code === activeRankCode)
       if (selectedRank) {
         rankDataCache.current.delete(selectedRank.id)
         // Increment refresh key to trigger re-fetch via useEffect
         setRefreshKey(k => k + 1)
       }
     }
-  }, [selectedRankCode, ranks])
+  }, [activeRankCode, ranks])
 
   // Loading state for initial ranks
   if (ranksLoading) {
@@ -318,7 +333,7 @@ export function LazyRankBrowser({
   }
 
   // Brief loading state between ranks loading and default selection being set
-  if (selectedRankCode === null) {
+  if (activeRankCode === null) {
     return (
       <div className="space-y-4">
         <RankSelectorSkeleton />
@@ -327,7 +342,7 @@ export function LazyRankBrowser({
     )
   }
 
-  const currentRank = ranks.find(r => r.code === selectedRankCode)
+  const currentRank = ranks.find(r => r.code === activeRankCode)
 
   // Get scouts working on this rank (if we have data)
   const scoutsWorkingOnRank = currentRankData?.scoutProgress.filter(
@@ -340,7 +355,7 @@ export function LazyRankBrowser({
       <RankTrailVisualization
         rankProgress={[]}
         currentRank={null}
-        selectedRank={selectedRankCode}
+        selectedRank={activeRankCode}
         onRankClick={handleRankSelect}
         selectorMode
         compact

@@ -9,6 +9,8 @@ interface LazyMeritBadgeBrowserProps {
   unitId: string
   canEdit: boolean
   currentUserName?: string
+  selectedBadgeId?: string | null
+  onBadgeChange?: (badgeId: string | null) => void
 }
 
 // Types matching what MeritBadgeBrowser expects
@@ -87,6 +89,8 @@ export function LazyMeritBadgeBrowser({
   unitId,
   canEdit,
   currentUserName = 'Leader',
+  selectedBadgeId,
+  onBadgeChange,
 }: LazyMeritBadgeBrowserProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -187,6 +191,8 @@ export function LazyMeritBadgeBrowser({
       canEdit={canEdit}
       currentUserName={currentUserName}
       onDataChange={handleDataChange}
+      selectedBadgeId={selectedBadgeId}
+      onBadgeChange={onBadgeChange}
     />
   )
 }

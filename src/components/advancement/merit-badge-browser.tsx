@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useTransition } from 'react'
+import { useState, useMemo, useTransition, useRef, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -51,6 +51,10 @@ interface MeritBadgeBrowserProps {
   currentUserName?: string
   /** Called when data changes (e.g., after sign-offs) to trigger a refresh */
   onDataChange?: () => void
+  /** Badge ID from URL search param — drives selection state */
+  selectedBadgeId?: string | null
+  /** Callback to update URL when badge selection changes */
+  onBadgeChange?: (badgeId: string | null) => void
 }
 
 type FilterType = 'all' | 'eagle' | 'in_progress' | 'category'
@@ -64,6 +68,8 @@ export function MeritBadgeBrowser({
   canEdit,
   currentUserName = 'Leader',
   onDataChange,
+  selectedBadgeId,
+  onBadgeChange,
 }: MeritBadgeBrowserProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeFilter, setActiveFilter] = useState<FilterType>('all')
@@ -72,6 +78,54 @@ export function MeritBadgeBrowser({
   const [badgeRequirements, setBadgeRequirements] = useState<BsaMeritBadgeRequirement[]>([])
   const [isLoadingRequirements, setIsLoadingRequirements] = useState(false)
   const [isPending, startTransition] = useTransition()
+
+  // Cache fetched requirements to avoid re-fetching on back-navigation
+  const requirementsCache = useRef<Map<string, BsaMeritBadgeRequirement[]>>(new Map())
+
+  // Sync selection state with URL search param (selectedBadgeId)
+  useEffect(() => {
+    // Already in sync — skip
+    if (selectedBadgeId === selectedBadge?.id) return
+    if (selectedBadgeId == null && selectedBadge === null) return
+
+    // URL says no badge → clear selection (browser Back)
+    if (selectedBadgeId == null) {
+      setSelectedBadge(null)
+      setBadgeRequirements([])
+      return
+    }
+
+    // URL says badge selected but badges haven't loaded yet → wait for next render
+    if (badges.length === 0) return
+
+    // Find and select the badge from the loaded list
+    const badge = badges.find(b => b.id === selectedBadgeId)
+    if (!badge) return
+
+    // Check cache first to avoid re-fetching
+    const cached = requirementsCache.current.get(badge.id)
+    if (cached) {
+      setSelectedBadge(badge)
+      setBadgeRequirements(cached)
+    } else {
+      // Fetch requirements (sets selectedBadge and caches results)
+      setSelectedBadge(badge)
+      setIsLoadingRequirements(true)
+      startTransition(async () => {
+        try {
+          const reqs = await getMeritBadgeRequirements(badge.id)
+          const typedReqs = reqs as BsaMeritBadgeRequirement[]
+          requirementsCache.current.set(badge.id, typedReqs)
+          setBadgeRequirements(typedReqs)
+        } catch (error) {
+          console.error('Error fetching requirements:', error)
+          setBadgeRequirements([])
+        } finally {
+          setIsLoadingRequirements(false)
+        }
+      })
+    }
+  }, [selectedBadgeId, badges]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Calculate badge stats
   const badgeStats = useMemo(() => {
@@ -142,13 +196,23 @@ export function MeritBadgeBrowser({
 
   const handleBadgeClick = async (badge: MeritBadge) => {
     setSelectedBadge(badge)
-    setIsLoadingRequirements(true)
+    onBadgeChange?.(badge.id)
+
+    // Check cache first
+    const cached = requirementsCache.current.get(badge.id)
+    if (cached) {
+      setBadgeRequirements(cached)
+      return
+    }
 
     // Fetch requirements on-demand for this specific badge
+    setIsLoadingRequirements(true)
     startTransition(async () => {
       try {
         const reqs = await getMeritBadgeRequirements(badge.id)
-        setBadgeRequirements(reqs as BsaMeritBadgeRequirement[])
+        const typedReqs = reqs as BsaMeritBadgeRequirement[]
+        requirementsCache.current.set(badge.id, typedReqs)
+        setBadgeRequirements(typedReqs)
       } catch (error) {
         console.error('Error fetching requirements:', error)
         setBadgeRequirements([])
@@ -161,6 +225,20 @@ export function MeritBadgeBrowser({
   const handleBack = () => {
     setSelectedBadge(null)
     setBadgeRequirements([])
+    onBadgeChange?.(null)
+  }
+
+  // Flash prevention: when refreshing with ?badge=<uuid>, badges haven't loaded yet.
+  // Show loading state instead of briefly flashing the grid.
+  if (!selectedBadge && selectedBadgeId && badges.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center text-stone-500">
+          <Award className="mx-auto h-8 w-8 animate-pulse text-stone-400" />
+          <p className="mt-2 text-sm">Loading merit badge...</p>
+        </div>
+      </div>
+    )
   }
 
   // Show unit-mode requirements view if a badge is selected
