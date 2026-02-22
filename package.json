@@ -23,7 +23,9 @@
     "db:normalize": "npx tsx scripts/normalize-canonical-data.ts",
     "db:dump": "npx tsx scripts/db.ts dump",
     "db:restore": "npx tsx scripts/db.ts restore",
-    "db:list": "npx tsx scripts/db.ts list"
+    "db:list": "npx tsx scripts/db.ts list",
+    "test:e2e": "npx playwright test",
+    "test:e2e:ui": "npx playwright test --ui"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
