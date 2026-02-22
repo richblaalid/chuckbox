@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Award, Medal, BarChart3 } from 'lucide-react'
 import { LazyRankBrowser } from './lazy-rank-browser'
@@ -104,23 +105,52 @@ export function UnitAdvancementTabs({
   currentUserName = 'Leader',
   initialTab = 'ranks',
 }: UnitAdvancementTabsProps) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  // Derive active tab from URL (fallback to server-provided initialTab)
+  const activeTab = (searchParams.get('tab') as TabValue) || initialTab
+  const badgeId = searchParams.get('badge') || null
+  const rankCode = searchParams.get('rank') || null
+
   // Track which tabs have been visited to enable lazy loading
-  // Include both ranks (prefetched) and the initial tab
+  // Include both ranks (always available) and the active tab from URL
   const [visitedTabs, setVisitedTabs] = useState<Set<string>>(
-    new Set(['ranks', initialTab])
+    new Set(['ranks', activeTab])
   )
 
-  const handleTabChange = (value: string) => {
+  // Tab switching: router.replace (lateral navigation, no history entry)
+  const handleTabChange = useCallback((value: string) => {
     setVisitedTabs((prev) => {
       if (prev.has(value)) return prev
       const next = new Set(prev)
       next.add(value)
       return next
     })
-  }
+    router.replace(pathname + '?tab=' + value, { scroll: false })
+  }, [router, pathname])
+
+  // Badge selection: router.push (depth navigation, creates history entry)
+  const handleBadgeChange = useCallback((newBadgeId: string | null) => {
+    if (newBadgeId) {
+      router.push(pathname + '?tab=badges&badge=' + newBadgeId, { scroll: false })
+    } else {
+      router.push(pathname + '?tab=badges', { scroll: false })
+    }
+  }, [router, pathname])
+
+  // Rank selection: router.push (depth navigation, creates history entry)
+  const handleRankChange = useCallback((newRankCode: string | null) => {
+    if (newRankCode) {
+      router.push(pathname + '?tab=ranks&rank=' + newRankCode, { scroll: false })
+    } else {
+      router.replace(pathname + '?tab=ranks', { scroll: false })
+    }
+  }, [router, pathname])
 
   return (
-    <Tabs defaultValue={initialTab} className="w-full" onValueChange={handleTabChange}>
+    <Tabs value={activeTab} className="w-full" onValueChange={handleTabChange}>
       <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="ranks" className="gap-1.5">
           <Award className="h-4 w-4 hidden sm:inline" />
@@ -136,31 +166,35 @@ export function UnitAdvancementTabs({
         </TabsTrigger>
       </TabsList>
 
-      {/* Rank Requirements Tab - Prefetched server-side for instant load */}
-      <TabsContent value="ranks" className="mt-4">
+      {/* Rank Requirements Tab — forceMount keeps DOM alive, CSS hides when inactive */}
+      <TabsContent value="ranks" forceMount className="data-[state=inactive]:hidden mt-4">
         {visitedTabs.has('ranks') && (
           <LazyRankBrowser
             unitId={unitId}
             canEdit={canEdit}
             currentUserName={currentUserName}
             prefetchedData={prefetchedRankData}
+            selectedRankCode={rankCode}
+            onRankChange={handleRankChange}
           />
         )}
       </TabsContent>
 
-      {/* Merit Badges Tab - Lazy loaded on click */}
-      <TabsContent value="badges" className="mt-4">
+      {/* Merit Badges Tab — forceMount preserves loaded badge data across tab switches */}
+      <TabsContent value="badges" forceMount className="data-[state=inactive]:hidden mt-4">
         {visitedTabs.has('badges') && (
           <LazyMeritBadgeBrowser
             unitId={unitId}
             canEdit={canEdit}
             currentUserName={currentUserName}
+            selectedBadgeId={badgeId}
+            onBadgeChange={handleBadgeChange}
           />
         )}
       </TabsContent>
 
-      {/* Summary Tab - Data lazy-loaded when visited (unless prefetched) */}
-      <TabsContent value="summary" className="mt-4">
+      {/* Summary Tab — forceMount preserves summary data across tab switches */}
+      <TabsContent value="summary" forceMount className="data-[state=inactive]:hidden mt-4">
         {visitedTabs.has('summary') && (
           <LazySummaryView
             scouts={scouts}
