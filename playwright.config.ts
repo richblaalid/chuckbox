@@ -14,8 +14,14 @@ export default defineConfig({
   },
   projects: [
     {
-      name: 'chromium',
+      name: 'auth-setup',
+      testMatch: /global-setup\.ts/,
+    },
+    {
+      name: 'smoke',
+      testDir: './tests/e2e/smoke',
       use: { ...devices['Desktop Chrome'] },
+      dependencies: ['auth-setup'],
     },
   ],
   webServer: {
