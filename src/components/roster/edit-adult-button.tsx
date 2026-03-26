@@ -15,8 +15,8 @@ interface EditAdultButtonProps {
     last_name: string | null
     email: string | null
     email_secondary: string | null
-    phone_primary: string | null
-    phone_secondary: string | null
+    phone_home: string | null
+    phone_mobile: string | null
     address_street: string | null
     address_city: string | null
     address_state: string | null

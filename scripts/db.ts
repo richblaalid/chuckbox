@@ -225,7 +225,7 @@ async function seedBase(): Promise<void> {
       full_name: 'Admin User',
       first_name: 'Admin',
       last_name: 'User',
-      phone_primary: '555-123-0001',
+      phone_home: '555-123-0001',
     }).eq('id', adminProfileId);
     if (updateError) console.log(`  Warning: ${updateError.message}`);
     console.log(`  Updated existing profile: ${adminProfileId}`);
@@ -237,7 +237,7 @@ async function seedBase(): Promise<void> {
       full_name: 'Admin User',
       first_name: 'Admin',
       last_name: 'User',
-      phone_primary: '555-123-0001',
+      phone_home: '555-123-0001',
     }).select('id').single();
     if (insertError) {
       console.error(`  Failed to create profile: ${insertError.message}`);
@@ -312,7 +312,7 @@ async function seedTestData(): Promise<void> {
         full_name: `${role.charAt(0).toUpperCase() + role.slice(1)} User`,
         first_name: role.charAt(0).toUpperCase() + role.slice(1),
         last_name: 'User',
-        phone_primary: `555-123-${String(Object.keys(userIds).indexOf(role) + 2).padStart(4, '0')}`,
+        phone_home: `555-123-${String(Object.keys(userIds).indexOf(role) + 2).padStart(4, '0')}`,
       }).eq('id', existingProfile.id);
       if (updateError) console.log(`  Warning: ${updateError.message}`);
       else console.log(`  Updated profile: ${role}`);
@@ -324,7 +324,7 @@ async function seedTestData(): Promise<void> {
         full_name: `${role.charAt(0).toUpperCase() + role.slice(1)} User`,
         first_name: role.charAt(0).toUpperCase() + role.slice(1),
         last_name: 'User',
-        phone_primary: `555-123-${String(Object.keys(userIds).indexOf(role) + 2).padStart(4, '0')}`,
+        phone_home: `555-123-${String(Object.keys(userIds).indexOf(role) + 2).padStart(4, '0')}`,
       }).select('id').single();
       if (insertError) console.log(`  Warning: ${insertError.message}`);
       else {

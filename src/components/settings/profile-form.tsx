@@ -27,8 +27,8 @@ interface ProfileFormProps {
     address_state: string | null
     address_zip: string | null
     email_secondary: string | null
-    phone_primary: string | null
-    phone_secondary: string | null
+    phone_home: string | null
+    phone_mobile: string | null
   }
 }
 
@@ -54,8 +54,8 @@ export function ProfileForm({ profile }: ProfileFormProps) {
       address_state: formData.get('address_state') as string || null,
       address_zip: formData.get('address_zip') as string || null,
       email_secondary: formData.get('email_secondary') as string || null,
-      phone_primary: formData.get('phone_primary') as string || null,
-      phone_secondary: formData.get('phone_secondary') as string || null,
+      phone_home: formData.get('phone_home') as string || null,
+      phone_mobile: formData.get('phone_mobile') as string || null,
     })
 
     setIsLoading(false)

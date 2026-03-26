@@ -15,8 +15,8 @@ interface ProfileData {
   last_name?: string | null
   gender?: Gender | null
   email_secondary?: string | null
-  phone_primary?: string | null
-  phone_secondary?: string | null
+  phone_home?: string | null
+  phone_mobile?: string | null
   address_street?: string | null
   address_city?: string | null
   address_state?: string | null
@@ -65,8 +65,8 @@ export async function updateProfile(data: ProfileData): Promise<ActionResult> {
   if ('last_name' in data) updateData.last_name = data.last_name
   if ('gender' in data) updateData.gender = data.gender
   if ('email_secondary' in data) updateData.email_secondary = data.email_secondary
-  if ('phone_primary' in data) updateData.phone_primary = data.phone_primary
-  if ('phone_secondary' in data) updateData.phone_secondary = data.phone_secondary
+  if ('phone_home' in data) updateData.phone_home = data.phone_home
+  if ('phone_mobile' in data) updateData.phone_mobile = data.phone_mobile
   if ('address_street' in data) updateData.address_street = data.address_street
   if ('address_city' in data) updateData.address_city = data.address_city
   if ('address_state' in data) updateData.address_state = data.address_state

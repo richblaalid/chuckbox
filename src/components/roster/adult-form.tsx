@@ -39,8 +39,8 @@ interface AdultData {
   last_name: string | null
   email: string | null
   email_secondary: string | null
-  phone_primary: string | null
-  phone_secondary: string | null
+  phone_home: string | null
+  phone_mobile: string | null
   address_street: string | null
   address_city: string | null
   address_state: string | null
@@ -193,7 +193,7 @@ export function AdultForm({ unitId, adult, onClose, onSuccess }: AdultFormProps)
         first_name: firstName,
         last_name: lastName,
         email: (formData.get('email') as string) || null,
-        phone_primary: (formData.get('phone_primary') as string) || null,
+        phone_home: (formData.get('phone_home') as string) || null,
         member_type: (formData.get('member_type') as string) || null,
         position: (formData.get('position') as string) || null,
         bsa_member_id: (formData.get('bsa_member_id') as string) || null,
@@ -225,8 +225,8 @@ export function AdultForm({ unitId, adult, onClose, onSuccess }: AdultFormProps)
         last_name: (formData.get('last_name') as string) || null,
         email: adult.user_id ? null : (formData.get('email') as string) || null,
         email_secondary: (formData.get('email_secondary') as string) || null,
-        phone_primary: (formData.get('phone_primary') as string) || null,
-        phone_secondary: (formData.get('phone_secondary') as string) || null,
+        phone_home: (formData.get('phone_home') as string) || null,
+        phone_mobile: (formData.get('phone_mobile') as string) || null,
         address_street: (formData.get('address_street') as string) || null,
         address_city: (formData.get('address_city') as string) || null,
         address_state: (formData.get('address_state') as string) || null,
@@ -332,10 +332,10 @@ export function AdultForm({ unitId, adult, onClose, onSuccess }: AdultFormProps)
           {/* Phone - simplified for create mode */}
           {isCreateMode ? (
             <div className="space-y-2">
-              <Label htmlFor="phone_primary">Phone</Label>
+              <Label htmlFor="phone_home">Home Phone</Label>
               <Input
-                id="phone_primary"
-                name="phone_primary"
+                id="phone_home"
+                name="phone_home"
                 type="tel"
                 placeholder="(555) 123-4567"
               />
@@ -343,22 +343,22 @@ export function AdultForm({ unitId, adult, onClose, onSuccess }: AdultFormProps)
           ) : (
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="phone_primary">Primary Phone</Label>
+                <Label htmlFor="phone_home">Home Phone</Label>
                 <Input
-                  id="phone_primary"
-                  name="phone_primary"
+                  id="phone_home"
+                  name="phone_home"
                   type="tel"
-                  defaultValue={adult?.phone_primary || ''}
+                  defaultValue={adult?.phone_home || ''}
                   placeholder="(555) 123-4567"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone_secondary">Secondary Phone</Label>
+                <Label htmlFor="phone_mobile">Mobile Phone</Label>
                 <Input
-                  id="phone_secondary"
-                  name="phone_secondary"
+                  id="phone_mobile"
+                  name="phone_mobile"
                   type="tel"
-                  defaultValue={adult?.phone_secondary || ''}
+                  defaultValue={adult?.phone_mobile || ''}
                   placeholder="(555) 123-4567"
                 />
               </div>

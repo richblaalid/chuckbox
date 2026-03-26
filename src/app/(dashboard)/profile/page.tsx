@@ -53,8 +53,8 @@ export default async function ProfilePage() {
           address_state: profile.address_state,
           address_zip: profile.address_zip,
           email_secondary: profile.email_secondary,
-          phone_primary: profile.phone_primary,
-          phone_secondary: profile.phone_secondary,
+          phone_home: profile.phone_home,
+          phone_mobile: profile.phone_mobile,
         }}
       />
 
@@ -62,8 +62,8 @@ export default async function ProfilePage() {
         profile={{
           email: user.email || profile.email || '',
           email_secondary: profile.email_secondary,
-          phone_primary: profile.phone_primary,
-          phone_secondary: profile.phone_secondary,
+          phone_home: profile.phone_home,
+          phone_mobile: profile.phone_mobile,
         }}
       />
 

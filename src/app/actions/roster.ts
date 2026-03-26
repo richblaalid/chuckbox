@@ -127,7 +127,7 @@ export async function createRosterAdult(
     first_name: string
     last_name: string
     email: string | null
-    phone_primary: string | null
+    phone_home: string | null
     member_type: string | null
     position: string | null
     bsa_member_id: string | null
@@ -214,7 +214,7 @@ export async function createRosterAdult(
       last_name: data.last_name,
       full_name: `${data.first_name} ${data.last_name}`,
       email: data.email?.toLowerCase() || null,
-      phone_primary: data.phone_primary,
+      phone_home: data.phone_home,
       member_type: data.member_type,
       position: data.position,
       bsa_member_id: data.bsa_member_id,
@@ -305,8 +305,8 @@ export async function updateRosterAdult(
     last_name: string | null
     email: string | null // Only updated if profile has no user account
     email_secondary: string | null
-    phone_primary: string | null
-    phone_secondary: string | null
+    phone_home: string | null
+    phone_mobile: string | null
     address_street: string | null
     address_city: string | null
     address_state: string | null
@@ -397,8 +397,8 @@ export async function updateRosterAdult(
     last_name: data.last_name,
     full_name: [data.first_name, data.last_name].filter(Boolean).join(' ') || null,
     email_secondary: data.email_secondary,
-    phone_primary: data.phone_primary,
-    phone_secondary: data.phone_secondary,
+    phone_home: data.phone_home,
+    phone_mobile: data.phone_mobile,
     address_street: data.address_street,
     address_city: data.address_city,
     address_state: data.address_state,

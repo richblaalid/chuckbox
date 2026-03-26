@@ -2024,8 +2024,8 @@ export type Database = {
           last_name: string | null
           last_synced_at: string | null
           member_type: string | null
-          phone_primary: string | null
-          phone_secondary: string | null
+          phone_home: string | null
+          phone_mobile: string | null
           position: string | null
           position_2: string | null
           renewal_status: string | null
@@ -2059,8 +2059,8 @@ export type Database = {
           last_name?: string | null
           last_synced_at?: string | null
           member_type?: string | null
-          phone_primary?: string | null
-          phone_secondary?: string | null
+          phone_home?: string | null
+          phone_mobile?: string | null
           position?: string | null
           position_2?: string | null
           renewal_status?: string | null
@@ -2094,8 +2094,8 @@ export type Database = {
           last_name?: string | null
           last_synced_at?: string | null
           member_type?: string | null
-          phone_primary?: string | null
-          phone_secondary?: string | null
+          phone_home?: string | null
+          phone_mobile?: string | null
           position?: string | null
           position_2?: string | null
           renewal_status?: string | null

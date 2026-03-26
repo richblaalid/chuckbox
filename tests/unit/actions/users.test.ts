@@ -537,8 +537,8 @@ describe('User Actions', () => {
     const profileData = {
       first_name: 'John',
       last_name: 'Doe',
-      phone_primary: '555-0100',
-      phone_secondary: null,
+      phone_home: '555-0100',
+      phone_mobile: null,
       email_secondary: null,
       address_street: null,
       address_city: null,

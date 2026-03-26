@@ -73,8 +73,8 @@ export default async function RosterPage() {
     full_name: string | null
     email: string | null
     email_secondary: string | null
-    phone_primary: string | null
-    phone_secondary: string | null
+    phone_home: string | null
+    phone_mobile: string | null
     address_street: string | null
     address_city: string | null
     address_state: string | null
@@ -180,8 +180,8 @@ export default async function RosterPage() {
           full_name,
           email,
           email_secondary,
-          phone_primary,
-          phone_secondary,
+          phone_home,
+          phone_mobile,
           address_street,
           address_city,
           address_state,

@@ -64,8 +64,8 @@ export default async function AdultDetailPage({ params }: AdultDetailPageProps) 
       full_name,
       email,
       email_secondary,
-      phone_primary,
-      phone_secondary,
+      phone_home,
+      phone_mobile,
       address_street,
       address_city,
       address_state,
@@ -181,8 +181,8 @@ export default async function AdultDetailPage({ params }: AdultDetailPageProps) 
               last_name: adult.last_name,
               email: adult.email,
               email_secondary: adult.email_secondary,
-              phone_primary: adult.phone_primary,
-              phone_secondary: adult.phone_secondary,
+              phone_home: adult.phone_home,
+              phone_mobile: adult.phone_mobile,
               address_street: adult.address_street,
               address_city: adult.address_city,
               address_state: adult.address_state,
@@ -225,13 +225,13 @@ export default async function AdultDetailPage({ params }: AdultDetailPageProps) 
                 </div>
               )}
               <div>
-                <p className="text-sm text-stone-500">Primary Phone</p>
-                <p className="font-medium">{adult.phone_primary || '—'}</p>
+                <p className="text-sm text-stone-500">Home Phone</p>
+                <p className="font-medium">{adult.phone_home || '—'}</p>
               </div>
-              {adult.phone_secondary && (
+              {adult.phone_mobile && (
                 <div>
-                  <p className="text-sm text-stone-500">Secondary Phone</p>
-                  <p className="font-medium">{adult.phone_secondary}</p>
+                  <p className="text-sm text-stone-500">Mobile Phone</p>
+                  <p className="font-medium">{adult.phone_mobile}</p>
                 </div>
               )}
             </div>

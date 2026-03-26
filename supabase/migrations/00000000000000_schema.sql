@@ -53,6 +53,11 @@ CREATE TYPE payment_link_status AS ENUM ('pending', 'completed', 'expired', 'can
 CREATE TYPE sync_status AS ENUM ('running', 'staged', 'completed', 'failed', 'cancelled');
 CREATE TYPE rsvp_status AS ENUM ('going', 'not_going', 'maybe');
 
+-- Expense types
+CREATE TYPE expense_category AS ENUM ('supplies', 'food', 'travel', 'other');
+CREATE TYPE expense_status AS ENUM ('draft', 'submitted', 'approved', 'rejected', 'paid');
+CREATE TYPE cost_share_status AS ENUM ('pending', 'paid', 'declined');
+
 -- ============================================
 -- SECTION 1: CORE TABLES
 -- ============================================
@@ -75,6 +80,21 @@ CREATE TABLE units (
     -- Sub-unit hierarchy
     parent_unit_id UUID REFERENCES units(id) ON DELETE CASCADE,
     is_section BOOLEAN DEFAULT false,
+    -- Setup tracking
+    needs_setup BOOLEAN DEFAULT false,
+    signup_path TEXT,
+    section_identifier VARCHAR(20),
+    -- Provisioning
+    provisioning_status VARCHAR(20) DEFAULT 'active'
+        CHECK (provisioning_status IN ('pending', 'active', 'suspended')),
+    setup_completed_at TIMESTAMPTZ,
+    -- Collection settings
+    collection_settings JSONB DEFAULT '{
+  "overdue_threshold_days": 30,
+  "overdue_threshold_amount_cents": 0,
+  "reminder_email_subject": "Payment Reminder - {unit_name}",
+  "reminder_email_template": "default"
+}'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -82,6 +102,12 @@ CREATE TABLE units (
 COMMENT ON COLUMN units.processing_fee_percent IS 'Card processing fee percentage (e.g., 0.0260 = 2.6%)';
 COMMENT ON COLUMN units.processing_fee_fixed IS 'Fixed card processing fee amount in dollars';
 COMMENT ON COLUMN units.pass_fees_to_payer IS 'If true, processing fees are added to payment amount';
+COMMENT ON COLUMN units.needs_setup IS 'True if unit was created without CSV roster and needs setup wizard completion';
+COMMENT ON COLUMN units.signup_path IS 'How the unit was created: csv (with roster upload) or manual (skip for now)';
+COMMENT ON COLUMN units.section_identifier IS 'Scoutbook-style section identifier (e.g., "9297B" for boys, "7297G" for girls). Used for matching during sync imports.';
+COMMENT ON COLUMN units.provisioning_status IS 'Unit provisioning status: pending (awaiting verification), active, or suspended';
+COMMENT ON COLUMN units.setup_completed_at IS 'Timestamp when unit completed first-time setup wizard';
+COMMENT ON COLUMN units.collection_settings IS 'Configurable settings for payment collection: overdue_threshold_days, overdue_threshold_amount_cents, reminder_email_subject, reminder_email_template';
 
 -- Profiles (decoupled from auth.users - can exist without user account)
 CREATE TABLE profiles (
@@ -91,8 +117,8 @@ CREATE TABLE profiles (
     full_name VARCHAR(255),
     first_name VARCHAR(100),
     last_name VARCHAR(100),
-    phone_primary VARCHAR(30),
-    phone_secondary VARCHAR(30),
+    phone_home VARCHAR(30),
+    phone_mobile VARCHAR(30),
     email_secondary VARCHAR(255),
     address_street VARCHAR(255),
     address_city VARCHAR(100),
@@ -112,6 +138,8 @@ CREATE TABLE profiles (
     swim_classification swim_classification,
     swim_class_date DATE,
     is_active BOOLEAN DEFAULT true,
+    -- Payment
+    venmo_username TEXT,
     -- Sync tracking
     sync_session_id UUID,
     last_synced_at TIMESTAMPTZ,
@@ -122,6 +150,7 @@ CREATE TABLE profiles (
 COMMENT ON COLUMN profiles.user_id IS 'Links to auth.users when they have an account (nullable for imported adults)';
 COMMENT ON COLUMN profiles.is_active IS 'Soft delete flag - false means account is deactivated';
 COMMENT ON COLUMN profiles.gender IS 'Used for auto-assigning members to boys/girls sections in coed troops';
+COMMENT ON COLUMN profiles.venmo_username IS 'User Venmo username for receiving reimbursements and cost-sharing payments';
 
 -- Unit Memberships (links profiles to units with roles)
 CREATE TABLE unit_memberships (
@@ -142,6 +171,8 @@ CREATE TABLE unit_memberships (
     current_position VARCHAR(100),
     -- Sub-unit support
     section_unit_id UUID REFERENCES units(id) ON DELETE SET NULL,
+    -- Merit badge counselor flag
+    is_merit_badge_counselor BOOLEAN DEFAULT false,
     created_by UUID REFERENCES profiles(id)
 );
 
@@ -534,6 +565,9 @@ CREATE TABLE sync_staged_members (
     skip_reason TEXT,
     is_selected BOOLEAN DEFAULT true,
     status TEXT DEFAULT 'pending',
+    -- Conflict resolution
+    conflicts JSONB,
+    field_resolutions JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -542,6 +576,8 @@ COMMENT ON COLUMN sync_staged_members.change_type IS 'create = new, update = exi
 COMMENT ON COLUMN sync_staged_members.matched_profile_id IS 'Profile ID matched by BSA ID or name for adults';
 COMMENT ON COLUMN sync_staged_members.match_type IS 'How the profile was matched: bsa_id, name, or null';
 COMMENT ON COLUMN sync_staged_members.status IS 'Processing status: pending, approved, rejected';
+COMMENT ON COLUMN sync_staged_members.conflicts IS 'Detected conflicts where Chuckbox value would win by default. Array of {field, chuckboxValue, scoutbookValue, reason, resolution}';
+COMMENT ON COLUMN sync_staged_members.field_resolutions IS 'Per-field resolution preferences: {field_name: chuckbox|scoutbook}';
 
 -- Adult Trainings
 CREATE TABLE adult_trainings (
@@ -677,6 +713,7 @@ CREATE TABLE waitlist (
 
 -- Units indexes
 CREATE INDEX idx_units_parent_unit_id ON units(parent_unit_id) WHERE parent_unit_id IS NOT NULL;
+CREATE INDEX idx_units_section_identifier ON units(section_identifier) WHERE section_identifier IS NOT NULL;
 
 -- Profiles indexes
 CREATE INDEX idx_profiles_user_id ON profiles(user_id);
@@ -2422,14 +2459,7 @@ WHERE parent_unit_id IS NULL AND is_section = false;
 
 COMMENT ON INDEX idx_units_unique_council_type_number IS 'Prevents duplicate primary units (same council, type, number)';
 
--- 2. Add provisioning status for tracking signup flow
-ALTER TABLE units ADD COLUMN IF NOT EXISTS provisioning_status VARCHAR(20)
-  DEFAULT 'active'
-  CHECK (provisioning_status IN ('pending', 'active', 'suspended'));
-
-COMMENT ON COLUMN units.provisioning_status IS 'Unit provisioning status: pending (awaiting verification), active, or suspended';
-
--- 3. Provisioning tokens for email verification during signup
+-- 2. Provisioning tokens for email verification during signup
 CREATE TABLE unit_provisioning_tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     unit_id UUID NOT NULL REFERENCES units(id) ON DELETE CASCADE,
@@ -2487,10 +2517,12 @@ CREATE TABLE staged_roster_imports (
     parsed_adults JSONB NOT NULL,
     parsed_scouts JSONB NOT NULL,
     unit_metadata JSONB,
+    section_unit_map JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 COMMENT ON TABLE staged_roster_imports IS 'Temporary storage for parsed roster data during signup verification';
+COMMENT ON COLUMN staged_roster_imports.section_unit_map IS 'Mapping of section identifiers to unit IDs for linked troops (e.g., {"9297B": "uuid-1", "7297G": "uuid-2"})';
 
 ALTER TABLE staged_roster_imports ENABLE ROW LEVEL SECURITY;
 
@@ -2501,12 +2533,7 @@ CREATE POLICY "Service role only for staged imports"
     USING (false)
     WITH CHECK (false);
 
--- 6. Add setup_completed_at field to track first-time setup completion
-ALTER TABLE units ADD COLUMN IF NOT EXISTS setup_completed_at TIMESTAMPTZ;
-
-COMMENT ON COLUMN units.setup_completed_at IS 'Timestamp when unit completed first-time setup wizard';
-
--- 7. Function to clean up expired provisioning tokens (run via cron)
+-- 6. Function to clean up expired provisioning tokens (run via cron)
 CREATE OR REPLACE FUNCTION cleanup_expired_provisioning_tokens()
 RETURNS void
 LANGUAGE plpgsql
@@ -2606,6 +2633,7 @@ CREATE TABLE bsa_rank_requirements (
     description TEXT NOT NULL,
     is_alternative BOOLEAN DEFAULT false,
     alternatives_group TEXT,
+    is_header BOOLEAN DEFAULT false,
     display_order INTEGER NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(version_year, rank_id, requirement_number, sub_requirement_letter)
@@ -2618,6 +2646,8 @@ CREATE INDEX idx_bsa_rank_requirements_parent ON bsa_rank_requirements(parent_re
 -- Comments for bsa_rank_requirements
 COMMENT ON COLUMN bsa_rank_requirements.version_year IS
   'BSA version year for these requirements (e.g., 2022, 2016). Query by joining to bsa_ranks.requirement_version_year for current requirements.';
+COMMENT ON COLUMN bsa_rank_requirements.is_header IS
+  'True if this requirement is a header that organizes child requirements and should not be completable';
 
 -- 141+ merit badges
 CREATE TABLE bsa_merit_badges (
@@ -2657,8 +2687,10 @@ CREATE TABLE bsa_merit_badge_requirements (
     is_alternative BOOLEAN DEFAULT false,
     alternatives_group TEXT,
     nesting_depth INTEGER DEFAULT 0,
+    is_header BOOLEAN DEFAULT false,
     original_scoutbook_id TEXT,
     required_count INTEGER,
+    scoutbook_requirement_number TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -2671,6 +2703,8 @@ CREATE INDEX idx_mb_requirements_badge_version ON bsa_merit_badge_requirements(m
 CREATE INDEX idx_bsa_mb_requirements_parent ON bsa_merit_badge_requirements(parent_requirement_id);
 CREATE INDEX idx_bsa_mb_requirements_scoutbook_id ON bsa_merit_badge_requirements(original_scoutbook_id) WHERE original_scoutbook_id IS NOT NULL;
 CREATE INDEX idx_bsa_mb_requirements_alternatives_group ON bsa_merit_badge_requirements(merit_badge_id, alternatives_group) WHERE alternatives_group IS NOT NULL;
+CREATE INDEX idx_bsa_mb_req_is_header ON bsa_merit_badge_requirements(is_header) WHERE is_header = true;
+CREATE INDEX idx_mb_req_scoutbook_num ON bsa_merit_badge_requirements(merit_badge_id, version_year, scoutbook_requirement_number) WHERE scoutbook_requirement_number IS NOT NULL;
 
 -- Comments for bsa_merit_badge_requirements
 COMMENT ON COLUMN bsa_merit_badge_requirements.version_year IS
@@ -2680,6 +2714,10 @@ COMMENT ON COLUMN bsa_merit_badge_requirements.alternatives_group IS 'Groups rel
 COMMENT ON COLUMN bsa_merit_badge_requirements.nesting_depth IS 'Depth level in the hierarchy (0=top, 1=sub-requirement, 2=sub-sub, etc.)';
 COMMENT ON COLUMN bsa_merit_badge_requirements.original_scoutbook_id IS 'Original requirement ID from Scoutbook exports (e.g., "6A(a)(1)") for import matching';
 COMMENT ON COLUMN bsa_merit_badge_requirements.required_count IS 'Number of alternatives that must be completed (e.g., 1 for "Do ONE", 2 for "Do TWO")';
+COMMENT ON COLUMN bsa_merit_badge_requirements.scoutbook_requirement_number IS
+  'Scoutbook canonical format (e.g., "6A(a)(1)"). Used for import matching and sync.';
+COMMENT ON COLUMN bsa_merit_badge_requirements.is_header IS
+  'True if this requirement is a header/description only (has children but no checkbox in Scoutbook). These should not be tracked as approvable requirements.';
 
 -- Valid leadership positions for rank advancement
 CREATE TABLE bsa_leadership_positions (
@@ -2773,6 +2811,8 @@ CREATE TABLE scout_merit_badge_progress (
     approved_at TIMESTAMPTZ,
     approved_by UUID REFERENCES profiles(id),
     awarded_at TIMESTAMPTZ,
+    -- Version tracking
+    requirement_version_year INTEGER,
     -- Sync fields
     synced_at TIMESTAMPTZ,
     sync_session_id UUID REFERENCES sync_sessions(id) ON DELETE SET NULL,
@@ -2795,13 +2835,24 @@ CREATE TABLE scout_merit_badge_requirement_progress (
     completed_at TIMESTAMPTZ,
     completed_by UUID REFERENCES profiles(id),
     notes TEXT,
+    -- Parent submission workflow
+    submitted_by UUID REFERENCES profiles(id),
+    submitted_at TIMESTAMPTZ,
+    submission_notes TEXT,
+    -- Approval workflow
+    approval_status TEXT,
+    reviewed_by UUID REFERENCES profiles(id),
+    reviewed_at TIMESTAMPTZ,
+    denial_reason TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(scout_merit_badge_progress_id, requirement_id)
 );
 
--- Index for requirement lookup
+-- Indexes for requirement lookup
 CREATE INDEX idx_scout_mb_req_progress_badge ON scout_merit_badge_requirement_progress(scout_merit_badge_progress_id);
+CREATE INDEX idx_scout_mb_req_progress_pending ON scout_merit_badge_requirement_progress(approval_status) WHERE approval_status = 'pending_approval';
+CREATE INDEX idx_scout_mb_req_progress_submitted_by ON scout_merit_badge_requirement_progress(submitted_by) WHERE submitted_by IS NOT NULL;
 
 -- Leadership history with proper start/end dates
 CREATE TABLE scout_leadership_history (
@@ -2870,9 +2921,6 @@ CREATE INDEX idx_scout_activity_entries_event ON scout_activity_entries(event_id
 -- ============================================
 -- SECTION 4: MERIT BADGE COUNSELORS
 -- ============================================
-
--- Add counselor flag to unit_memberships
-ALTER TABLE unit_memberships ADD COLUMN IF NOT EXISTS is_merit_badge_counselor BOOLEAN DEFAULT false;
 
 -- Track which adults can counsel which merit badges
 CREATE TABLE merit_badge_counselors (
@@ -2972,6 +3020,40 @@ BEGIN
     WHERE brr.version_year = v_version_year
     AND brr.rank_id = p_rank_id
     AND brr.parent_requirement_id IS NULL  -- Only top-level requirements
+    ON CONFLICT (scout_rank_progress_id, requirement_id) DO NOTHING;
+
+    RETURN v_progress_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to start rank progress for a scout (excludes header requirements)
+CREATE OR REPLACE FUNCTION start_rank_progress(
+    p_scout_id UUID,
+    p_rank_id UUID
+)
+RETURNS UUID AS $$
+DECLARE
+    v_progress_id UUID;
+    v_version_year INTEGER;
+BEGIN
+    -- Get the version year from the rank
+    SELECT requirement_version_year INTO v_version_year
+    FROM bsa_ranks WHERE id = p_rank_id;
+
+    -- Create rank progress record
+    INSERT INTO scout_rank_progress (scout_id, rank_id, status, started_at)
+    VALUES (p_scout_id, p_rank_id, 'in_progress', NOW())
+    ON CONFLICT (scout_id, rank_id) DO UPDATE SET updated_at = NOW()
+    RETURNING id INTO v_progress_id;
+
+    -- Create requirement progress records for all completable requirements
+    -- (excluding headers which only organize child requirements)
+    INSERT INTO scout_rank_requirement_progress (scout_rank_progress_id, requirement_id)
+    SELECT v_progress_id, brr.id
+    FROM bsa_rank_requirements brr
+    WHERE brr.version_year = v_version_year
+    AND brr.rank_id = p_rank_id
+    AND (brr.is_header = false OR brr.is_header IS NULL)  -- Exclude headers
     ON CONFLICT (scout_rank_progress_id, requirement_id) DO NOTHING;
 
     RETURN v_progress_id;
@@ -3485,7 +3567,23 @@ COMMENT ON TABLE bsa_leadership_positions IS 'Valid leadership positions for ran
 COMMENT ON TABLE scout_rank_progress IS 'Scout progress toward each rank';
 COMMENT ON TABLE scout_rank_requirement_progress IS 'Individual requirement completion with parent submission workflow';
 COMMENT ON TABLE scout_merit_badge_progress IS 'Scout progress on merit badges with counselor tracking';
+COMMENT ON COLUMN scout_merit_badge_progress.requirement_version_year IS
+  'Year of requirements the scout is working on (e.g., 2025, 2026). NULL means use badge default.';
 COMMENT ON TABLE scout_merit_badge_requirement_progress IS 'Individual merit badge requirement completion';
+COMMENT ON COLUMN scout_merit_badge_requirement_progress.submitted_by IS
+  'Profile ID of parent/guardian who submitted this requirement for approval';
+COMMENT ON COLUMN scout_merit_badge_requirement_progress.submitted_at IS
+  'When the requirement was submitted for leader approval';
+COMMENT ON COLUMN scout_merit_badge_requirement_progress.submission_notes IS
+  'Notes from parent about how/when requirement was completed';
+COMMENT ON COLUMN scout_merit_badge_requirement_progress.approval_status IS
+  'Approval workflow status: pending_approval, approved, denied';
+COMMENT ON COLUMN scout_merit_badge_requirement_progress.reviewed_by IS
+  'Profile ID of leader who reviewed/approved this requirement';
+COMMENT ON COLUMN scout_merit_badge_requirement_progress.reviewed_at IS
+  'When the requirement was reviewed by a leader';
+COMMENT ON COLUMN scout_merit_badge_requirement_progress.denial_reason IS
+  'If denied, the reason provided by the leader';
 COMMENT ON TABLE scout_leadership_history IS 'Leadership positions held by scouts with date tracking';
 COMMENT ON TABLE scout_activity_entries IS 'Detailed activity log (camping, hiking, service hours)';
 COMMENT ON TABLE merit_badge_counselors IS 'Adults approved to counsel specific merit badges';
@@ -3502,45 +3600,11 @@ COMMENT ON TABLE sync_staged_advancement IS 'Staging table for Scoutbook sync ad
 -- ============================================
 
 -- ============================================
--- 0.1.1: Add requirement_version_year to scout_merit_badge_progress
--- Track which version of requirements each scout is working on
--- ============================================
-
-ALTER TABLE scout_merit_badge_progress
-ADD COLUMN IF NOT EXISTS requirement_version_year INTEGER;
-
-COMMENT ON COLUMN scout_merit_badge_progress.requirement_version_year IS
-  'Year of requirements the scout is working on (e.g., 2025, 2026). NULL means use badge default.';
-
--- Backfill from badge's current version
-UPDATE scout_merit_badge_progress smbp
-SET requirement_version_year = mb.requirement_version_year
-FROM bsa_merit_badges mb
-WHERE smbp.merit_badge_id = mb.id
-AND smbp.requirement_version_year IS NULL;
-
--- ============================================
--- 0.1.2: Add scoutbook_requirement_number to requirements
--- Store canonical Scoutbook format (e.g., "6A(a)(1)")
--- ============================================
-
-ALTER TABLE bsa_merit_badge_requirements
-ADD COLUMN IF NOT EXISTS scoutbook_requirement_number TEXT;
-
-COMMENT ON COLUMN bsa_merit_badge_requirements.scoutbook_requirement_number IS
-  'Scoutbook canonical format (e.g., "6A(a)(1)"). Used for import matching and sync.';
-
--- Index for efficient import lookups by Scoutbook format
-CREATE INDEX IF NOT EXISTS idx_mb_req_scoutbook_num
-ON bsa_merit_badge_requirements(merit_badge_id, version_year, scoutbook_requirement_number)
-WHERE scoutbook_requirement_number IS NOT NULL;
-
--- ============================================
--- 0.1.3: Create bsa_merit_badge_versions tracking table
+-- bsa_merit_badge_versions tracking table
 -- Track available versions per badge with metadata
 -- ============================================
 
-CREATE TABLE IF NOT EXISTS bsa_merit_badge_versions (
+CREATE TABLE bsa_merit_badge_versions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   merit_badge_id UUID NOT NULL REFERENCES bsa_merit_badges(id) ON DELETE CASCADE,
   version_year INTEGER NOT NULL,
@@ -3665,14 +3729,9 @@ GRANT ALL ON TABLE scout_leadership_history TO postgres;
 GRANT ALL ON TABLE scout_activity_entries TO postgres;
 GRANT ALL ON TABLE merit_badge_counselors TO postgres;
 
--- Grant access to version tables if they exist
-DO $$
-BEGIN
-    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'bsa_merit_badge_versions') THEN
-        GRANT ALL ON TABLE bsa_merit_badge_versions TO service_role;
-        GRANT ALL ON TABLE bsa_merit_badge_versions TO postgres;
-    END IF;
-END $$;
+-- Grant access to version tables
+GRANT ALL ON TABLE bsa_merit_badge_versions TO service_role;
+GRANT ALL ON TABLE bsa_merit_badge_versions TO postgres;
 
 
 -- ============================================
@@ -3704,44 +3763,12 @@ GRANT ALL ON TABLE scout_leadership_history TO postgres;
 GRANT ALL ON TABLE scout_activity_entries TO postgres;
 GRANT ALL ON TABLE merit_badge_counselors TO postgres;
 
--- Also grant to sync staging if it exists
-DO $$
-BEGIN
-    IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'sync_staged_advancement') THEN
-        GRANT ALL ON TABLE sync_staged_advancement TO service_role;
-        GRANT ALL ON TABLE sync_staged_advancement TO postgres;
-    END IF;
-END $$;
+-- Grant to sync staging
+GRANT ALL ON TABLE sync_staged_advancement TO service_role;
+GRANT ALL ON TABLE sync_staged_advancement TO postgres;
 
 
--- ============================================
--- FROM: 20260128000001_add_is_header_column.sql
--- ============================================
-
--- ============================================
--- Add is_header column to bsa_merit_badge_requirements
--- ============================================
---
--- Parent requirements that have children are typically description-only
--- headers like "Do the following:" - they don't have checkboxes in Scoutbook
--- and shouldn't be tracked as approvable requirements.
---
--- This column allows us to mark these requirements so the UI can:
--- 1. Skip them in progress tracking
--- 2. Display them differently (as section headers)
--- 3. Not show checkboxes for sign-off
-
-ALTER TABLE bsa_merit_badge_requirements
-ADD COLUMN IF NOT EXISTS is_header BOOLEAN DEFAULT false;
-
-COMMENT ON COLUMN bsa_merit_badge_requirements.is_header IS
-  'True if this requirement is a header/description only (has children but no checkbox in Scoutbook). These should not be tracked as approvable requirements.';
-
--- Create index for efficient filtering
-CREATE INDEX IF NOT EXISTS idx_bsa_mb_req_is_header
-ON bsa_merit_badge_requirements(is_header)
-WHERE is_header = true;
-
+-- (is_header column folded into bsa_merit_badge_requirements CREATE TABLE)
 
 -- ============================================
 -- FROM: 20260129000001_import_jobs.sql
@@ -4016,76 +4043,10 @@ COMMENT ON COLUMN plaid_connections.access_token IS 'Plaid access token - encryp
 COMMENT ON COLUMN plaid_connections.accounts IS 'Cached account info from Plaid: [{account_id, name, mask, type, subtype, balance}]';
 
 
--- ============================================
--- FROM: 20260207100002_collection_settings.sql
--- ============================================
-
--- Migration: 20260207000002_collection_settings.sql
--- Purpose: Add collection settings to units table for configurable overdue thresholds
-
--- Add collection settings column to units table
-ALTER TABLE units ADD COLUMN IF NOT EXISTS collection_settings JSONB DEFAULT '{
-  "overdue_threshold_days": 30,
-  "overdue_threshold_amount_cents": 0,
-  "reminder_email_subject": "Payment Reminder - {unit_name}",
-  "reminder_email_template": "default"
-}'::jsonb;
-
--- Add comment for documentation
-COMMENT ON COLUMN units.collection_settings IS 'Configurable settings for payment collection: overdue_threshold_days, overdue_threshold_amount_cents, reminder_email_subject, reminder_email_template';
+-- (collection_settings folded into units CREATE TABLE)
 
 
--- ============================================
--- FROM: 20260210000001_merit_badge_approval_workflow.sql
--- ============================================
-
--- ============================================
--- ADD APPROVAL WORKFLOW TO MERIT BADGE REQUIREMENTS
--- Matches the rank requirement approval pattern:
--- Parent submits → Leader approves
--- ============================================
-
--- Add approval workflow fields to merit_badge_requirement_progress
--- (matching scout_rank_requirement_progress structure)
-
--- Submission fields (parent marks complete with notes)
-ALTER TABLE scout_merit_badge_requirement_progress
-ADD COLUMN IF NOT EXISTS submitted_by UUID REFERENCES profiles(id),
-ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMPTZ,
-ADD COLUMN IF NOT EXISTS submission_notes TEXT;
-
--- Approval workflow fields (leader reviews)
-ALTER TABLE scout_merit_badge_requirement_progress
-ADD COLUMN IF NOT EXISTS approval_status TEXT DEFAULT NULL,
-ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES profiles(id),
-ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ,
-ADD COLUMN IF NOT EXISTS denial_reason TEXT;
-
--- Index for pending approvals (matches rank requirements index)
-CREATE INDEX IF NOT EXISTS idx_scout_mb_req_progress_pending
-ON scout_merit_badge_requirement_progress(approval_status)
-WHERE approval_status = 'pending_approval';
-
--- Index for efficient dashboard queries
-CREATE INDEX IF NOT EXISTS idx_scout_mb_req_progress_submitted_by
-ON scout_merit_badge_requirement_progress(submitted_by)
-WHERE submitted_by IS NOT NULL;
-
--- Comments
-COMMENT ON COLUMN scout_merit_badge_requirement_progress.submitted_by IS
-  'Profile ID of parent/guardian who submitted this requirement for approval';
-COMMENT ON COLUMN scout_merit_badge_requirement_progress.submitted_at IS
-  'When the requirement was submitted for leader approval';
-COMMENT ON COLUMN scout_merit_badge_requirement_progress.submission_notes IS
-  'Notes from parent about how/when requirement was completed';
-COMMENT ON COLUMN scout_merit_badge_requirement_progress.approval_status IS
-  'Approval workflow status: pending_approval, approved, denied';
-COMMENT ON COLUMN scout_merit_badge_requirement_progress.reviewed_by IS
-  'Profile ID of leader who reviewed/approved this requirement';
-COMMENT ON COLUMN scout_merit_badge_requirement_progress.reviewed_at IS
-  'When the requirement was reviewed by a leader';
-COMMENT ON COLUMN scout_merit_badge_requirement_progress.denial_reason IS
-  'If denied, the reason provided by the leader';
+-- (Approval workflow columns folded into scout_merit_badge_requirement_progress CREATE TABLE)
 
 
 -- ============================================
@@ -4135,3 +4096,489 @@ GRANT SELECT ON TABLE bsa_rank_requirements TO anon;
 GRANT SELECT ON TABLE bsa_merit_badges TO anon;
 GRANT SELECT ON TABLE bsa_merit_badge_requirements TO anon;
 GRANT SELECT ON TABLE bsa_leadership_positions TO anon;
+
+
+-- ============================================
+-- EXPENSE REIMBURSEMENTS
+-- ============================================
+
+-- Add expense_reimbursement to journal_entry_type enum
+ALTER TYPE journal_entry_type ADD VALUE IF NOT EXISTS 'expense_reimbursement';
+
+-- Main expense reimbursements table
+CREATE TABLE expense_reimbursements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    unit_id UUID NOT NULL REFERENCES units(id) ON DELETE CASCADE,
+    submitter_id UUID NOT NULL REFERENCES profiles(id),
+
+    -- Expense details
+    description TEXT NOT NULL,
+    amount DECIMAL(10,2) NOT NULL CHECK (amount > 0),
+    expense_date DATE NOT NULL,
+    category expense_category NOT NULL DEFAULT 'other',
+    vendor TEXT,
+
+    -- Receipt
+    receipt_url TEXT,
+    receipt_filename TEXT,
+
+    -- AI extraction metadata (optional)
+    ai_extracted BOOLEAN DEFAULT FALSE,
+    ai_extraction_data JSONB,
+
+    -- Workflow status
+    status expense_status NOT NULL DEFAULT 'draft',
+
+    -- Submission
+    submitted_at TIMESTAMPTZ,
+
+    -- Review
+    reviewed_by UUID REFERENCES profiles(id),
+    reviewed_at TIMESTAMPTZ,
+    review_notes TEXT,
+    rejection_reason TEXT,
+
+    -- Payment
+    paid_at TIMESTAMPTZ,
+    paid_by UUID REFERENCES profiles(id),
+    payment_method TEXT,
+    payment_reference TEXT,
+
+    -- Journal entry (created on approval)
+    journal_entry_id UUID REFERENCES journal_entries(id),
+
+    -- Timestamps
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Indexes
+CREATE INDEX idx_expense_reimbursements_unit ON expense_reimbursements(unit_id);
+CREATE INDEX idx_expense_reimbursements_submitter ON expense_reimbursements(submitter_id);
+CREATE INDEX idx_expense_reimbursements_status ON expense_reimbursements(status);
+CREATE INDEX idx_expense_reimbursements_unit_status ON expense_reimbursements(unit_id, status);
+
+-- RLS
+ALTER TABLE expense_reimbursements ENABLE ROW LEVEL SECURITY;
+
+-- Users can view their own expenses
+CREATE POLICY "Users can view own expenses"
+ON expense_reimbursements FOR SELECT
+USING (
+    submitter_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+);
+
+-- Admins/treasurers can view all unit expenses
+CREATE POLICY "Admins can view unit expenses"
+ON expense_reimbursements FOR SELECT
+USING (
+    EXISTS (
+        SELECT 1 FROM unit_memberships
+        WHERE unit_memberships.unit_id = expense_reimbursements.unit_id
+        AND unit_memberships.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+        AND unit_memberships.role IN ('admin', 'treasurer')
+        AND unit_memberships.status = 'active'
+    )
+);
+
+-- Leaders can view all unit expenses (read-only for oversight)
+CREATE POLICY "Leaders can view unit expenses"
+ON expense_reimbursements FOR SELECT
+USING (
+    EXISTS (
+        SELECT 1 FROM unit_memberships
+        WHERE unit_memberships.unit_id = expense_reimbursements.unit_id
+        AND unit_memberships.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+        AND unit_memberships.role = 'leader'
+        AND unit_memberships.status = 'active'
+    )
+);
+
+-- Users can create expenses for themselves
+CREATE POLICY "Users can create expenses"
+ON expense_reimbursements FOR INSERT
+WITH CHECK (
+    submitter_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+    AND EXISTS (
+        SELECT 1 FROM unit_memberships
+        WHERE unit_memberships.unit_id = expense_reimbursements.unit_id
+        AND unit_memberships.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+        AND unit_memberships.status = 'active'
+    )
+);
+
+-- Users can update their own draft/rejected expenses
+CREATE POLICY "Users can update own draft expenses"
+ON expense_reimbursements FOR UPDATE
+USING (
+    submitter_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+    AND status IN ('draft', 'rejected')
+)
+WITH CHECK (
+    submitter_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+    AND status IN ('draft', 'rejected', 'submitted')
+);
+
+-- Admins/treasurers can update any unit expense (for approval/rejection/payment)
+CREATE POLICY "Admins can update unit expenses"
+ON expense_reimbursements FOR UPDATE
+USING (
+    EXISTS (
+        SELECT 1 FROM unit_memberships
+        WHERE unit_memberships.unit_id = expense_reimbursements.unit_id
+        AND unit_memberships.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+        AND unit_memberships.role IN ('admin', 'treasurer')
+        AND unit_memberships.status = 'active'
+    )
+);
+
+-- Updated_at trigger
+CREATE TRIGGER set_expense_reimbursements_updated_at
+    BEFORE UPDATE ON expense_reimbursements
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+COMMENT ON TABLE expense_reimbursements IS 'Expense reimbursement requests from adults, approved by treasurers';
+
+
+-- ============================================
+-- EXPENSE JOURNAL ENTRY RPC
+-- ============================================
+
+CREATE OR REPLACE FUNCTION create_expense_journal_entry(
+    p_expense_id UUID
+)
+RETURNS JSONB AS $$
+DECLARE
+    v_expense RECORD;
+    v_unit_id UUID;
+    v_journal_entry_id UUID;
+    v_expense_account_id UUID;
+    v_payable_account_id UUID;
+    v_expense_code TEXT;
+    v_submitter_name TEXT;
+BEGIN
+    -- Get the expense with submitter info
+    SELECT
+        er.*,
+        p.full_name AS submitter_name
+    INTO v_expense
+    FROM expense_reimbursements er
+    JOIN profiles p ON p.id = er.submitter_id
+    WHERE er.id = p_expense_id;
+
+    IF v_expense IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Expense not found');
+    END IF;
+
+    -- Must be approved to create journal entry
+    IF v_expense.status != 'approved' THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Expense must be approved');
+    END IF;
+
+    -- Already has journal entry
+    IF v_expense.journal_entry_id IS NOT NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Journal entry already exists');
+    END IF;
+
+    v_unit_id := v_expense.unit_id;
+    v_submitter_name := COALESCE(v_expense.submitter_name, 'Unknown');
+
+    -- Check permission
+    IF NOT user_has_role(v_unit_id, ARRAY['admin', 'treasurer']::membership_role[]) THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Permission denied');
+    END IF;
+
+    -- Map expense category to account code
+    v_expense_code := CASE v_expense.category
+        WHEN 'supplies' THEN '5100'  -- Equipment & Supplies
+        WHEN 'food' THEN '5000'      -- Camping Expenses (includes food for events)
+        WHEN 'travel' THEN '5900'    -- Other Expenses (travel category)
+        ELSE '5900'                  -- Other Expenses (catch-all)
+    END;
+
+    -- Get expense account
+    SELECT id INTO v_expense_account_id
+    FROM accounts
+    WHERE unit_id = v_unit_id AND code = v_expense_code;
+
+    IF v_expense_account_id IS NULL THEN
+        -- Fall back to Other Expenses
+        SELECT id INTO v_expense_account_id
+        FROM accounts
+        WHERE unit_id = v_unit_id AND code = '5900';
+    END IF;
+
+    IF v_expense_account_id IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Expense account not found');
+    END IF;
+
+    -- Get Accounts Payable account
+    SELECT id INTO v_payable_account_id
+    FROM accounts
+    WHERE unit_id = v_unit_id AND code = '2100';
+
+    IF v_payable_account_id IS NULL THEN
+        RETURN jsonb_build_object('success', false, 'error', 'Accounts Payable account not found');
+    END IF;
+
+    -- Create journal entry
+    INSERT INTO journal_entries (
+        unit_id,
+        entry_date,
+        description,
+        entry_type,
+        is_posted,
+        created_by
+    )
+    VALUES (
+        v_unit_id,
+        CURRENT_DATE,
+        'Expense Reimbursement: ' || v_expense.description || ' - ' || v_submitter_name,
+        'expense_reimbursement',
+        true,
+        get_current_profile_id()
+    )
+    RETURNING id INTO v_journal_entry_id;
+
+    -- Debit expense account (increase expense)
+    INSERT INTO journal_lines (
+        journal_entry_id,
+        account_id,
+        debit,
+        credit,
+        memo
+    )
+    VALUES (
+        v_journal_entry_id,
+        v_expense_account_id,
+        v_expense.amount,
+        0,
+        v_expense.description
+    );
+
+    -- Credit accounts payable (increase liability - owe money to submitter)
+    INSERT INTO journal_lines (
+        journal_entry_id,
+        account_id,
+        debit,
+        credit,
+        memo
+    )
+    VALUES (
+        v_journal_entry_id,
+        v_payable_account_id,
+        0,
+        v_expense.amount,
+        'Payable to ' || v_submitter_name
+    );
+
+    -- Link journal entry to expense
+    UPDATE expense_reimbursements
+    SET journal_entry_id = v_journal_entry_id
+    WHERE id = p_expense_id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'journal_entry_id', v_journal_entry_id,
+        'expense_id', p_expense_id,
+        'amount', v_expense.amount
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION create_expense_journal_entry(UUID) TO authenticated;
+
+COMMENT ON FUNCTION create_expense_journal_entry IS 'Creates a journal entry for an approved expense reimbursement. Debits expense account, credits accounts payable.';
+
+
+-- ============================================
+-- EXPENSE RECEIPTS STORAGE BUCKET
+-- ============================================
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+    'expense-receipts',
+    'expense-receipts',
+    true,  -- Public read via direct URL (paths are unguessable UUIDs)
+    10485760,  -- 10MB limit
+    ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf']
+)
+ON CONFLICT (id) DO UPDATE SET
+    public = true,
+    file_size_limit = EXCLUDED.file_size_limit,
+    allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+-- Allow authenticated users to upload receipts
+CREATE POLICY "Authenticated users can upload receipts"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'expense-receipts');
+
+-- Allow authenticated users to delete their own receipts
+CREATE POLICY "Authenticated users can delete receipts"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (bucket_id = 'expense-receipts');
+
+
+-- ============================================
+-- EXPENSE COST SHARING
+-- ============================================
+
+CREATE TABLE expense_cost_shares (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    unit_id UUID NOT NULL REFERENCES units(id) ON DELETE CASCADE,
+
+    -- Organizer (person who paid initially)
+    organizer_id UUID NOT NULL REFERENCES profiles(id),
+
+    -- Share details
+    description TEXT NOT NULL,
+    total_amount DECIMAL(10,2) NOT NULL CHECK (total_amount > 0),
+    total_scouts INTEGER NOT NULL CHECK (total_scouts > 0),
+    per_scout_amount DECIMAL(10,2) NOT NULL CHECK (per_scout_amount > 0),
+    share_amount DECIMAL(10,2) NOT NULL CHECK (share_amount > 0),
+    scout_count INTEGER NOT NULL CHECK (scout_count > 0),
+
+    -- Participant owing money
+    participant_id UUID NOT NULL REFERENCES profiles(id),
+
+    -- Payment info
+    status cost_share_status NOT NULL DEFAULT 'pending',
+    paid_at TIMESTAMPTZ,
+
+    -- Venmo info for organizer (snapshot at creation time)
+    organizer_venmo TEXT,
+
+    -- Timestamps
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Indexes
+CREATE INDEX idx_expense_cost_shares_organizer ON expense_cost_shares(organizer_id);
+CREATE INDEX idx_expense_cost_shares_participant ON expense_cost_shares(participant_id);
+CREATE INDEX idx_expense_cost_shares_unit ON expense_cost_shares(unit_id);
+CREATE INDEX idx_expense_cost_shares_status ON expense_cost_shares(status);
+
+-- RLS
+ALTER TABLE expense_cost_shares ENABLE ROW LEVEL SECURITY;
+
+-- Organizer can view their own cost shares
+CREATE POLICY "Organizers can view own cost shares"
+ON expense_cost_shares FOR SELECT
+USING (
+    organizer_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+);
+
+-- Participants can view shares assigned to them
+CREATE POLICY "Participants can view assigned cost shares"
+ON expense_cost_shares FOR SELECT
+USING (
+    participant_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+);
+
+-- Admins/treasurers can view all unit cost shares
+CREATE POLICY "Admins can view unit cost shares"
+ON expense_cost_shares FOR SELECT
+USING (
+    EXISTS (
+        SELECT 1 FROM unit_memberships
+        WHERE unit_memberships.unit_id = expense_cost_shares.unit_id
+        AND unit_memberships.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+        AND unit_memberships.role IN ('admin', 'treasurer')
+        AND unit_memberships.status = 'active'
+    )
+);
+
+-- Organizer can create cost shares for their unit
+CREATE POLICY "Organizers can create cost shares"
+ON expense_cost_shares FOR INSERT
+WITH CHECK (
+    organizer_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+    AND EXISTS (
+        SELECT 1 FROM unit_memberships
+        WHERE unit_memberships.unit_id = expense_cost_shares.unit_id
+        AND unit_memberships.profile_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+        AND unit_memberships.status = 'active'
+    )
+);
+
+-- Organizer can update their own cost shares (e.g., mark paid)
+CREATE POLICY "Organizers can update own cost shares"
+ON expense_cost_shares FOR UPDATE
+USING (
+    organizer_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+);
+
+-- Organizer can delete their own pending cost shares
+CREATE POLICY "Organizers can delete own pending cost shares"
+ON expense_cost_shares FOR DELETE
+USING (
+    organizer_id = (SELECT id FROM profiles WHERE user_id = auth.uid())
+    AND status = 'pending'
+);
+
+-- Updated_at trigger
+CREATE TRIGGER set_expense_cost_shares_updated_at
+    BEFORE UPDATE ON expense_cost_shares
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+
+-- ============================================
+-- BSA REQUIREMENT RESOURCES
+-- ============================================
+
+-- Resources linked to merit badge requirements
+CREATE TABLE bsa_requirement_resources (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    requirement_id UUID NOT NULL REFERENCES bsa_merit_badge_requirements(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    resource_type TEXT NOT NULL,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_req_resources_requirement ON bsa_requirement_resources(requirement_id);
+
+-- Resources linked to rank requirements
+CREATE TABLE bsa_rank_requirement_resources (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    requirement_id UUID NOT NULL REFERENCES bsa_rank_requirements(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    resource_type TEXT NOT NULL,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_rank_req_resources_requirement ON bsa_rank_requirement_resources(requirement_id);
+
+-- RLS: Read-only for authenticated users
+ALTER TABLE bsa_requirement_resources ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bsa_rank_requirement_resources ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "BSA requirement resources viewable by authenticated users"
+    ON bsa_requirement_resources FOR SELECT
+    TO authenticated
+    USING (true);
+
+CREATE POLICY "BSA rank requirement resources viewable by authenticated users"
+    ON bsa_rank_requirement_resources FOR SELECT
+    TO authenticated
+    USING (true);
+
+-- Grants for seeding
+GRANT ALL ON TABLE bsa_requirement_resources TO service_role;
+GRANT ALL ON TABLE bsa_requirement_resources TO postgres;
+GRANT ALL ON TABLE bsa_rank_requirement_resources TO service_role;
+GRANT ALL ON TABLE bsa_rank_requirement_resources TO postgres;
+
+-- Grant authenticated users SELECT access
+GRANT SELECT ON TABLE bsa_requirement_resources TO authenticated;
+GRANT SELECT ON TABLE bsa_rank_requirement_resources TO authenticated;

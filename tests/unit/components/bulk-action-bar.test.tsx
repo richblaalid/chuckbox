@@ -23,7 +23,8 @@ describe('BulkActionBar', () => {
     expect(screen.getByRole('button', { name: /add funds/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /send reminders/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /export/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /clear/i })).toBeInTheDocument()
+    // Two clear buttons exist (mobile + desktop), both should render
+    expect(screen.getAllByRole('button', { name: /clear/i })).toHaveLength(2)
   })
 
   it('calls onBillSelected when Bill Selected clicked', () => {
@@ -34,7 +35,7 @@ describe('BulkActionBar', () => {
 
   it('calls onClearSelection when Clear clicked', () => {
     render(<BulkActionBar {...defaultProps} />)
-    fireEvent.click(screen.getByRole('button', { name: /clear/i }))
+    fireEvent.click(screen.getAllByRole('button', { name: /clear/i })[0])
     expect(defaultProps.onClearSelection).toHaveBeenCalled()
   })
 

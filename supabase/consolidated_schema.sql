@@ -47,8 +47,8 @@ CREATE TABLE profiles (
     -- Extended fields (from migration 15)
     first_name VARCHAR(100),
     last_name VARCHAR(100),
-    phone_primary VARCHAR(20),
-    phone_secondary VARCHAR(20),
+    phone_home VARCHAR(20),
+    phone_mobile VARCHAR(20),
     email_secondary VARCHAR(255),
     address_street VARCHAR(255),
     address_city VARCHAR(100),
