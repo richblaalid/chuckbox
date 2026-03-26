@@ -2,8 +2,11 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ExpenseReimbursementList } from '@/components/expenses/expense-list'
+import { FinanceSubnav } from '@/components/finances/finance-subnav'
 import { isFinancialRole } from '@/lib/roles'
+import { Clock, CheckCircle, Banknote, XCircle, Plus } from 'lucide-react'
 import type { ExpenseReimbursementWithSubmitter } from '@/lib/expenses/types'
 
 export default async function ExpensesPage() {
@@ -40,6 +43,16 @@ export default async function ExpensesPage() {
   const unit = membership.units as { name: string } | null
   const hasFinancialRole = isFinancialRole(membership.role)
 
+  // Check if unit has an active payment processor connection (for subnav)
+  const { data: squareCredentials } = await supabase
+    .from('unit_square_credentials')
+    .select('id')
+    .eq('unit_id', membership.unit_id)
+    .eq('is_active', true)
+    .single()
+
+  const hasPaymentProcessor = !!squareCredentials
+
   // Build expense query
   let query = supabase
     .from('expense_reimbursements')
@@ -65,13 +78,18 @@ export default async function ExpensesPage() {
 
   const { data: expenses, count } = await query
 
+  const pendingCount = expenses?.filter((e) => e.status === 'submitted').length || 0
+  const approvedCount = expenses?.filter((e) => e.status === 'approved').length || 0
+  const paidCount = expenses?.filter((e) => e.status === 'paid').length || 0
+  const rejectedCount = expenses?.filter((e) => e.status === 'rejected').length || 0
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Expense Reimbursements</h1>
-          <p className="text-stone-600">
+          <h1 className="text-3xl font-bold text-stone-900">Expenses</h1>
+          <p className="mt-1 text-stone-600">
             {hasFinancialRole
               ? `Manage expense reimbursement requests for ${unit?.name || 'your unit'}`
               : 'Submit and track your expense reimbursement requests'}
@@ -79,47 +97,73 @@ export default async function ExpensesPage() {
         </div>
         <Button asChild>
           <Link href="/expenses/new">
-            <svg
-              className="mr-2 h-4 w-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
+            <Plus className="mr-2 h-4 w-4" />
             New Expense
           </Link>
         </Button>
       </div>
 
+      <FinanceSubnav showPaymentsTab={hasPaymentProcessor} />
+
       {/* Summary Cards for Financial Roles */}
       {hasFinancialRole && expenses && expenses.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <SummaryCard
-            label="Pending Review"
-            count={expenses.filter((e) => e.status === 'submitted').length}
-            color="blue"
-          />
-          <SummaryCard
-            label="Approved"
-            count={expenses.filter((e) => e.status === 'approved').length}
-            color="green"
-          />
-          <SummaryCard
-            label="Paid"
-            count={expenses.filter((e) => e.status === 'paid').length}
-            color="emerald"
-          />
-          <SummaryCard
-            label="Rejected"
-            count={expenses.filter((e) => e.status === 'rejected').length}
-            color="red"
-          />
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Pending Review
+              </CardDescription>
+              <CardTitle className="text-2xl">{pendingCount}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">
+                Awaiting approval
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4" />
+                Approved
+              </CardDescription>
+              <CardTitle className="text-2xl">{approvedCount}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">
+                Ready for payment
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-2">
+                <Banknote className="h-4 w-4" />
+                Paid
+              </CardDescription>
+              <CardTitle className="text-2xl">{paidCount}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">
+                Reimbursement complete
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription className="flex items-center gap-2">
+                <XCircle className="h-4 w-4" />
+                Rejected
+              </CardDescription>
+              <CardTitle className="text-2xl text-error">{rejectedCount}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">
+                Needs revision
+              </p>
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -135,30 +179,6 @@ export default async function ExpensesPage() {
             : "You haven't submitted any expenses yet"
         }
       />
-    </div>
-  )
-}
-
-function SummaryCard({
-  label,
-  count,
-  color,
-}: {
-  label: string
-  count: number
-  color: 'blue' | 'green' | 'emerald' | 'red'
-}) {
-  const colorClasses = {
-    blue: 'bg-blue-50 border-blue-200 text-blue-700',
-    green: 'bg-green-50 border-green-200 text-green-700',
-    emerald: 'bg-emerald-50 border-emerald-200 text-emerald-700',
-    red: 'bg-red-50 border-red-200 text-red-700',
-  }
-
-  return (
-    <div className={`rounded-lg border p-4 ${colorClasses[color]}`}>
-      <p className="text-sm font-medium">{label}</p>
-      <p className="mt-1 text-2xl font-bold">{count}</p>
     </div>
   )
 }
