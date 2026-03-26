@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { acceptPendingInvites } from '@/app/actions/users'
-import { verifyProvisioningToken } from '@/app/actions/onboarding'
+import { verifyProvisioningToken, activateProvisionedMemberships } from '@/app/actions/onboarding'
 import { trackLoginCompleted } from '@/lib/analytics'
 
 // Helper to safely check for pending invites (non-blocking)
@@ -16,6 +16,19 @@ async function tryAcceptInvites(): Promise<number> {
     // Log but don't block auth flow if invite check fails
     console.error('Failed to check pending invites:', err)
     return 0
+  }
+}
+
+// Helper to auto-activate provisioned memberships (fallback for failed invite flows)
+async function tryActivateProvisionedMemberships(): Promise<{
+  activated: number
+  unitNames: string[]
+}> {
+  try {
+    return await activateProvisionedMemberships()
+  } catch (err) {
+    console.error('Failed to activate provisioned memberships:', err)
+    return { activated: 0, unitNames: [] }
   }
 }
 
@@ -93,8 +106,13 @@ function AuthConfirmContent() {
         }
 
         setStatus('Completing sign in...')
+        // Auto-activate any provisioned memberships (fallback for failed invite email flows)
+        const { activated, unitNames } = await tryActivateProvisionedMemberships()
         const accepted = await tryAcceptInvites()
-        if (accepted > 0) {
+        if (activated > 0) {
+          setStatus(`Welcome to ${unitNames[0]}!`)
+          await new Promise(resolve => setTimeout(resolve, 1500))
+        } else if (accepted > 0) {
           setStatus('Welcome! You have been added to your unit.')
           await new Promise(resolve => setTimeout(resolve, 1500))
         }
@@ -133,8 +151,13 @@ function AuthConfirmContent() {
         }
 
         setStatus('Completing sign in...')
+        // Auto-activate any provisioned memberships (fallback for failed invite email flows)
+        const { activated, unitNames } = await tryActivateProvisionedMemberships()
         const accepted = await tryAcceptInvites()
-        if (accepted > 0) {
+        if (activated > 0) {
+          setStatus(`Welcome to ${unitNames[0]}!`)
+          await new Promise(resolve => setTimeout(resolve, 1500))
+        } else if (accepted > 0) {
           setStatus('Welcome! You have been added to your unit.')
           await new Promise(resolve => setTimeout(resolve, 1500))
         }
@@ -170,8 +193,13 @@ function AuthConfirmContent() {
         }
 
         setStatus('Completing sign in...')
+        // Auto-activate any provisioned memberships (fallback for failed invite email flows)
+        const { activated, unitNames } = await tryActivateProvisionedMemberships()
         const accepted = await tryAcceptInvites()
-        if (accepted > 0) {
+        if (activated > 0) {
+          setStatus(`Welcome to ${unitNames[0]}!`)
+          await new Promise(resolve => setTimeout(resolve, 1500))
+        } else if (accepted > 0) {
           setStatus('Welcome! You have been added to your unit.')
           await new Promise(resolve => setTimeout(resolve, 1500))
         }
@@ -209,8 +237,13 @@ function AuthConfirmContent() {
         }
 
         setStatus('Completing sign in...')
+        // Auto-activate any provisioned memberships (fallback for failed invite email flows)
+        const { activated, unitNames } = await tryActivateProvisionedMemberships()
         const accepted = await tryAcceptInvites()
-        if (accepted > 0) {
+        if (activated > 0) {
+          setStatus(`Welcome to ${unitNames[0]}!`)
+          await new Promise(resolve => setTimeout(resolve, 1500))
+        } else if (accepted > 0) {
           setStatus('Welcome! You have been added to your unit.')
           await new Promise(resolve => setTimeout(resolve, 1500))
         }
@@ -316,8 +349,13 @@ function AuthConfirmContent() {
         }
 
         setStatus('Completing sign in...')
+        // Auto-activate any provisioned memberships (fallback for failed invite email flows)
+        const { activated, unitNames } = await tryActivateProvisionedMemberships()
         const accepted = await tryAcceptInvites()
-        if (accepted > 0) {
+        if (activated > 0) {
+          setStatus(`Welcome to ${unitNames[0]}!`)
+          await new Promise(resolve => setTimeout(resolve, 1500))
+        } else if (accepted > 0) {
           setStatus('Welcome! You have been added to your unit.')
           await new Promise(resolve => setTimeout(resolve, 1500))
         }

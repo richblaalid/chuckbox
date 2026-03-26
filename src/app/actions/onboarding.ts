@@ -519,6 +519,86 @@ export async function verifyProvisioningToken(token: string): Promise<VerifyProv
 }
 
 // ============================================
+// Auto-activate Provisioned Memberships
+// ============================================
+// Fallback for when the provisioning token flow fails (e.g., PKCE + invite email
+// opens in a new browser context). Called after any successful authentication to
+// activate memberships for unverified provisioning tokens matching the user's email.
+
+export async function activateProvisionedMemberships(): Promise<{
+  activated: number
+  unitNames: string[]
+}> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user?.email) {
+    return { activated: 0, unitNames: [] }
+  }
+
+  const adminSupabase = createAdminClient()
+
+  // Find unverified provisioning tokens matching this user's email
+  const { data: pendingTokens } = await adminSupabase
+    .from('unit_provisioning_tokens')
+    .select('id, unit_id, profile_id, units:units!unit_provisioning_tokens_unit_id_fkey(name)')
+    .eq('email', user.email.toLowerCase())
+    .is('verified_at', null)
+
+  if (!pendingTokens || pendingTokens.length === 0) {
+    return { activated: 0, unitNames: [] }
+  }
+
+  const unitNames: string[] = []
+
+  for (const token of pendingTokens) {
+    try {
+      // Mark token as verified
+      await adminSupabase.from('unit_provisioning_tokens')
+        .update({ verified_at: new Date().toISOString() })
+        .eq('id', token.id)
+
+      // Link profile to user account
+      await adminSupabase
+        .from('profiles')
+        .update({ user_id: user.id })
+        .eq('id', token.profile_id)
+
+      // Activate membership
+      await adminSupabase
+        .from('unit_memberships')
+        .update({ status: 'active' })
+        .eq('unit_id', token.unit_id)
+        .eq('profile_id', token.profile_id)
+
+      // Import any staged roster data
+      const { data: stagedData } = await adminSupabase.from('staged_roster_imports')
+        .select('*')
+        .eq('provisioning_token_id', token.id)
+        .maybeSingle()
+
+      if (stagedData) {
+        await importRosterData(
+          token.unit_id,
+          stagedData.parsed_adults as unknown as ParsedAdult[],
+          stagedData.parsed_scouts as unknown as ParsedScout[]
+        )
+        await adminSupabase.from('staged_roster_imports')
+          .delete()
+          .eq('id', stagedData.id)
+      }
+
+      const unitName = (token.units as { name: string } | null)?.name
+      if (unitName) unitNames.push(unitName)
+    } catch (err) {
+      console.error(`Failed to activate provisioned membership for token ${token.id}:`, err)
+    }
+  }
+
+  return { activated: unitNames.length, unitNames }
+}
+
+// ============================================
 // Import Roster Data (reusable helper)
 // ============================================
 
@@ -641,7 +721,8 @@ async function importRosterData(
               last_name: adult.lastName,
               full_name: fullName,
               email: adult.email?.toLowerCase() || null,
-              phone_primary: adult.phone || null,
+              phone_home: adult.phoneHome || null,
+              phone_mobile: adult.phoneMobile || null,
               address_street: adult.address || null,
               address_city: adult.city || null,
               address_state: adult.state || null,
@@ -681,7 +762,8 @@ async function importRosterData(
             last_name: adult.lastName,
             full_name: fullName,
             email: adult.email?.toLowerCase() || null,
-            phone_primary: adult.phone || null,
+            phone_home: adult.phoneHome || null,
+            phone_mobile: adult.phoneMobile || null,
             address_street: adult.address || null,
             address_city: adult.city || null,
             address_state: adult.state || null,

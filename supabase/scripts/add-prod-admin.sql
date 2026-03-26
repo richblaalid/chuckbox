@@ -8,7 +8,7 @@
 -- ============================================
 -- CREATE PROFILE (if not exists)
 -- ============================================
-INSERT INTO profiles (id, email, full_name, first_name, last_name, phone_primary)
+INSERT INTO profiles (id, email, full_name, first_name, last_name, phone_home)
 SELECT
   id,
   email,

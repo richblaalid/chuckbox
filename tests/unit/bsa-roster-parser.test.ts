@@ -7,6 +7,7 @@ import {
   getScoutPosition,
   normalizeCouncilName,
   normalizeDistrictName,
+  parsePhoneField,
   type ParsedRoster,
 } from '@/lib/import/bsa-roster-parser'
 
@@ -902,6 +903,51 @@ Sam,Johnson,111111111,M,Eagle
 
       const errors = validateRoster(roster)
       expect(errors).toContain('Existing error from parsing')
+    })
+  })
+
+  describe('parsePhoneField', () => {
+    it('should return nulls for null input', () => {
+      expect(parsePhoneField(null)).toEqual({ home: null, mobile: null })
+    })
+
+    it('should return nulls for empty string', () => {
+      expect(parsePhoneField('')).toEqual({ home: null, mobile: null })
+    })
+
+    it('should parse single home number', () => {
+      expect(parsePhoneField('(651) 746-9075 home')).toEqual({
+        home: '(651) 746-9075',
+        mobile: null,
+      })
+    })
+
+    it('should parse single mobile number', () => {
+      expect(parsePhoneField('(612) 222-1786 Mobile')).toEqual({
+        home: null,
+        mobile: '(612) 222-1786',
+      })
+    })
+
+    it('should parse both home and mobile numbers', () => {
+      expect(parsePhoneField('(651) 746-9075 home, (612) 555-1234 Mobile')).toEqual({
+        home: '(651) 746-9075',
+        mobile: '(612) 555-1234',
+      })
+    })
+
+    it('should handle same number for home and mobile', () => {
+      expect(parsePhoneField('(651) 746-9075 home, (651) 746-9075 Mobile')).toEqual({
+        home: '(651) 746-9075',
+        mobile: '(651) 746-9075',
+      })
+    })
+
+    it('should handle unlabeled number as home', () => {
+      expect(parsePhoneField('(612) 555-1234')).toEqual({
+        home: '(612) 555-1234',
+        mobile: null,
+      })
     })
   })
 })

@@ -21,21 +21,21 @@ UPDATE profiles SET
   full_name = 'Admin User',
   first_name = 'Admin',
   last_name = 'User',
-  phone_primary = '555-123-4567'
+  phone_home = '555-123-4567'
 WHERE email = 'richard.blaalid+admin@withcaldera.com';
 
 UPDATE profiles SET
   full_name = 'Treasurer User',
   first_name = 'Treasurer',
   last_name = 'User',
-  phone_primary = '555-123-4567'
+  phone_home = '555-123-4567'
 WHERE email = 'richard.blaalid+treasurer@withcaldera.com';
 
 UPDATE profiles SET
   full_name = 'Parent User',
   first_name = 'Parent',
   last_name = 'User',
-  phone_primary = '555-123-4567'
+  phone_home = '555-123-4567'
 WHERE email = 'richard.blaalid+parent@withcaldera.com';
 
 -- ============================================

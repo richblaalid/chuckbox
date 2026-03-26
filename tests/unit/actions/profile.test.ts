@@ -121,7 +121,7 @@ describe('Profile Actions', () => {
 
       expect(updateData.first_name).toBe('Jane')
       expect(updateData.last_name).toBeUndefined()
-      expect(updateData.phone_primary).toBeUndefined()
+      expect(updateData.phone_home).toBeUndefined()
     })
 
     it('should update full_name when name fields are provided', async () => {
@@ -195,7 +195,7 @@ describe('Profile Actions', () => {
       const result = await updateProfile({
         first_name: 'Jane',
         last_name: 'Smith',
-        phone_primary: '555-1234',
+        phone_home: '555-1234',
         address_street: '123 Main St',
       })
 

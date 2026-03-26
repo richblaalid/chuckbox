@@ -24,7 +24,8 @@ interface ParsedAdult {
   firstName: string
   lastName: string
   email?: string
-  phone?: string
+  phoneHome?: string
+  phoneMobile?: string
   position?: string
 }
 
@@ -176,7 +177,8 @@ async function main() {
         last_name: adult.lastName,
         full_name: `${adult.firstName} ${adult.lastName}`,
         email: adult.email?.toLowerCase() || null,
-        phone_primary: adult.phone || null,
+        phone_home: adult.phoneHome || null,
+        phone_mobile: adult.phoneMobile || null,
         position: adult.position || null,
       })
       .select('id')

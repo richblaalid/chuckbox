@@ -4,20 +4,21 @@
  * Parses the "Troop Advancement" CSV export from Scoutbook which contains
  * advancement data for all scouts in a unit.
  *
- * CSV Format:
- * bsamemberid,firstname,nickname,middlename,lastname,advancementtype,advancement,version,
- * awarded,datecompleted,approved,markedcompleteddate,...
+ * Supports multiple CSV formats via dynamic header detection:
+ * - Old format (pre-2026): lowercase headers, no spaces (bsamemberid,firstname,...)
+ * - New format (2026+): Title Case headers with spaces (BSA Member ID, First Name, ...)
  *
- * Key columns:
- * - bsamemberid: Match to scouts.bsa_member_id
- * - advancementtype: Type discriminator:
+ * Key columns (mapped by alias):
+ * - bsaMemberId: Match to scouts.bsa_member_id
+ * - advancementType: Type discriminator:
  *   - "Rank" - Rank completion (e.g., advancement="Tenderfoot Rank")
  *   - "Merit Badges" - Badge completion (e.g., advancement="Camping MB")
  *   - "Scout Rank Requirements" - Rank requirement (advancement="1a")
  *   - "[Badge Name] Merit Badge Requirements" - Badge requirement (advancement="7a")
  * - advancement: Item name or requirement number
  * - version: Version year for requirements
- * - datecompleted / awardeddate: Completion dates
+ * - dateCompleted / awardedDate: Completion dates
+ * - awarded / approved: Booleans (accepts "1", "True", "true", "yes")
  */
 
 import type {
@@ -65,22 +66,62 @@ const RANK_REQUIREMENT_PATTERNS: Array<{ pattern: RegExp; rankCode: string }> = 
   { pattern: /^eagle (scout )?rank requirements$/i, rankCode: 'eagle' },
 ]
 
-// Column indices in the CSV (0-based)
-const CSV_COLUMNS = {
-  bsaMemberId: 0,
-  firstName: 1,
-  nickname: 2,
-  middleName: 3,
-  lastName: 4,
-  advancementType: 5,
-  advancement: 6,
-  version: 7,
-  awarded: 8,
-  dateCompleted: 9,
-  approved: 10,
-  markedCompletedDate: 11,
-  // ... more columns exist but we don't need them
-  awardedDate: 19,
+// Column name aliases for dynamic header detection.
+// Each key is a semantic field name; values are possible header strings (lowercase).
+// Supports both old Scoutbook format (lowercase, no spaces) and new format (Title Case, spaces).
+const COLUMN_ALIASES: Record<string, string[]> = {
+  bsaMemberId: ['bsamemberid', 'bsa member id', 'bsa number'],
+  firstName: ['firstname', 'first name'],
+  middleName: ['middlename', 'middle name'],
+  lastName: ['lastname', 'last name'],
+  advancementType: ['advancementtype', 'advancement type'],
+  advancement: ['advancement'],
+  version: ['version'],
+  awarded: ['awarded'],
+  dateCompleted: ['datecompleted', 'date completed'],
+  approved: ['approved'],
+  markedCompletedDate: ['markedcompleteddate', 'marked completed date'],
+  awardedDate: ['awardeddate', 'awarded date'],
+}
+
+// Required columns — parser will error if these are missing from the header
+const REQUIRED_COLUMNS = ['bsaMemberId', 'advancementType', 'advancement']
+
+type ColumnMap = Record<string, number | undefined>
+
+/**
+ * Detect column indices from the CSV header row.
+ * Returns a map of semantic field name → column index.
+ * Throws if required columns are missing.
+ */
+export function detectColumns(headerLine: string): ColumnMap {
+  const headers = parseCSVLine(headerLine).map(h => h.toLowerCase().trim())
+  const columnMap: ColumnMap = {}
+
+  for (const [field, aliases] of Object.entries(COLUMN_ALIASES)) {
+    const idx = headers.findIndex(h => aliases.includes(h))
+    if (idx !== -1) {
+      columnMap[field] = idx
+    }
+  }
+
+  // Validate required columns
+  const missing = REQUIRED_COLUMNS.filter(col => columnMap[col] === undefined)
+  if (missing.length > 0) {
+    const missingNames = missing.map(col => COLUMN_ALIASES[col]?.[0] || col).join(', ')
+    throw new Error(`Missing required columns: ${missingNames}. Check that the CSV has a valid header row.`)
+  }
+
+  return columnMap
+}
+
+/**
+ * Parse a boolean value from CSV — handles both "1"/"0" (old) and "True"/"False" (new) formats
+ */
+function parseBool(value: string | undefined): boolean {
+  if (!value) return false
+  const v = value.toLowerCase().trim()
+  return v === '1' || v === 'true' || v === 'yes'
 }
 
 // ============================================
@@ -194,27 +235,33 @@ function classifyAdvancementType(advancementType: string): {
 }
 
 /**
+ * Get a column value by field name, returning empty string if column not mapped
+ */
+function getCol(parts: string[], columnMap: ColumnMap, field: string): string {
+  const idx = columnMap[field]
+  return idx !== undefined && idx < parts.length ? (parts[idx] || '') : ''
+}
+
+/**
  * Parse a single CSV row into a structured object
  */
-function parseRow(parts: string[]): ParsedAdvancementRow | null {
-  if (parts.length < 12) return null
-
-  const bsaMemberId = parts[CSV_COLUMNS.bsaMemberId]
+function parseRow(parts: string[], columnMap: ColumnMap): ParsedAdvancementRow | null {
+  const bsaMemberId = getCol(parts, columnMap, 'bsaMemberId')
   if (!bsaMemberId || !/^\d+$/.test(bsaMemberId)) return null
 
   return {
     bsaMemberId,
-    firstName: parts[CSV_COLUMNS.firstName] || '',
-    middleName: parts[CSV_COLUMNS.middleName] || '',
-    lastName: parts[CSV_COLUMNS.lastName] || '',
-    advancementType: parts[CSV_COLUMNS.advancementType] || '',
-    advancement: parts[CSV_COLUMNS.advancement] || '',
-    version: parts[CSV_COLUMNS.version] || '',
-    awarded: parts[CSV_COLUMNS.awarded] === '1',
-    dateCompleted: parseDate(parts[CSV_COLUMNS.dateCompleted] || ''),
-    approved: parts[CSV_COLUMNS.approved] === '1',
-    markedCompletedDate: parseDate(parts[CSV_COLUMNS.markedCompletedDate] || ''),
-    awardedDate: parseDate(parts[CSV_COLUMNS.awardedDate] || ''),
+    firstName: getCol(parts, columnMap, 'firstName'),
+    middleName: getCol(parts, columnMap, 'middleName'),
+    lastName: getCol(parts, columnMap, 'lastName'),
+    advancementType: getCol(parts, columnMap, 'advancementType'),
+    advancement: getCol(parts, columnMap, 'advancement'),
+    version: getCol(parts, columnMap, 'version'),
+    awarded: parseBool(getCol(parts, columnMap, 'awarded')),
+    dateCompleted: parseDate(getCol(parts, columnMap, 'dateCompleted')),
+    approved: parseBool(getCol(parts, columnMap, 'approved')),
+    markedCompletedDate: parseDate(getCol(parts, columnMap, 'markedCompletedDate')),
+    awardedDate: parseDate(getCol(parts, columnMap, 'awardedDate')),
   }
 }
 
@@ -237,7 +284,20 @@ export function parseTroopAdvancementCSV(content: string): ParsedTroopAdvancemen
   let badgeCount = 0
   let badgeRequirementCount = 0
 
-  // Skip header row
+  // Detect columns from header row
+  const headerLine = lines[0]?.trim()
+  if (!headerLine) {
+    return { scouts, summary: { totalRows: 0, scoutCount: 0, rankCount: 0, rankRequirementCount: 0, badgeCount: 0, badgeRequirementCount: 0, skippedRows: 0 }, errors: ['Empty file — no header row found'] }
+  }
+
+  let columnMap: ColumnMap
+  try {
+    columnMap = detectColumns(headerLine)
+  } catch (err) {
+    return { scouts, summary: { totalRows: 0, scoutCount: 0, rankCount: 0, rankRequirementCount: 0, badgeCount: 0, badgeRequirementCount: 0, skippedRows: 0 }, errors: [err instanceof Error ? err.message : String(err)] }
+  }
+
+  // Process data rows (skip header)
   const dataLines = lines.slice(1)
 
   for (let i = 0; i < dataLines.length; i++) {
@@ -248,7 +308,7 @@ export function parseTroopAdvancementCSV(content: string): ParsedTroopAdvancemen
 
     try {
       const parts = parseCSVLine(line)
-      const row = parseRow(parts)
+      const row = parseRow(parts, columnMap)
 
       if (!row) {
         skippedRows++

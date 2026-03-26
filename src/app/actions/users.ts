@@ -560,8 +560,8 @@ export async function updateUserProfile(
     first_name: string | null
     last_name: string | null
     gender?: 'male' | 'female' | 'other' | 'prefer_not_to_say' | null
-    phone_primary: string | null
-    phone_secondary: string | null
+    phone_home: string | null
+    phone_mobile: string | null
     email_secondary: string | null
     address_street: string | null
     address_city: string | null
@@ -631,8 +631,8 @@ export async function updateUserProfile(
     first_name: data.first_name,
     last_name: data.last_name,
     full_name: [data.first_name, data.last_name].filter(Boolean).join(' ') || null,
-    phone_primary: data.phone_primary,
-    phone_secondary: data.phone_secondary,
+    phone_home: data.phone_home,
+    phone_mobile: data.phone_mobile,
     email_secondary: data.email_secondary,
     address_street: data.address_street,
     address_city: data.address_city,

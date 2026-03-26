@@ -26,6 +26,8 @@ export interface ParsedAdult {
   state: string | null
   zip: string | null
   phone: string | null
+  phoneHome: string | null
+  phoneMobile: string | null
   gender: 'male' | 'female' | 'other' | 'prefer_not_to_say'
   dateJoined: string | null
   bsaMemberId: string | null
@@ -197,6 +199,39 @@ function parseTrainings(trainingStr: string, expirationStr: string): ParsedTrain
 
     return { code, name, expiresAt }
   })
+}
+
+/**
+ * Parse BSA phone field into separate home and mobile numbers.
+ * Input formats:
+ *   "(651) 746-9075 home" -> { home: "(651) 746-9075", mobile: null }
+ *   "(612) 222-1786 Mobile" -> { home: null, mobile: "(612) 222-1786" }
+ *   "(651) 746-9075 home, (651) 746-9075 Mobile" -> { home: "(651) 746-9075", mobile: "(651) 746-9075" }
+ */
+export function parsePhoneField(phoneStr: string | null): { home: string | null; mobile: string | null } {
+  if (!phoneStr) return { home: null, mobile: null }
+
+  const parts = phoneStr.split(',').map(p => p.trim())
+  let home: string | null = null
+  let mobile: string | null = null
+
+  for (const part of parts) {
+    // Extract the phone number (everything before the label)
+    const number = part.replace(/\s*(home|mobile)\s*$/i, '').trim()
+    if (!number) continue
+
+    if (/mobile/i.test(part)) {
+      mobile = number
+    } else if (/home/i.test(part)) {
+      home = number
+    } else {
+      // No label - default to home
+      if (!home) home = number
+      else if (!mobile) mobile = number
+    }
+  }
+
+  return { home, mobile }
 }
 
 /**
@@ -407,6 +442,10 @@ export function parseRosterCSV(content: string): ParsedRoster {
             state: getVal('State') || null,
             zip: getVal('Zip') || null,
             phone: getVal('Phone') || null,
+            ...(() => {
+              const parsed = parsePhoneField(getVal('Phone') || null)
+              return { phoneHome: parsed.home, phoneMobile: parsed.mobile }
+            })(),
             gender: mapGender(getVal('Gender')),
             dateJoined: extractDate(getVal('Date Joined')),
             bsaMemberId: getVal('BSA Number') || null,

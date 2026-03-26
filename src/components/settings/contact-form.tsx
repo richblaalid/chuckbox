@@ -11,8 +11,8 @@ interface ContactFormProps {
   profile: {
     email: string
     email_secondary: string | null
-    phone_primary: string | null
-    phone_secondary: string | null
+    phone_home: string | null
+    phone_mobile: string | null
   }
 }
 
@@ -31,8 +31,8 @@ export function ContactForm({ profile }: ContactFormProps) {
 
     const result = await updateProfile({
       email_secondary: formData.get('email_secondary') as string || null,
-      phone_primary: formData.get('phone_primary') as string || null,
-      phone_secondary: formData.get('phone_secondary') as string || null,
+      phone_home: formData.get('phone_home') as string || null,
+      phone_mobile: formData.get('phone_mobile') as string || null,
     })
 
     setIsLoading(false)
@@ -150,22 +150,22 @@ export function ContactForm({ profile }: ContactFormProps) {
           {/* Phone Fields */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="phone_primary">Primary Phone</Label>
+              <Label htmlFor="phone_home">Home Phone</Label>
               <Input
-                id="phone_primary"
-                name="phone_primary"
+                id="phone_home"
+                name="phone_home"
                 type="tel"
-                defaultValue={profile.phone_primary || ''}
+                defaultValue={profile.phone_home || ''}
                 placeholder="(555) 123-4567"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone_secondary">Secondary Phone</Label>
+              <Label htmlFor="phone_mobile">Mobile Phone</Label>
               <Input
-                id="phone_secondary"
-                name="phone_secondary"
+                id="phone_mobile"
+                name="phone_mobile"
                 type="tel"
-                defaultValue={profile.phone_secondary || ''}
+                defaultValue={profile.phone_mobile || ''}
                 placeholder="(555) 123-4567"
               />
             </div>

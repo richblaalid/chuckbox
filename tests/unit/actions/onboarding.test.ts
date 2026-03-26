@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { extractUnitFromCSV } from '@/app/actions/onboarding'
+import { extractUnitFromCSV, activateProvisionedMemberships } from '@/app/actions/onboarding'
 import * as bsaRosterParser from '@/lib/import/bsa-roster-parser'
 
 // Mock the bsa-roster-parser module
@@ -256,6 +256,136 @@ describe('onboarding actions', () => {
 
       expect(result.success).toBe(true)
       expect(result.unitMetadata?.unitSuffix).toBe('B')
+    })
+  })
+
+  describe('activateProvisionedMemberships', () => {
+    it('should return 0 activated when user is not authenticated', async () => {
+      // Default mock: getUser returns null
+      const result = await activateProvisionedMemberships()
+      expect(result.activated).toBe(0)
+      expect(result.unitNames).toEqual([])
+    })
+
+    it('should return 0 activated when no pending tokens exist', async () => {
+      const { createClient } = await import('@/lib/supabase/server')
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: 'user-1', email: 'test@example.com' } },
+          }),
+        },
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+      } as never)
+
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const mockFrom = vi.fn()
+      const mockChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        is: vi.fn().mockResolvedValue({ data: [], error: null }),
+        insert: vi.fn().mockReturnThis(),
+        update: vi.fn().mockReturnThis(),
+        delete: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        single: vi.fn().mockResolvedValue({ data: null, error: null }),
+      }
+      mockFrom.mockReturnValue(mockChain)
+      vi.mocked(createAdminClient).mockReturnValue({
+        from: mockFrom,
+        auth: { admin: { inviteUserByEmail: vi.fn() } },
+      } as never)
+
+      const result = await activateProvisionedMemberships()
+      expect(result.activated).toBe(0)
+      expect(result.unitNames).toEqual([])
+    })
+
+    it('should activate membership when pending provisioning token exists', async () => {
+      const { createClient } = await import('@/lib/supabase/server')
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: 'user-1', email: 'admin@example.com' } },
+          }),
+        },
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+      } as never)
+
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const mockFrom = vi.fn()
+      const pendingToken = {
+        id: 'token-1',
+        unit_id: 'unit-1',
+        profile_id: 'profile-1',
+        units: { name: 'Troop 297' },
+      }
+
+      // Track which table is being queried
+      mockFrom.mockImplementation((table: string) => {
+        const chain = {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          is: vi.fn().mockReturnThis(),
+          update: vi.fn().mockReturnThis(),
+          delete: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+
+        if (table === 'unit_provisioning_tokens') {
+          // For the initial query with .is('verified_at', null)
+          chain.is = vi.fn().mockResolvedValue({ data: [pendingToken], error: null })
+          // For the update
+          chain.update = vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+          })
+        }
+        if (table === 'profiles') {
+          chain.update = vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+          })
+        }
+        if (table === 'unit_memberships') {
+          chain.update = vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+            }),
+          })
+        }
+        if (table === 'staged_roster_imports') {
+          chain.select = vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+            }),
+          })
+        }
+        return chain
+      })
+
+      vi.mocked(createAdminClient).mockReturnValue({
+        from: mockFrom,
+        auth: { admin: { inviteUserByEmail: vi.fn() } },
+      } as never)
+
+      const result = await activateProvisionedMemberships()
+      expect(result.activated).toBe(1)
+      expect(result.unitNames).toEqual(['Troop 297'])
+
+      // Verify the correct tables were queried
+      expect(mockFrom).toHaveBeenCalledWith('unit_provisioning_tokens')
+      expect(mockFrom).toHaveBeenCalledWith('profiles')
+      expect(mockFrom).toHaveBeenCalledWith('unit_memberships')
     })
   })
 
