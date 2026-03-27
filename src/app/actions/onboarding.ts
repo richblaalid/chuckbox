@@ -71,6 +71,30 @@ interface VerifyProvisionResult {
 }
 
 // ============================================
+// Email Existence Check
+// ============================================
+
+export async function checkEmailExists(email: string): Promise<{ exists: boolean }> {
+  try {
+    const adminSupabase = createAdminClient()
+    const { data, error } = await adminSupabase.auth.admin.listUsers()
+
+    if (error || !data?.users) {
+      return { exists: false }
+    }
+
+    const normalizedEmail = email.toLowerCase()
+    const found = data.users.some(
+      (u) => u.email?.toLowerCase() === normalizedEmail
+    )
+
+    return { exists: found }
+  } catch {
+    return { exists: false }
+  }
+}
+
+// ============================================
 // Rate Limiting
 // ============================================
 

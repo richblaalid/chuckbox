@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { extractUnitFromCSV, activateProvisionedMemberships } from '@/app/actions/onboarding'
+import { extractUnitFromCSV, activateProvisionedMemberships, checkEmailExists } from '@/app/actions/onboarding'
 import * as bsaRosterParser from '@/lib/import/bsa-roster-parser'
 
 // Mock the bsa-roster-parser module
@@ -386,6 +386,82 @@ describe('onboarding actions', () => {
       expect(mockFrom).toHaveBeenCalledWith('unit_provisioning_tokens')
       expect(mockFrom).toHaveBeenCalledWith('profiles')
       expect(mockFrom).toHaveBeenCalledWith('unit_memberships')
+    })
+  })
+
+  describe('checkEmailExists', () => {
+    it('should return exists: true when email is found in auth', async () => {
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      vi.mocked(createAdminClient).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+        auth: {
+          admin: {
+            listUsers: vi.fn().mockResolvedValue({
+              data: {
+                users: [{ id: 'user-1', email: 'existing@example.com' }],
+              },
+              error: null,
+            }),
+            inviteUserByEmail: vi.fn(),
+          },
+        },
+      } as never)
+
+      const result = await checkEmailExists('existing@example.com')
+      expect(result.exists).toBe(true)
+    })
+
+    it('should return exists: false when email is not in auth', async () => {
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      vi.mocked(createAdminClient).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+        auth: {
+          admin: {
+            listUsers: vi.fn().mockResolvedValue({
+              data: { users: [] },
+              error: null,
+            }),
+            inviteUserByEmail: vi.fn(),
+          },
+        },
+      } as never)
+
+      const result = await checkEmailExists('new@example.com')
+      expect(result.exists).toBe(false)
+    })
+
+    it('should return exists: false when auth check errors', async () => {
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      vi.mocked(createAdminClient).mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+        auth: {
+          admin: {
+            listUsers: vi.fn().mockResolvedValue({
+              data: null,
+              error: { message: 'Service unavailable' },
+            }),
+            inviteUserByEmail: vi.fn(),
+          },
+        },
+      } as never)
+
+      const result = await checkEmailExists('test@example.com')
+      expect(result.exists).toBe(false)
     })
   })
 
