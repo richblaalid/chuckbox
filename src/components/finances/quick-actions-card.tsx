@@ -9,7 +9,8 @@ import { QuickPaymentForm } from '@/components/payments/quick-payment-form'
 import { BillingForm } from '@/components/billing/billing-form'
 import { ReminderSelectionDialog } from './reminder-selection-dialog'
 import { BulkReminderWrapper } from './bulk-reminder-wrapper'
-import { CreditCard, Receipt, Bell } from 'lucide-react'
+import Link from 'next/link'
+import { CreditCard, Receipt, Bell, Upload } from 'lucide-react'
 
 interface Scout {
   id: string
@@ -111,6 +112,12 @@ export function QuickActionsCard({ unitId, unitName, scouts, squareConfig }: Qui
                   {accountsOwingMoney.length}
                 </span>
               )}
+            </Button>
+            <Button variant="outline" className="gap-2" asChild>
+              <Link href="/settings/import/charges">
+                <Upload className="h-4 w-4" />
+                Import Charges
+              </Link>
             </Button>
           </div>
         </CardContent>

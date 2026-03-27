@@ -404,14 +404,24 @@ describe('applyColumnMapping', () => {
 })
 
 describe('validateMapping', () => {
-  it('returns error if no name column is mapped', () => {
+  it('returns error if no identification column is mapped', () => {
     const mapping: ColumnMapping = {
       singleBalanceColumn: 1,
       positiveBalanceMeaning: 'credit',
     }
 
     const errors = validateMapping(mapping)
-    expect(errors).toContain('A name column is required (first/last name or full name)')
+    expect(errors).toContain('A scout identification column is required (name or BSA Member ID)')
+  })
+
+  it('returns no errors with BSA ID only (no name column)', () => {
+    const mapping: ColumnMapping = {
+      bsaMemberIdColumn: 0,
+      billingBalanceColumn: 1,
+    }
+
+    const errors = validateMapping(mapping)
+    expect(errors).toEqual([])
   })
 
   it('returns error if no balance column is mapped', () => {

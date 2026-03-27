@@ -6,6 +6,7 @@ import { LogoUpload } from '@/components/settings/logo-upload'
 import { PaymentProcessingCard } from '@/components/settings/payment-processing-card'
 import { ScoutbookSyncCardLazy } from '@/components/settings/scoutbook-sync-card-lazy'
 import { BalanceImportCard } from '@/components/settings/balance-import-card'
+import { BillingChargeImportCard } from '@/components/settings/billing-charge-import-card'
 import { CollectionSettingsCard } from '@/components/settings/collection-settings-card'
 import { UsersList } from '@/components/settings/users/users-list'
 import { InviteUserButton } from '@/components/settings/users/invite-user-button'
@@ -296,6 +297,37 @@ export default async function SettingsPage({
     canUndoLatestBatch = (subsequentEntries ?? 0) === 0
   }
 
+  // Get billing charge import batches for this unit (most recent 10)
+  const { data: billingBatchesData } = await supabase
+    .from('billing_import_batches')
+    .select(`
+      id,
+      created_at,
+      total_records,
+      total_amount,
+      notifications_sent,
+      created_by_profile:profiles!billing_import_batches_created_by_fkey(
+        full_name,
+        email
+      )
+    `)
+    .eq('unit_id', membership.unit_id)
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  interface BillingBatch {
+    id: string
+    created_at: string
+    total_records: number
+    total_amount: number
+    notifications_sent: boolean | null
+    created_by_profile: {
+      full_name: string | null
+      email: string | null
+    } | null
+  }
+  const billingBatches = (billingBatchesData as unknown as BillingBatch[]) || []
+
   // Unit Tab Content (admin only)
   const unitTabContent = isAdmin ? (
     <div className="grid gap-6">
@@ -440,6 +472,9 @@ export default async function SettingsPage({
       <BalanceImportCard
         batches={importBatches}
         canUndoLatest={canUndoLatestBatch}
+      />
+      <BillingChargeImportCard
+        batches={billingBatches}
       />
       <CollectionSettingsCard
         unitId={unit.id}

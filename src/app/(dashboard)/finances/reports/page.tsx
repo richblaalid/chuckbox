@@ -87,6 +87,16 @@ export default async function ReportsPage() {
     return <AccessDenied message="Only administrators, treasurers, and leaders can access reports." />
   }
 
+  // Check if unit has an active payment processor connection
+  const { data: squareCredentials } = await supabase
+    .from('unit_square_credentials')
+    .select('id')
+    .eq('unit_id', membership.unit_id)
+    .eq('is_active', true)
+    .single()
+
+  const hasPaymentProcessor = !!squareCredentials
+
   // Get all scout accounts
   const { data: accountsData } = await supabase
     .from('scout_accounts')
@@ -271,7 +281,7 @@ export default async function ReportsPage() {
         </p>
       </div>
 
-      <FinanceSubnav />
+      <FinanceSubnav showPaymentsTab={hasPaymentProcessor} />
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">

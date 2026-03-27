@@ -68,6 +68,16 @@ export default async function AccountsPage() {
   const isScout = role === 'scout'
   const canTakeActions = isFinancialRole(role)
 
+  // Check if unit has an active payment processor connection
+  const { data: squareCredentials } = await supabase
+    .from('unit_square_credentials')
+    .select('id')
+    .eq('unit_id', membership.unit_id)
+    .eq('is_active', true)
+    .single()
+
+  const hasPaymentProcessor = !!squareCredentials
+
   // For parents/scouts, get their linked scout IDs
   let linkedScoutIds: string[] = []
 
@@ -319,7 +329,7 @@ export default async function AccountsPage() {
         </p>
       </div>
 
-      <FinanceSubnav />
+      <FinanceSubnav showPaymentsTab={hasPaymentProcessor} />
 
       {/* Undo Banner for recent imports */}
       {isFinancialRole(role) && latestBatch && canUndo && (

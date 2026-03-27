@@ -44,6 +44,18 @@ export default async function AccountDetailPage({ params }: AccountPageProps) {
   const canRecordPayment = isFinancialRole(userRole)
   const canTakeActions = isFinancialRole(userRole)
 
+  // Check if unit has an active payment processor connection
+  const { data: squareCredentials } = unitId
+    ? await supabase
+        .from('unit_square_credentials')
+        .select('id')
+        .eq('unit_id', unitId)
+        .eq('is_active', true)
+        .single()
+    : { data: null }
+
+  const hasPaymentProcessor = !!squareCredentials
+
   // Check if user is a parent (guardian of this scout)
   const { data: guardianCheck } = await supabase
     .from('scout_guardians')
@@ -200,7 +212,7 @@ export default async function AccountDetailPage({ params }: AccountPageProps) {
         </div>
       </div>
 
-      <FinanceSubnav />
+      <FinanceSubnav showPaymentsTab={hasPaymentProcessor} />
 
       {/* Transaction History with Pagination */}
       <PaginatedTransactionHistory

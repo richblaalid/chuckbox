@@ -228,6 +228,54 @@ export type Database = {
           },
         ]
       }
+      billing_import_batches: {
+        Row: {
+          id: string
+          unit_id: string
+          created_by: string
+          filename: string | null
+          total_records: number
+          total_amount: number
+          notifications_sent: boolean | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          unit_id: string
+          created_by: string
+          filename?: string | null
+          total_records?: number
+          total_amount?: number
+          notifications_sent?: boolean | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          unit_id?: string
+          created_by?: string
+          filename?: string | null
+          total_records?: number
+          total_amount?: number
+          notifications_sent?: boolean | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_import_batches_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_import_batches_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_charges: {
         Row: {
           amount: number
@@ -299,6 +347,7 @@ export type Database = {
       billing_records: {
         Row: {
           billing_date: string
+          billing_import_batch_id: string | null
           created_at: string | null
           created_by: string | null
           description: string
@@ -314,6 +363,7 @@ export type Database = {
         }
         Insert: {
           billing_date: string
+          billing_import_batch_id?: string | null
           created_at?: string | null
           created_by?: string | null
           description: string
@@ -329,6 +379,7 @@ export type Database = {
         }
         Update: {
           billing_date?: string
+          billing_import_batch_id?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string
