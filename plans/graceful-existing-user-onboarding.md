@@ -149,7 +149,7 @@ flowchart TD
   - Details: Uses admin client to check if email exists in auth. Returns `{ exists: boolean }`. Rate-limited.
   - Test: Unit test with mock admin client
 
-- [ ] **0.2.2** Modify `provisionUnit()` to detect existing auth users
+- [x] **0.2.2** Modify `provisionUnit()` to detect existing auth users
   - Files: `src/app/actions/onboarding.ts`
   - Details: Before creating unit/profile, check auth. If email exists, return `{ success: false, code: 'account_exists' }` instead of silently failing on `inviteUserByEmail`.
   - Test: Unit test — existing email returns `account_exists` code
@@ -282,7 +282,8 @@ flowchart TD
 | Task | Date | Commit | Notes |
 |------|------|--------|-------|
 | 0.1.1 | 2026-03-27 | — | DROPPED: automated auth user deletion too risky |
-| 0.2.1 | 2026-03-27 | pending | checkEmailExists() added with 3 unit tests |
+| 0.2.1 | 2026-03-27 | ce52d74 | checkEmailExists() added with 3 unit tests |
+| 0.2.2 | 2026-03-27 | pending | provisionUnit() returns account_exists for existing emails |
 
 ---
 

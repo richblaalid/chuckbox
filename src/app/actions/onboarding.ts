@@ -47,6 +47,7 @@ interface ProvisionUnitInput {
 interface ProvisionResult {
   success: boolean
   error?: string
+  code?: 'account_exists'
   unitId?: string
   profileId?: string
   duplicateWarning?: {
@@ -303,6 +304,16 @@ export async function provisionUnit(input: ProvisionUnitInput, ipAddress: string
         existingUnitNumber: duplicateCheck.unitNumber,
         existingCouncil: duplicateCheck.council,
       },
+    }
+  }
+
+  // Check if admin email already exists in auth
+  const emailCheck = await checkEmailExists(admin.email)
+  if (emailCheck.exists) {
+    return {
+      success: false,
+      code: 'account_exists',
+      error: 'An account with this email already exists. Please sign in to create a new unit.',
     }
   }
 

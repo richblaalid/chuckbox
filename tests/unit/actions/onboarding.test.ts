@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { extractUnitFromCSV, activateProvisionedMemberships, checkEmailExists } from '@/app/actions/onboarding'
+import { extractUnitFromCSV, activateProvisionedMemberships, checkEmailExists, provisionUnit } from '@/app/actions/onboarding'
 import * as bsaRosterParser from '@/lib/import/bsa-roster-parser'
 
 // Mock the bsa-roster-parser module
@@ -462,6 +462,79 @@ describe('onboarding actions', () => {
 
       const result = await checkEmailExists('test@example.com')
       expect(result.exists).toBe(false)
+    })
+  })
+
+  describe('provisionUnit - existing user detection', () => {
+    const validInput = {
+      unitMetadata: {
+        unitNumber: '100',
+        unitType: 'troop' as const,
+        council: 'Test Council',
+        district: 'Test District',
+      },
+      admin: {
+        firstName: 'John',
+        lastName: 'Doe',
+        email: 'existing@example.com',
+      },
+      parsedAdults: [],
+      parsedScouts: [],
+    }
+
+    it('should return account_exists code when admin email exists in auth', async () => {
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const mockFrom = vi.fn()
+      const mockChain = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        is: vi.fn().mockReturnThis(),
+        gte: vi.fn().mockReturnThis(),
+        ilike: vi.fn().mockReturnThis(),
+        insert: vi.fn().mockReturnThis(),
+        update: vi.fn().mockReturnThis(),
+        delete: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        single: vi.fn().mockResolvedValue({ data: null, error: null }),
+      }
+      mockFrom.mockImplementation((table: string) => {
+        if (table === 'signup_rate_limits') {
+          return {
+            ...mockChain,
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }
+        }
+        if (table === 'units') {
+          return {
+            ...mockChain,
+            // checkDuplicateUnit: no matching units
+            is: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }
+        }
+        return mockChain
+      })
+
+      vi.mocked(createAdminClient).mockReturnValue({
+        from: mockFrom,
+        auth: {
+          admin: {
+            inviteUserByEmail: vi.fn(),
+            listUsers: vi.fn().mockResolvedValue({
+              data: {
+                users: [{ id: 'user-1', email: 'existing@example.com' }],
+              },
+              error: null,
+            }),
+          },
+        },
+      } as never)
+
+      const result = await provisionUnit(validInput, '127.0.0.1')
+
+      expect(result.success).toBe(false)
+      expect(result.code).toBe('account_exists')
     })
   })
 
