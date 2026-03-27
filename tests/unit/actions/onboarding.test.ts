@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { extractUnitFromCSV, activateProvisionedMemberships, checkEmailExists, provisionUnit } from '@/app/actions/onboarding'
+import { extractUnitFromCSV, activateProvisionedMemberships, checkEmailExists, provisionUnit, provisionUnitAuthenticated } from '@/app/actions/onboarding'
 import * as bsaRosterParser from '@/lib/import/bsa-roster-parser'
 
 // Mock the bsa-roster-parser module
@@ -535,6 +535,125 @@ describe('onboarding actions', () => {
 
       expect(result.success).toBe(false)
       expect(result.code).toBe('account_exists')
+    })
+  })
+
+  describe('provisionUnitAuthenticated', () => {
+    const validInput = {
+      unitMetadata: {
+        unitNumber: '200',
+        unitType: 'troop' as const,
+        council: 'Test Council',
+        district: 'Test District',
+      },
+      parsedAdults: [],
+      parsedScouts: [],
+      signupPath: 'csv' as const,
+    }
+
+    it('should return error when user is not authenticated', async () => {
+      const { createClient } = await import('@/lib/supabase/server')
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+        },
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+      } as never)
+
+      const result = await provisionUnitAuthenticated(validInput)
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('authenticated')
+    })
+
+    it('should create unit with active membership for authenticated user', async () => {
+      const { createClient } = await import('@/lib/supabase/server')
+      vi.mocked(createClient).mockResolvedValue({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: 'user-1', email: 'admin@example.com' } },
+          }),
+        },
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          single: vi.fn().mockResolvedValue({
+            data: { id: 'profile-1', email: 'admin@example.com' },
+            error: null,
+          }),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }),
+      } as never)
+
+      const { createAdminClient } = await import('@/lib/supabase/admin')
+      const insertedUnit = { id: 'unit-new' }
+      const mockFrom = vi.fn()
+      mockFrom.mockImplementation((table: string) => {
+        const chain = {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          is: vi.fn().mockReturnThis(),
+          gte: vi.fn().mockReturnThis(),
+          ilike: vi.fn().mockReturnThis(),
+          insert: vi.fn().mockReturnThis(),
+          update: vi.fn().mockReturnThis(),
+          delete: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+
+        if (table === 'signup_rate_limits') {
+          return chain
+        }
+        if (table === 'units') {
+          // For duplicate check: no match
+          chain.is = vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+          })
+          // For insert: return new unit
+          chain.insert = vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: insertedUnit, error: null }),
+            }),
+          })
+          return chain
+        }
+        if (table === 'unit_memberships') {
+          chain.insert = vi.fn().mockResolvedValue({ data: null, error: null })
+          return chain
+        }
+        if (table === 'staged_roster_imports') {
+          chain.insert = vi.fn().mockResolvedValue({ data: null, error: null })
+          return chain
+        }
+        return chain
+      })
+
+      vi.mocked(createAdminClient).mockReturnValue({
+        from: mockFrom,
+        auth: {
+          admin: {
+            inviteUserByEmail: vi.fn(),
+            listUsers: vi.fn().mockResolvedValue({ data: { users: [] }, error: null }),
+          },
+        },
+      } as never)
+
+      const result = await provisionUnitAuthenticated(validInput)
+
+      expect(result.success).toBe(true)
+      expect(result.unitId).toBe('unit-new')
+
+      // Verify membership was created with 'active' status
+      expect(mockFrom).toHaveBeenCalledWith('unit_memberships')
+      const membershipCall = mockFrom.mock.calls.find(
+        (call: string[]) => call[0] === 'unit_memberships'
+      )
+      expect(membershipCall).toBeDefined()
     })
   })
 

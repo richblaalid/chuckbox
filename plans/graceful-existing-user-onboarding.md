@@ -1,6 +1,6 @@
 # Graceful Existing User Onboarding
 
-> **Status:** Draft
+> **Status:** In Progress
 > **Created:** 2026-03-25
 > **Author:** Claude
 
@@ -154,7 +154,7 @@ flowchart TD
   - Details: Before creating unit/profile, check auth. If email exists, return `{ success: false, code: 'account_exists' }` instead of silently failing on `inviteUserByEmail`.
   - Test: Unit test — existing email returns `account_exists` code
 
-- [ ] **0.2.3** Create `provisionUnitAuthenticated()` server action
+- [x] **0.2.3** Create `provisionUnitAuthenticated()` server action
   - Files: `src/app/actions/onboarding.ts`
   - Details: For authenticated users — creates unit, reuses existing profile, sets membership to active, imports roster. No invite email.
   - Test: Unit test — creates unit with active membership, no email sent
@@ -271,7 +271,7 @@ flowchart TD
 
 | Phase | Total | Complete | Status |
 |-------|-------|----------|--------|
-| Phase 0 | 4 | 0 | Not Started |
+| Phase 0 | 4 | 4 | Complete (0.1.1 dropped) |
 | Phase 1 | 3 | 0 | Not Started |
 | Phase 2 | 4 | 0 | Not Started |
 
@@ -283,7 +283,8 @@ flowchart TD
 |------|------|--------|-------|
 | 0.1.1 | 2026-03-27 | — | DROPPED: automated auth user deletion too risky |
 | 0.2.1 | 2026-03-27 | ce52d74 | checkEmailExists() added with 3 unit tests |
-| 0.2.2 | 2026-03-27 | pending | provisionUnit() returns account_exists for existing emails |
+| 0.2.2 | 2026-03-27 | 14a889f | provisionUnit() returns account_exists for existing emails |
+| 0.2.3 | 2026-03-27 | pending | provisionUnitAuthenticated() for logged-in users, 2 tests |
 
 ---
 
