@@ -135,9 +135,21 @@ export async function createImportJob(
 export async function getImportJobStatus(
   jobId: string
 ): Promise<ActionResult<ImportJob>> {
+  // Verify the user is authenticated
   const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  const { data: job, error } = await supabase
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  // Use admin client to bypass RLS - the import_jobs RLS policy
+  // has issues matching profiles via auth.uid() subquery
+  const adminSupabase = createAdminClient()
+
+  const { data: job, error } = await adminSupabase
     .from('import_jobs')
     .select('*')
     .eq('id', jobId)
@@ -149,6 +161,29 @@ export async function getImportJobStatus(
 
   if (!job) {
     return { success: false, error: 'Job not found' }
+  }
+
+  // Verify the user has access to this job's unit
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (!profile) {
+    return { success: false, error: 'Profile not found' }
+  }
+
+  const { data: membership } = await supabase
+    .from('unit_memberships')
+    .select('role')
+    .eq('unit_id', job.unit_id)
+    .eq('profile_id', profile.id)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  if (!membership || !['admin', 'treasurer', 'leader'].includes(membership.role)) {
+    return { success: false, error: 'Access denied' }
   }
 
   return {

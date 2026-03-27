@@ -114,9 +114,26 @@ describe('createImportJob', () => {
 describe('getImportJobStatus', () => {
   beforeEach(() => vi.clearAllMocks())
 
+  function setupAuthenticatedUser() {
+    mockSupabase.auth.getUser.mockResolvedValue({
+      data: { user: { id: 'user-1' } },
+      error: null,
+    })
+    mockSupabase.from.mockImplementation((table: string) => {
+      if (table === 'profiles') {
+        return chainWithMaybeSingle({ id: 'profile-1' })
+      }
+      if (table === 'unit_memberships') {
+        return chainWithMaybeSingle({ role: 'admin' })
+      }
+      return chainWithSingle(null)
+    })
+  }
+
   it('should return job data', async () => {
+    setupAuthenticatedUser()
     const mockJob = { id: 'job-1', unit_id: 'unit-1', status: 'completed', result: { imported: 5 } }
-    mockSupabase.from.mockReturnValue(chainWithSingle(mockJob))
+    mockAdminSupabase.from.mockReturnValue(chainWithSingle(mockJob))
 
     const result = await getImportJobStatus('job-1')
     expect(result.success).toBe(true)
@@ -125,7 +142,8 @@ describe('getImportJobStatus', () => {
   })
 
   it('should return error on DB failure', async () => {
-    mockSupabase.from.mockReturnValue(chainWithSingle(null, { message: 'Not found' }))
+    setupAuthenticatedUser()
+    mockAdminSupabase.from.mockReturnValue(chainWithSingle(null, { message: 'Not found' }))
 
     const result = await getImportJobStatus('job-999')
     expect(result.success).toBe(false)
@@ -133,11 +151,23 @@ describe('getImportJobStatus', () => {
   })
 
   it('should return error when job not found', async () => {
-    mockSupabase.from.mockReturnValue(chainWithSingle(null))
+    setupAuthenticatedUser()
+    mockAdminSupabase.from.mockReturnValue(chainWithSingle(null))
 
     const result = await getImportJobStatus('job-999')
     expect(result.success).toBe(false)
     expect(result.error).toBe('Job not found')
+  })
+
+  it('should return error when not authenticated', async () => {
+    mockSupabase.auth.getUser.mockResolvedValue({
+      data: { user: null },
+      error: null,
+    })
+
+    const result = await getImportJobStatus('job-1')
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Not authenticated')
   })
 })
 
