@@ -55,7 +55,7 @@ export function OutstandingBillsCard({ billingRecords, totalScoutsOwing }: Outst
       </CardHeader>
       <CardContent>
         {activeRecords.length > 0 ? (
-          <div className="space-y-2">
+          <><div className="space-y-2">
             {activeRecords.map((record) => {
               const unpaidCharges = record.charges.filter((c) => !c.is_paid)
               const paidCharges = record.charges.filter((c) => c.is_paid)
@@ -134,6 +134,13 @@ export function OutstandingBillsCard({ billingRecords, totalScoutsOwing }: Outst
               )
             })}
           </div>
+          <Link
+            href="/finances/billing?status=unpaid"
+            className="mt-3 block text-center text-sm text-forest-600 hover:text-forest-800"
+          >
+            View all billing records →
+          </Link>
+          </>
         ) : (
           <p className="text-success">No outstanding billing records</p>
         )}

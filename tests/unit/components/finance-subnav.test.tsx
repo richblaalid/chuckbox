@@ -8,19 +8,19 @@ vi.mock('next/navigation', () => ({
 }))
 
 describe('FinanceSubnav', () => {
-  it('renders exactly 4 tabs: Overview, Scout Accounts, Expenses, Reports', () => {
+  it('renders 5 base tabs: Overview, Scout Accounts, Billing, Expenses, Reports', () => {
     render(<FinanceSubnav />)
 
     expect(screen.getByRole('link', { name: /overview/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /scout accounts/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /billing/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /expenses/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /reports/i })).toBeInTheDocument()
   })
 
-  it('does not render deprecated tabs (Billing, Collection, Transactions)', () => {
+  it('does not render deprecated tabs (Collection, Transactions)', () => {
     render(<FinanceSubnav />)
 
-    expect(screen.queryByRole('link', { name: /^billing$/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /^collection$/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /^transactions$/i })).not.toBeInTheDocument()
   })
@@ -36,10 +36,10 @@ describe('FinanceSubnav', () => {
     expect(screen.getByRole('link', { name: /payments/i })).toHaveAttribute('href', '/finances/payments')
   })
 
-  it('renders 5 links when showPaymentsTab is true', () => {
+  it('renders 6 links when showPaymentsTab is true', () => {
     render(<FinanceSubnav showPaymentsTab />)
     const links = screen.getAllByRole('link')
-    expect(links.length).toBe(5)
+    expect(links.length).toBe(6)
   })
 
   it('links to correct routes', () => {
@@ -47,13 +47,14 @@ describe('FinanceSubnav', () => {
 
     expect(screen.getByRole('link', { name: /overview/i })).toHaveAttribute('href', '/finances')
     expect(screen.getByRole('link', { name: /scout accounts/i })).toHaveAttribute('href', '/finances/accounts')
+    expect(screen.getByRole('link', { name: /billing/i })).toHaveAttribute('href', '/finances/billing')
     expect(screen.getByRole('link', { name: /expenses/i })).toHaveAttribute('href', '/expenses')
     expect(screen.getByRole('link', { name: /reports/i })).toHaveAttribute('href', '/finances/reports')
   })
 
-  it('renders only 4 links total', () => {
+  it('renders only 5 links by default', () => {
     render(<FinanceSubnav />)
     const links = screen.getAllByRole('link')
-    expect(links.length).toBe(4)
+    expect(links.length).toBe(5)
   })
 })
