@@ -128,10 +128,31 @@ export function BalanceColumnMapper({ csv, onMappingChange }: BalanceColumnMappe
         <CardHeader>
           <CardTitle className="text-base">Scout Identification</CardTitle>
           <CardDescription>
-            Map columns to identify scouts. Use first/last name, full name, or BSA Member ID.
+            Map columns to identify scouts. BSA Member ID is the most reliable match when available.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="bsaMemberId">BSA Member ID Column</Label>
+            <Select
+              value={getSelectValue('bsaMemberIdColumn')}
+              onValueChange={(v) => handleColumnChange('bsaMemberIdColumn', v)}
+            >
+              <SelectTrigger id="bsaMemberId" className="max-w-sm">
+                <SelectValue placeholder="Select column" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={UNMAPPED_VALUE}>-- Not Mapped --</SelectItem>
+                {csv.headers.map((header, i) => (
+                  <SelectItem key={i} value={String(i)}>
+                    {header}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-stone-500">Preferred — exact match, no ambiguity with duplicate names</p>
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="firstName">First Name Column</Label>
@@ -180,46 +201,24 @@ export function BalanceColumnMapper({ csv, onMappingChange }: BalanceColumnMappe
             <div className="h-px flex-1 bg-stone-200" />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name Column</Label>
-              <Select
-                value={getSelectValue('fullNameColumn')}
-                onValueChange={(v) => handleColumnChange('fullNameColumn', v)}
-              >
-                <SelectTrigger id="fullName">
-                  <SelectValue placeholder="Select column" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={UNMAPPED_VALUE}>-- Not Mapped --</SelectItem>
-                  {csv.headers.map((header, i) => (
-                    <SelectItem key={i} value={String(i)}>
-                      {header}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="bsaMemberId">BSA Member ID Column</Label>
-              <Select
-                value={getSelectValue('bsaMemberIdColumn')}
-                onValueChange={(v) => handleColumnChange('bsaMemberIdColumn', v)}
-              >
-                <SelectTrigger id="bsaMemberId">
-                  <SelectValue placeholder="Select column" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={UNMAPPED_VALUE}>-- Not Mapped --</SelectItem>
-                  {csv.headers.map((header, i) => (
-                    <SelectItem key={i} value={String(i)}>
-                      {header}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="fullName">Full Name Column</Label>
+            <Select
+              value={getSelectValue('fullNameColumn')}
+              onValueChange={(v) => handleColumnChange('fullNameColumn', v)}
+            >
+              <SelectTrigger id="fullName" className="max-w-sm">
+                <SelectValue placeholder="Select column" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={UNMAPPED_VALUE}>-- Not Mapped --</SelectItem>
+                {csv.headers.map((header, i) => (
+                  <SelectItem key={i} value={String(i)}>
+                    {header}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>

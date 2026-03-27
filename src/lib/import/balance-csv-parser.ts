@@ -403,14 +403,15 @@ export function applyColumnMapping(
 export function validateMapping(mapping: ColumnMapping): string[] {
   const errors: string[] = []
 
-  // Check for name column
-  const hasNameColumn =
+  // Check for identification column (name or BSA ID)
+  const hasIdentificationColumn =
     mapping.firstNameColumn !== undefined ||
     mapping.lastNameColumn !== undefined ||
-    mapping.fullNameColumn !== undefined
+    mapping.fullNameColumn !== undefined ||
+    mapping.bsaMemberIdColumn !== undefined
 
-  if (!hasNameColumn) {
-    errors.push('A name column is required (first/last name or full name)')
+  if (!hasIdentificationColumn) {
+    errors.push('A scout identification column is required (name or BSA Member ID)')
   }
 
   // Check for balance column

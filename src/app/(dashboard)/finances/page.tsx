@@ -10,6 +10,7 @@ import { QuickActionsCard } from '@/components/finances/quick-actions-card'
 import { Receipt, CreditCard, TrendingDown, PiggyBank, AlertTriangle } from 'lucide-react'
 import { BankWidget } from '@/components/plaid/bank-widget'
 import { BankBalanceCard } from '@/components/plaid/bank-balance-card'
+import { OutstandingBillsCard, type BillingRecordSummary } from '@/components/finances/outstanding-bills-card'
 
 interface ScoutAccount {
   id: string
@@ -82,6 +83,16 @@ export default async function FinancesOverviewPage() {
   }
 
   const canTakeActions = isFinancialRole(membership.role)
+
+  // Check if unit has an active payment processor connection
+  const { data: squareCredentials } = await supabase
+    .from('unit_square_credentials')
+    .select('id')
+    .eq('unit_id', membership.unit_id)
+    .eq('is_active', true)
+    .single()
+
+  const hasPaymentProcessor = !!squareCredentials
 
   // Get all scout accounts
   const { data: accountsData } = await supabase
@@ -169,23 +180,109 @@ export default async function FinancesOverviewPage() {
 
   const recentPayments = (paymentsData as PaymentWithScout[]) || []
 
-  // Get recent billing records
-  const { data: billingData } = await supabase
+  // Get recent billing records with per-scout charge details (used by both Outstanding Bills and Recent Activity)
+  const { data: billingRecordsData } = await supabase
     .from('billing_records')
-    .select('id, description, total_amount, billing_date')
+    .select(`
+      id,
+      description,
+      billing_date,
+      created_at,
+      total_amount,
+      is_void,
+      billing_import_batch_id,
+      billing_charges (
+        id,
+        amount,
+        is_paid,
+        scout_account_id,
+        scout_accounts (
+          scouts (
+            first_name,
+            last_name
+          )
+        )
+      )
+    `)
     .eq('unit_id', membership.unit_id)
     .or('is_void.is.null,is_void.eq.false')
-    .order('billing_date', { ascending: false })
-    .limit(10)
+    .order('created_at', { ascending: false })
+    .limit(50)
 
-  interface BillingRecord {
+  type BillingRecordWithCharges = {
     id: string
     description: string
-    total_amount: number
     billing_date: string
+    created_at: string | null
+    total_amount: number
+    is_void: boolean | null
+    billing_import_batch_id: string | null
+    billing_charges: Array<{
+      id: string
+      amount: number
+      is_paid: boolean | null
+      scout_account_id: string
+      scout_accounts: {
+        scouts: {
+          first_name: string
+          last_name: string
+        }
+      } | null
+    }>
   }
 
-  const recentBilling = (billingData as BillingRecord[]) || []
+  const rawBillingRecords = (billingRecordsData as unknown as BillingRecordWithCharges[]) || []
+
+  // Group billing records that share the same batch OR same description+date into single entries
+  // This collapses 20 individual "Summer Camp" charges into one grouped row
+  const groupedMap = new Map<string, BillingRecordSummary>()
+
+  for (const record of rawBillingRecords) {
+    // Group key: batch ID if from import, otherwise record ID (no grouping)
+    const groupKey = record.billing_import_batch_id
+      ? `batch:${record.billing_import_batch_id}`
+      : `record:${record.id}`
+
+    const charges = (record.billing_charges || []).map((charge) => ({
+      id: charge.id,
+      amount: charge.amount,
+      is_paid: charge.is_paid,
+      scout_account_id: charge.scout_account_id,
+      scout_first_name: charge.scout_accounts?.scouts?.first_name || 'Unknown',
+      scout_last_name: charge.scout_accounts?.scouts?.last_name || '',
+    }))
+
+    const existing = groupedMap.get(groupKey)
+    if (existing) {
+      existing.charges.push(...charges)
+      existing.total_amount += record.total_amount
+    } else {
+      groupedMap.set(groupKey, {
+        id: record.id,
+        description: record.description,
+        billing_date: record.billing_date,
+        created_at: record.created_at,
+        total_amount: record.total_amount,
+        is_void: record.is_void,
+        charges,
+      })
+    }
+  }
+
+  const billingRecordsSummary: BillingRecordSummary[] = Array.from(groupedMap.values())
+    .sort((a, b) => {
+      // Sort by created_at (full timestamp) for accurate time ordering
+      const timeA = a.created_at || a.billing_date
+      const timeB = b.created_at || b.billing_date
+      return timeB.localeCompare(timeA)
+    })
+    .map((group) => ({
+      ...group,
+      charges: group.charges.sort((a, b) =>
+        `${a.scout_last_name} ${a.scout_first_name}`.localeCompare(`${b.scout_last_name} ${b.scout_first_name}`)
+      ),
+    }))
+    .slice(0, 10)
 
   // Calculate totals
   const totalOwed = accounts
@@ -220,15 +317,28 @@ export default async function FinancesOverviewPage() {
       scoutName: `${p.scout_accounts.scouts.first_name} ${p.scout_accounts.scouts.last_name}`,
       scoutAccountId: p.scout_accounts.id,
     })),
-    ...recentBilling.map(b => ({
-      id: b.id,
-      type: 'billing' as const,
-      description: b.description,
-      amount: b.total_amount,
-      date: b.billing_date,
-      scoutName: 'Multiple scouts',
-      scoutAccountId: '',
-    })),
+    ...billingRecordsSummary.map(b => {
+      const chargeCount = b.charges.length
+      let scoutName: string
+      let scoutAccountId = ''
+      if (chargeCount === 1) {
+        scoutName = `${b.charges[0].scout_first_name} ${b.charges[0].scout_last_name}`.trim()
+        scoutAccountId = b.charges[0].scout_account_id
+      } else if (chargeCount > 1) {
+        scoutName = `${chargeCount} scouts`
+      } else {
+        scoutName = 'Unknown'
+      }
+      return {
+        id: b.id,
+        type: 'billing' as const,
+        description: b.description,
+        amount: b.total_amount,
+        date: b.created_at || b.billing_date,
+        scoutName,
+        scoutAccountId,
+      }
+    }),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10)
 
   // Transform accounts into scouts format for QuickActionsCard
@@ -256,7 +366,7 @@ export default async function FinancesOverviewPage() {
         </p>
       </div>
 
-      <FinanceSubnav />
+      <FinanceSubnav showPaymentsTab={hasPaymentProcessor} />
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -330,49 +440,11 @@ export default async function FinancesOverviewPage() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Who Owes Money */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Who Owes Money</CardTitle>
-            <CardDescription>
-              {scoutsOwing.length} scout{scoutsOwing.length !== 1 ? 's' : ''} with outstanding balance
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {scoutsOwing.length > 0 ? (
-              <div className="space-y-3">
-                {scoutsOwing.slice(0, 10).map((account) => (
-                  <div key={account.id} className="flex items-center justify-between">
-                    <div>
-                      <Link
-                        href={`/finances/accounts/${account.id}`}
-                        className="font-medium text-forest-600 hover:text-forest-800 hover:underline"
-                      >
-                        {account.scouts?.first_name} {account.scouts?.last_name}
-                      </Link>
-                      <p className="text-xs text-stone-500">
-                        {account.scouts?.patrols?.name || 'No patrol'}
-                      </p>
-                    </div>
-                    <span className="font-medium text-error">
-                      {formatCurrency(Math.abs(account.billing_balance || 0))}
-                    </span>
-                  </div>
-                ))}
-                {scoutsOwing.length > 10 && (
-                  <Link
-                    href="/finances/accounts"
-                    className="block text-center text-sm text-forest-600 hover:text-forest-800"
-                  >
-                    View all {scoutsOwing.length} scouts →
-                  </Link>
-                )}
-              </div>
-            ) : (
-              <p className="text-success">No scouts currently owe money!</p>
-            )}
-          </CardContent>
-        </Card>
+        {/* Outstanding Bills */}
+        <OutstandingBillsCard
+          billingRecords={billingRecordsSummary}
+          totalScoutsOwing={scoutsOwing.length}
+        />
 
         {/* Recent Activity */}
         <Card>
@@ -399,22 +471,21 @@ export default async function FinancesOverviewPage() {
                       </div>
                       <div>
                         <p className="text-sm font-medium">
-                          {activity.type === 'payment' ? (
-                            activity.scoutAccountId ? (
-                              <Link
-                                href={`/finances/accounts/${activity.scoutAccountId}`}
-                                className="text-forest-600 hover:text-forest-800 hover:underline"
-                              >
-                                {activity.scoutName}
-                              </Link>
-                            ) : (
-                              activity.scoutName
-                            )
+                          {activity.scoutAccountId ? (
+                            <Link
+                              href={`/finances/accounts/${activity.scoutAccountId}`}
+                              className="text-forest-600 hover:text-forest-800 hover:underline"
+                            >
+                              {activity.scoutName}
+                            </Link>
                           ) : (
-                            activity.description
+                            activity.scoutName
                           )}
                         </p>
                         <p className="text-xs text-stone-500">
+                          {activity.type === 'billing' && (
+                            <span>{activity.description} · </span>
+                          )}
                           {new Date(activity.date).toLocaleDateString()}
                         </p>
                       </div>

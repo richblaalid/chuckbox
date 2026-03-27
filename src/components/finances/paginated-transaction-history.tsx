@@ -17,6 +17,7 @@ interface Transaction {
   journal_entries: {
     id: string
     entry_date: string
+    created_at: string | null
     description: string
     entry_type: string | null
     is_posted: boolean | null
@@ -79,17 +80,27 @@ export function PaginatedTransactionHistory({
             journal_entries (
               id,
               entry_date,
+              created_at,
               description,
               entry_type,
               is_posted
             )
           `)
           .eq('scout_account_id', scoutAccountId)
-          .order('id', { ascending: false })
           .range(from, to)
 
         if (dataError) throw dataError
-        setTransactions((data as Transaction[]) || [])
+
+        // Sort by entry_date descending, then created_at descending for same-day entries
+        const sorted = ((data as Transaction[]) || []).sort((a, b) => {
+          const dateA = a.journal_entries?.entry_date || ''
+          const dateB = b.journal_entries?.entry_date || ''
+          if (dateA !== dateB) return dateB.localeCompare(dateA)
+          const createdA = a.journal_entries?.created_at || ''
+          const createdB = b.journal_entries?.created_at || ''
+          return createdB.localeCompare(createdA)
+        })
+        setTransactions(sorted)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load transactions')
       } finally {
@@ -137,7 +148,9 @@ export function PaginatedTransactionHistory({
                 {transactions.map((tx) => (
                   <tr key={tx.id} className="border-b last:border-0">
                     <td className="py-2.5 pr-4 text-stone-600">
-                      {tx.journal_entries?.entry_date || '—'}
+                      {tx.journal_entries?.entry_date
+                        ? new Date(tx.journal_entries.entry_date + 'T00:00:00').toLocaleDateString()
+                        : '—'}
                     </td>
                     <td className="py-2.5 pr-4">
                       <p className="font-medium text-stone-900">

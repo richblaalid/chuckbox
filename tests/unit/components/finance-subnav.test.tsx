@@ -17,13 +17,29 @@ describe('FinanceSubnav', () => {
     expect(screen.getByRole('link', { name: /reports/i })).toBeInTheDocument()
   })
 
-  it('does not render deprecated tabs (Billing, Payments, Collection, Transactions)', () => {
+  it('does not render deprecated tabs (Billing, Collection, Transactions)', () => {
     render(<FinanceSubnav />)
 
     expect(screen.queryByRole('link', { name: /^billing$/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /^payments$/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /^collection$/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /^transactions$/i })).not.toBeInTheDocument()
+  })
+
+  it('does not render Payments tab by default', () => {
+    render(<FinanceSubnav />)
+    expect(screen.queryByRole('link', { name: /^payments$/i })).not.toBeInTheDocument()
+  })
+
+  it('renders Payments tab when showPaymentsTab is true', () => {
+    render(<FinanceSubnav showPaymentsTab />)
+    expect(screen.getByRole('link', { name: /payments/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /payments/i })).toHaveAttribute('href', '/finances/payments')
+  })
+
+  it('renders 5 links when showPaymentsTab is true', () => {
+    render(<FinanceSubnav showPaymentsTab />)
+    const links = screen.getAllByRole('link')
+    expect(links.length).toBe(5)
   })
 
   it('links to correct routes', () => {
