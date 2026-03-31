@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { formatCurrency } from '@/lib/utils'
 
 interface QuickPaymentParams {
   unitId: string
@@ -82,13 +83,37 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
   try {
     const paymentDate = new Date().toISOString().split('T')[0]
 
+    // Build enriched description with allocation details when charges are specified
+    let journalDescription = `${method.charAt(0).toUpperCase() + method.slice(1)} payment from ${scoutName}`
+    if (params.allocations && params.allocations.length > 0) {
+      const chargeIds = params.allocations.map((a) => a.chargeId)
+      const { data: charges } = await supabase
+        .from('billing_charges')
+        .select('id, billing_records(description)')
+        .in('id', chargeIds)
+
+      if (charges && charges.length > 0) {
+        const allocationDetails = params.allocations
+          .map((alloc) => {
+            const charge = charges.find((c) => c.id === alloc.chargeId)
+            const chargeDescription = (charge?.billing_records as { description: string } | null)?.description
+            return chargeDescription ? `${chargeDescription} (${formatCurrency(alloc.amount)})` : null
+          })
+          .filter(Boolean)
+
+        if (allocationDetails.length > 0) {
+          journalDescription += ` — ${allocationDetails.join(', ')}`
+        }
+      }
+    }
+
     // Create journal entry
     const { data: journalEntry, error: journalError } = await supabase
       .from('journal_entries')
       .insert({
         unit_id: unitId,
         entry_date: paymentDate,
-        description: `${method.charAt(0).toUpperCase() + method.slice(1)} payment from ${scoutName}`,
+        description: journalDescription,
         entry_type: 'payment',
         reference: reference || null,
         is_posted: true,
