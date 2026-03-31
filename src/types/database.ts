@@ -283,6 +283,7 @@ export type Database = {
           id: string
           is_paid: boolean | null
           is_void: boolean | null
+          paid_amount: number
           scout_account_id: string
           void_journal_entry_id: string | null
           void_reason: string | null
@@ -295,6 +296,7 @@ export type Database = {
           id?: string
           is_paid?: boolean | null
           is_void?: boolean | null
+          paid_amount?: number
           scout_account_id: string
           void_journal_entry_id?: string | null
           void_reason?: string | null
@@ -307,6 +309,7 @@ export type Database = {
           id?: string
           is_paid?: boolean | null
           is_void?: boolean | null
+          paid_amount?: number
           scout_account_id?: string
           void_journal_entry_id?: string | null
           void_reason?: string | null
@@ -350,11 +353,14 @@ export type Database = {
           billing_import_batch_id: string | null
           created_at: string | null
           created_by: string | null
+          deposit_amount: number | null
+          deposit_due_date: string | null
           description: string
           event_id: string | null
           id: string
           is_void: boolean | null
           journal_entry_id: string | null
+          line_items: Json | null
           total_amount: number
           unit_id: string
           void_reason: string | null
@@ -366,11 +372,14 @@ export type Database = {
           billing_import_batch_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          deposit_amount?: number | null
+          deposit_due_date?: string | null
           description: string
           event_id?: string | null
           id?: string
           is_void?: boolean | null
           journal_entry_id?: string | null
+          line_items?: Json | null
           total_amount: number
           unit_id: string
           void_reason?: string | null
@@ -382,11 +391,14 @@ export type Database = {
           billing_import_batch_id?: string | null
           created_at?: string | null
           created_by?: string | null
+          deposit_amount?: number | null
+          deposit_due_date?: string | null
           description?: string
           event_id?: string | null
           id?: string
           is_void?: boolean | null
           journal_entry_id?: string | null
+          line_items?: Json | null
           total_amount?: number
           unit_id?: string
           void_reason?: string | null
@@ -1907,6 +1919,45 @@ export type Database = {
             columns: ["unit_id"]
             isOneToOne: false
             referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_allocations: {
+        Row: {
+          id: string
+          payment_id: string
+          billing_charge_id: string
+          amount: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          payment_id: string
+          billing_charge_id: string
+          amount: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          payment_id?: string
+          billing_charge_id?: string
+          amount?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_allocations_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_allocations_billing_charge_id_fkey"
+            columns: ["billing_charge_id"]
+            isOneToOne: false
+            referencedRelation: "billing_charges"
             referencedColumns: ["id"]
           },
         ]
