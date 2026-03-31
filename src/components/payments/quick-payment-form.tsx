@@ -68,6 +68,8 @@ export function QuickPaymentForm({
 
   // Outstanding charges & allocation state
   const [outstandingCharges, setOutstandingCharges] = useState<OutstandingCharge[]>([])
+  const [chargesLoading, setChargesLoading] = useState(false)
+  const [chargesLoaded, setChargesLoaded] = useState(false)
   const [allocations, setAllocations] = useState<Allocation[]>([])
 
   // Inline billing creation state (shown when scout has no outstanding charges)
@@ -123,6 +125,7 @@ export function QuickPaymentForm({
     if (!selectedScoutId) {
       setOutstandingCharges([])
       setAllocations([])
+      setChargesLoaded(false)
       setFundsToApply('0')
       setShowInlineBilling(false)
       setInlineBillingDescription('')
@@ -138,6 +141,8 @@ export function QuickPaymentForm({
     setShowInlineBilling(false)
     setInlineBillingDescription('')
     setInlineBillingDate(new Date().toISOString().split('T')[0])
+    setChargesLoading(true)
+    setChargesLoaded(false)
 
     const fetchCharges = async () => {
       const supabase = createClient()
@@ -167,6 +172,8 @@ export function QuickPaymentForm({
           }))
         setOutstandingCharges(charges)
       }
+      setChargesLoading(false)
+      setChargesLoaded(true)
     }
     fetchCharges()
   }, [selectedScoutId, scouts])
@@ -568,7 +575,7 @@ export function QuickPaymentForm({
       )}
 
       {/* Inline Billing Creation (shown when scout has no outstanding charges) */}
-      {selectedScoutId && outstandingCharges.length === 0 && (
+      {selectedScoutId && chargesLoaded && outstandingCharges.length === 0 && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-2">
           <p className="text-sm text-amber-800">No outstanding bill found for this scout.</p>
           {!showInlineBilling ? (
