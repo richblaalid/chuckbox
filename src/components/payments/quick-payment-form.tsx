@@ -70,6 +70,11 @@ export function QuickPaymentForm({
   const [outstandingCharges, setOutstandingCharges] = useState<OutstandingCharge[]>([])
   const [allocations, setAllocations] = useState<Allocation[]>([])
 
+  // Inline billing creation state (shown when scout has no outstanding charges)
+  const [showInlineBilling, setShowInlineBilling] = useState(false)
+  const [inlineBillingDescription, setInlineBillingDescription] = useState('')
+  const [inlineBillingDate, setInlineBillingDate] = useState(new Date().toISOString().split('T')[0])
+
   // Funds-first split payment state
   const [fundsToApply, setFundsToApply] = useState('0')
   const parsedFundsToApply = parseFloat(fundsToApply) || 0
@@ -115,14 +120,20 @@ export function QuickPaymentForm({
       setOutstandingCharges([])
       setAllocations([])
       setFundsToApply('0')
+      setShowInlineBilling(false)
+      setInlineBillingDescription('')
+      setInlineBillingDate(new Date().toISOString().split('T')[0])
       return
     }
     const selectedScoutForCharges = scouts.find((s) => s.id === selectedScoutId)
     const accountId = selectedScoutForCharges?.scout_accounts?.id
     if (!accountId) return
 
-    // Reset funds when scout changes
+    // Reset funds and inline billing when scout changes
     setFundsToApply('0')
+    setShowInlineBilling(false)
+    setInlineBillingDescription('')
+    setInlineBillingDate(new Date().toISOString().split('T')[0])
 
     const fetchCharges = async () => {
       const supabase = createClient()
@@ -313,10 +324,11 @@ export function QuickPaymentForm({
     }
   }
 
-  const handleManualPayment = async () => {
+  const handleManualPayment = async (allocationsOverride?: Allocation[]) => {
     if (!selectedScout?.scout_accounts?.id) return
 
     const paymentMethod = method as 'cash' | 'check'
+    const effectiveAllocations = allocationsOverride ?? allocations
 
     trackPaymentInitiated({
       amount: parsedAmount,
@@ -333,8 +345,8 @@ export function QuickPaymentForm({
         method: paymentMethod,
         reference: reference || undefined,
         notes: notes || undefined,
-        allocations: allocations.length > 0
-          ? allocations.map((a) => ({ chargeId: a.chargeId, amount: a.amount }))
+        allocations: effectiveAllocations.length > 0
+          ? effectiveAllocations.map((a) => ({ chargeId: a.chargeId, amount: a.amount }))
           : undefined,
       })
 
@@ -388,6 +400,44 @@ export function QuickPaymentForm({
 
     try {
       const scoutAccountId = selectedScout.scout_accounts.id
+      let inlineAllocation: Allocation[] | undefined
+
+      // Step 0: Create inline billing record if requested
+      if (showInlineBilling && inlineBillingDescription.trim()) {
+        const supabase = createClient()
+        const { data: billingData, error: billingRpcError } = await supabase.rpc(
+          'create_billing_with_journal',
+          {
+            p_unit_id: unitId,
+            p_description: inlineBillingDescription.trim(),
+            p_total_amount: parsedAmount,
+            p_billing_date: inlineBillingDate,
+            p_billing_type: 'fixed',
+            p_per_scout_amount: parsedAmount,
+            p_scout_accounts: [{ scoutId: selectedScout.id, accountId: scoutAccountId, scoutName: `${selectedScout.first_name} ${selectedScout.last_name}` }],
+          }
+        )
+
+        if (billingRpcError) {
+          throw new Error(billingRpcError.message)
+        }
+
+        const billingResult = billingData as { success: boolean; billing_record_id: string } | null
+        if (!billingResult?.success) {
+          throw new Error('Failed to create billing record')
+        }
+
+        const { data: newCharge } = await supabase
+          .from('billing_charges')
+          .select('id')
+          .eq('billing_record_id', billingResult.billing_record_id)
+          .eq('scout_account_id', scoutAccountId)
+          .single()
+
+        inlineAllocation = newCharge?.id
+          ? [{ chargeId: newCharge.id, amount: parsedAmount }]
+          : []
+      }
 
       // Step 1: Apply funds transfer if any
       if (parsedFundsToApply > 0) {
@@ -409,7 +459,7 @@ export function QuickPaymentForm({
         if (method === 'card') {
           await handleCardPayment()
         } else {
-          await handleManualPayment()
+          await handleManualPayment(inlineAllocation)
         }
       }
 
@@ -507,6 +557,36 @@ export function QuickPaymentForm({
             onAllocationsChange={setAllocations}
             onAmountChange={(newAmount) => setAmount(String(newAmount))}
           />
+        </div>
+      )}
+
+      {/* Inline Billing Creation (shown when scout has no outstanding charges) */}
+      {selectedScoutId && outstandingCharges.length === 0 && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-2">
+          <p className="text-sm text-amber-800">No outstanding bill found for this scout.</p>
+          {!showInlineBilling ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowInlineBilling(true)}
+            >
+              Create billing record for this payment
+            </Button>
+          ) : (
+            <div className="space-y-2">
+              <Input
+                placeholder="Description (e.g., Summer Camp Deposit)"
+                value={inlineBillingDescription}
+                onChange={(e) => setInlineBillingDescription(e.target.value)}
+              />
+              <Input
+                type="date"
+                value={inlineBillingDate}
+                onChange={(e) => setInlineBillingDate(e.target.value)}
+              />
+            </div>
+          )}
         </div>
       )}
 
