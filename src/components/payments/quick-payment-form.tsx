@@ -489,7 +489,9 @@ export function QuickPaymentForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+      {/* Scrollable form body */}
+      <div className="flex-1 overflow-y-auto space-y-4 pr-1">
       {/* Scout Selector - hide if preselected */}
       {!preselectedScoutId && (
         <div className="space-y-2">
@@ -787,44 +789,48 @@ export function QuickPaymentForm({
         </div>
       )}
 
-      {/* Action Buttons */}
-      <div className="flex gap-3 pt-2">
-        {onCancel && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleCancel}
-            disabled={isSubmitting}
-            className="flex-1"
-          >
-            <X className="mr-1.5 h-4 w-4" />
-            Cancel
-          </Button>
-        )}
-        <Button
-          type="submit"
-          variant="default"
-          className="flex-1"
-          disabled={
-            isSubmitting ||
-            !selectedScoutId ||
-            parsedAmount <= 0 ||
-            (!fundsCoverAll && method === 'card' && !cardInitialized)
-          }
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Processing...
-            </>
-          ) : fundsCoverAll ? (
-            `Apply Funds (${formatCurrency(parsedAmount)})`
-          ) : parsedFundsToApply > 0 ? (
-            `Apply ${formatCurrency(parsedFundsToApply)} Funds + Record ${formatCurrency(remainingAfterFunds)}`
-          ) : (
-            `Record ${formatCurrency(parsedAmount)}`
+      </div>
+
+      {/* Sticky footer — always visible */}
+      <div className="shrink-0 border-t border-stone-200 dark:border-stone-700 pt-3 mt-3">
+        <div className="flex gap-3">
+          {onCancel && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCancel}
+              disabled={isSubmitting}
+              className="flex-1"
+            >
+              <X className="mr-1.5 h-4 w-4" />
+              Cancel
+            </Button>
           )}
-        </Button>
+          <Button
+            type="submit"
+            variant="default"
+            className="flex-1"
+            disabled={
+              isSubmitting ||
+              !selectedScoutId ||
+              parsedAmount <= 0 ||
+              (!fundsCoverAll && method === 'card' && !cardInitialized)
+            }
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : fundsCoverAll ? (
+              `Apply Funds (${formatCurrency(parsedAmount)})`
+            ) : parsedFundsToApply > 0 ? (
+              `Apply ${formatCurrency(parsedFundsToApply)} Funds + Record ${formatCurrency(remainingAfterFunds)}`
+            ) : (
+              `Record ${formatCurrency(parsedAmount)}`
+            )}
+          </Button>
+        </div>
       </div>
     </form>
   )

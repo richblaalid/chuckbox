@@ -97,7 +97,7 @@ export function OverviewActions({ unitId, unitName, scouts, scoutsOwing, squareC
         setIsPaymentOpen(open)
         if (!open) setPreselectedScoutId(undefined)
       }}>
-        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>Record Payment</DialogTitle>
           </DialogHeader>

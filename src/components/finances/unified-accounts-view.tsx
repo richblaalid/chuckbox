@@ -133,7 +133,7 @@ export function UnifiedAccountsView({
 
       {/* Individual Payment Dialog */}
       <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
-        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>
               Record Payment{actionScout ? ` for ${actionScout.scoutName}` : ''}
