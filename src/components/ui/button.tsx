@@ -34,9 +34,6 @@ const buttonVariants = cva(
         // Warning - Amber action
         warning:
           "bg-warning text-white shadow-sm hover:bg-warning-dark hover:-translate-y-0.5 active:translate-y-0",
-        // Accent - Amber for high-visibility CTAs (Brand Guide: btn-primary)
-        accent:
-          "bg-amber-700 text-white shadow-sm hover:bg-amber-800 hover:shadow-amber hover:-translate-y-0.5 active:translate-y-0",
       },
       size: {
         default: "h-11 px-5 py-2.5",  // 44px min touch target

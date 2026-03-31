@@ -85,7 +85,7 @@ export function AccountActions({
         {/* Financial role: Create Billing - always available */}
         {isFinancialRole && unitId && (
           <>
-            <Button variant="accent" className="gap-2" onClick={() => setIsBillingOpen(true)}>
+            <Button variant="default" className="gap-2" onClick={() => setIsBillingOpen(true)}>
               <Receipt className="h-4 w-4" />
               Create Billing
             </Button>
@@ -130,7 +130,7 @@ export function AccountActions({
         {/* Parent actions */}
         {isParent && owesBalance && squareConfig && (
           <>
-            <Button variant="accent" onClick={() => setIsPaymentModalOpen(true)}>Make a Payment</Button>
+            <Button variant="default" onClick={() => setIsPaymentModalOpen(true)}>Make a Payment</Button>
             <PaymentModal
               isOpen={isPaymentModalOpen}
               onClose={() => setIsPaymentModalOpen(false)}

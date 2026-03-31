@@ -126,7 +126,7 @@ export function UnifiedAccountsView({
           <div className="flex items-center gap-2">
             <Dialog open={isBillingOpen} onOpenChange={setIsBillingOpen}>
               <DialogTrigger asChild>
-                <Button variant="accent">
+                <Button variant="default">
                   <Receipt className="mr-2 h-4 w-4" />
                   Create Billing
                 </Button>

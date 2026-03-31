@@ -453,7 +453,7 @@ export default async function DashboardPage() {
               </Link>
             </Button>
             {/* Advancement Tracking */}
-            <Button asChild variant="accent" className="gap-2">
+            <Button asChild variant="default" className="gap-2">
               <Link href="/advancement?tab=summary">
                 <Award className="h-4 w-4" />
                 Advancement
