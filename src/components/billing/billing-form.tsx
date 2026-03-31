@@ -297,7 +297,9 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+      {/* Scrollable form body */}
+      <div className="flex-1 overflow-y-auto space-y-6 pr-1">
       {/* 1. Description */}
       <div className="space-y-2">
         <Label htmlFor="description">Description *</Label>
@@ -616,10 +618,12 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
           {error}
         </div>
       )}
+      </div>
 
-      {/* 6. Notification Option */}
-      {selectedScouts.size > 0 && parsedAmount > 0 && (
-        <div className="rounded-lg border border-stone-200 dark:border-stone-700 p-4">
+      {/* Sticky footer — always visible */}
+      <div className="shrink-0 border-t border-stone-200 dark:border-stone-700 pt-4 mt-4 space-y-3">
+        {/* 6. Notification Option */}
+        {selectedScouts.size > 0 && parsedAmount > 0 && (
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
@@ -628,17 +632,15 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
               className="checkbox-native mt-0.5"
             />
             <div>
-              <span className="font-medium text-stone-900 dark:text-stone-100">Send payment notifications to parents</span>
-              <p className="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
+              <span className="text-sm font-medium text-stone-900 dark:text-stone-100">Send payment notifications to parents</span>
+              <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
                 Each parent will receive an email with the charge details and a payment link
               </p>
             </div>
           </label>
-        </div>
-      )}
+        )}
 
-      {/* 7. Submit */}
-      <div className="space-y-2">
+        {/* 7. Submit */}
         <Button
           type="submit"
           loading={isLoading}
@@ -649,7 +651,7 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
           Create Billing
         </Button>
         <p className="text-xs text-center text-stone-400 dark:text-stone-500">
-          Tip: Press ⌘+Enter (Mac) or Ctrl+Enter to submit
+          ⌘+Enter to submit
         </p>
       </div>
     </form>

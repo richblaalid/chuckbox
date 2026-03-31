@@ -154,7 +154,7 @@ export function UnifiedAccountsView({
 
       {/* Bulk Billing Dialog */}
       <Dialog open={isBillingOpen} onOpenChange={setIsBillingOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>Create Billing</DialogTitle>
           </DialogHeader>
