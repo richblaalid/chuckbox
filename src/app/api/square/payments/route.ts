@@ -11,6 +11,14 @@ const createPaymentSchema = z.object({
   sourceId: z.string().min(1, 'Payment source is required'),
   description: z.string().max(500, 'Description must be under 500 characters').optional(),
   billingChargeId: z.string().uuid('Invalid billing charge ID').optional(),
+  allocations: z
+    .array(
+      z.object({
+        chargeId: z.string().uuid(),
+        amount: z.number().positive(),
+      })
+    )
+    .optional(),
 })
 
 // Square fee: 2.6% + $0.10 per transaction
@@ -107,7 +115,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { scoutAccountId, amountCents, sourceId, description, billingChargeId } = parseResult.data
+    const { scoutAccountId, amountCents, sourceId, description, billingChargeId, allocations } = parseResult.data
 
     // Verify the scout account belongs to this unit
     const { data: scoutAccount } = await supabase
@@ -318,6 +326,38 @@ export async function POST(request: NextRequest) {
         .update({ is_paid: true })
         .eq('id', billingChargeId)
         .eq('scout_account_id', scoutAccountId)
+    }
+
+    // Persist charge allocations if provided
+    if (allocations && allocations.length > 0 && paymentRecord?.id) {
+      const allocationRows = allocations.map((alloc) => ({
+        payment_id: paymentRecord.id,
+        billing_charge_id: alloc.chargeId,
+        amount: alloc.amount,
+      }))
+
+      const { error: allocError } = await supabase
+        .from('payment_allocations')
+        .insert(allocationRows)
+
+      if (allocError) {
+        console.error('Failed to create payment allocations:', allocError)
+      }
+
+      for (const alloc of allocations) {
+        const { data: charge } = await supabase
+          .from('billing_charges')
+          .select('paid_amount')
+          .eq('id', alloc.chargeId)
+          .single()
+
+        if (charge) {
+          await supabase
+            .from('billing_charges')
+            .update({ paid_amount: (charge.paid_amount || 0) + alloc.amount })
+            .eq('id', alloc.chargeId)
+        }
+      }
     }
 
     // Sync the transaction to square_transactions
