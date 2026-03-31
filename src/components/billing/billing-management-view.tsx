@@ -16,12 +16,11 @@ import {
   Plus,
   Bell,
   Trash2,
-  CreditCard,
   Loader2,
   ClipboardList,
 } from 'lucide-react'
 import { BillingForm } from '@/components/billing/billing-form'
-import { QuickPaymentForm } from '@/components/payments/quick-payment-form'
+import { BillingRecordActions } from '@/components/billing/billing-record-actions'
 import { VoidBillingDialog } from '@/components/billing/void-billing-dialog'
 
 // ============================================
@@ -121,10 +120,7 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus }
 
   // Dialog state
   const [isBillingOpen, setIsBillingOpen] = useState(false)
-  const [isPaymentOpen, setIsPaymentOpen] = useState(false)
-  const [paymentScoutId, setPaymentScoutId] = useState<string | null>(null)
   const [voidRecord, setVoidRecord] = useState<BillingRecordEntry | null>(null)
-  const [notifyingId, setNotifyingId] = useState<string | null>(null)
   const [notifyResult, setNotifyResult] = useState<{ id: string; sent: number; error?: string } | null>(null)
 
   // ============================================
@@ -211,37 +207,8 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus }
     }
   }
 
-  const handleNotify = async (recordId: string) => {
-    setNotifyingId(recordId)
-    setNotifyResult(null)
-
-    try {
-      const response = await fetch(`/api/billing-records/${recordId}/notify`, {
-        method: 'POST',
-      })
-      const data = await response.json()
-
-      if (!response.ok) {
-        setNotifyResult({ id: recordId, sent: 0, error: data.error || 'Failed to send' })
-      } else {
-        setNotifyResult({ id: recordId, sent: data.notificationsSent })
-      }
-    } catch {
-      setNotifyResult({ id: recordId, sent: 0, error: 'Network error' })
-    } finally {
-      setNotifyingId(null)
-    }
-  }
-
-  const handlePaymentForScout = (scoutAccountId: string) => {
-    setPaymentScoutId(scoutAccountId)
-    setIsPaymentOpen(true)
-  }
-
   const handleActionSuccess = () => {
     setIsBillingOpen(false)
-    setIsPaymentOpen(false)
-    setPaymentScoutId(null)
     setVoidRecord(null)
     setSelectedIds(new Set())
     router.refresh()
@@ -352,25 +319,6 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus }
     patrols: s.patrols,
   }))
 
-  // Scouts formatted for QuickPaymentForm
-  const scoutsForPayment = scouts.map((s) => ({
-    id: s.id,
-    first_name: s.first_name,
-    last_name: s.last_name,
-    scout_accounts: s.scout_accounts
-      ? {
-          id: s.scout_accounts.id,
-          billing_balance: s.scout_accounts.billing_balance ?? null,
-          funds_balance: s.scout_accounts.funds_balance ?? null,
-        }
-      : null,
-  }))
-
-  // Find scout ID from account ID (for pre-selecting in payment form)
-  const scoutIdFromAccountId = (accountId: string): string | undefined => {
-    return scouts.find((s) => s.scout_accounts?.id === accountId)?.id
-  }
-
   // ============================================
   // Render
   // ============================================
@@ -410,19 +358,17 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus }
         <CardContent className="pt-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:flex-wrap">
             {/* Status Filter */}
-            <div className="inline-flex rounded-lg border border-stone-200 bg-white p-1">
+            <div className="inline-flex rounded-lg border border-stone-200 bg-white p-1 gap-1">
               {(['all', 'unpaid', 'paid', 'voided'] as StatusFilter[]).map((s) => (
-                <button
+                <Button
                   key={s}
+                  variant={statusFilter === s ? 'default' : 'outline'}
+                  size="sm"
                   onClick={() => setStatusFilter2(s)}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
-                    statusFilter === s
-                      ? 'bg-forest-700 text-white'
-                      : 'text-stone-600 hover:text-stone-900'
-                  }`}
+                  className="capitalize"
                 >
                   {s}
-                </button>
+                </Button>
               ))}
             </div>
 
@@ -459,7 +405,7 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus }
             </div>
 
             {/* Create Billing */}
-            <Button className="gap-2" onClick={() => setIsBillingOpen(true)}>
+            <Button variant="default" className="gap-2" onClick={() => setIsBillingOpen(true)}>
               <Plus className="h-4 w-4" />
               Create Billing
             </Button>
@@ -492,9 +438,9 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus }
             )}
             {selectedNonVoided.length > 0 && (
               <Button
-                variant="outline"
+                variant="destructive"
                 size="sm"
-                className="gap-1 text-error hover:text-error"
+                className="gap-1"
                 onClick={handleBulkVoid}
                 disabled={isBulkVoiding}
               >
@@ -637,48 +583,18 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus }
 
                       {/* Actions */}
                       <div className="flex items-center gap-1 w-28 justify-end">
-                        {hasUnpaid && !record.is_void && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={() => handleNotify(record.id)}
-                            disabled={notifyingId === record.id}
-                            title="Send reminders"
-                          >
-                            {notifyingId === record.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Bell className="h-4 w-4" />
-                            )}
-                          </Button>
-                        )}
-                        {!record.is_void && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0 text-stone-400 hover:text-error"
-                            onClick={() => setVoidRecord(record)}
-                            title="Void record"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
+                        <BillingRecordActions
+                          billingRecordId={record.id}
+                          description={record.description}
+                          totalAmount={record.total_amount}
+                          isVoid={record.is_void ?? false}
+                          hasPaidCharges={record.charges.some((c) => c.is_paid && !c.is_void)}
+                          hasUnpaidCharges={hasUnpaid}
+                          canEdit={true}
+                          canVoid={true}
+                        />
                       </div>
                     </div>
-
-                    {/* Notification feedback */}
-                    {notifyResult?.id === record.id && (
-                      <div className={`mx-3 mb-3 rounded-md p-2 text-xs ${
-                        notifyResult.error
-                          ? 'bg-red-50 text-red-700'
-                          : 'bg-green-50 text-green-700'
-                      }`}>
-                        {notifyResult.error
-                          ? `Error: ${notifyResult.error}`
-                          : `${notifyResult.sent} reminder${notifyResult.sent !== 1 ? 's' : ''} sent`}
-                      </div>
-                    )}
 
                     {/* Expanded Charges */}
                     {isExpanded && (
@@ -712,20 +628,9 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus }
                                       Paid
                                     </Badge>
                                   ) : (
-                                    <div className="flex items-center gap-1">
-                                      <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 text-xs px-1.5 py-0">
-                                        Unpaid
-                                      </Badge>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-6 w-6 p-0"
-                                        onClick={() => handlePaymentForScout(charge.scout_account_id)}
-                                        title="Record payment"
-                                      >
-                                        <CreditCard className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </div>
+                                    <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 text-xs px-1.5 py-0">
+                                      Unpaid
+                                    </Badge>
                                   )}
                                 </div>
                               </div>
@@ -754,28 +659,6 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus }
             <DialogTitle>Create Billing</DialogTitle>
           </DialogHeader>
           <BillingForm unitId={unitId} scouts={scoutsForBilling} onSuccess={handleActionSuccess} />
-        </DialogContent>
-      </Dialog>
-
-      {/* Record Payment Dialog */}
-      <Dialog open={isPaymentOpen} onOpenChange={(open) => {
-        setIsPaymentOpen(open)
-        if (!open) setPaymentScoutId(null)
-      }}>
-        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Record Payment</DialogTitle>
-          </DialogHeader>
-          <QuickPaymentForm
-            unitId={unitId}
-            scouts={scoutsForPayment}
-            preselectedScoutId={paymentScoutId ? scoutIdFromAccountId(paymentScoutId) : undefined}
-            onSuccess={handleActionSuccess}
-            onCancel={() => {
-              setIsPaymentOpen(false)
-              setPaymentScoutId(null)
-            }}
-          />
         </DialogContent>
       </Dialog>
 
