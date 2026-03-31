@@ -9,6 +9,8 @@ import { BalanceSheetReport } from '@/components/reports/balance-sheet-report'
 import { IncomeExpenseReport } from '@/components/reports/income-expense-report'
 import { DuesByPatrolReport } from '@/components/reports/dues-by-patrol-report'
 import { FinanceSubnav } from '@/components/finances/finance-subnav'
+import { BankWidget } from '@/components/plaid/bank-widget'
+import { isFeatureEnabled, FeatureFlag } from '@/lib/feature-flags'
 import Link from 'next/link'
 
 interface ScoutAccount {
@@ -336,6 +338,11 @@ export default async function ReportsPage() {
 
       {/* Collection & Cash Flow */}
       <CollectionSummary payments={paymentsForReport} billingRecords={billingForReport} />
+
+      {/* Bank Integration */}
+      {isFeatureEnabled(FeatureFlag.BANK_INTEGRATION) && (
+        <BankWidget />
+      )}
 
       {/* Balance by Patrol */}
       <Card>

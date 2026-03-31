@@ -127,17 +127,15 @@ export function ExpenseReimbursementCard({
               {canReview && (
                 <>
                   <Button
-                    variant="outline"
+                    variant="default"
                     size="sm"
-                    className="border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800"
                     onClick={() => setApprovalMode('approve')}
                   >
                     Approve
                   </Button>
                   <Button
-                    variant="outline"
+                    variant="destructive"
                     size="sm"
-                    className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
                     onClick={() => setApprovalMode('reject')}
                   >
                     Reject
@@ -146,9 +144,8 @@ export function ExpenseReimbursementCard({
               )}
               {canMarkPaid && (
                 <Button
-                  variant="outline"
+                  variant="default"
                   size="sm"
-                  className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
                   onClick={() => setShowPaymentDialog(true)}
                 >
                   Mark Paid
