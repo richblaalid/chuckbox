@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { MoreHorizontal, Pencil, Ban, Mail } from 'lucide-react'
+import { MoreHorizontal, Pencil, Ban, Bell, Mail } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +20,7 @@ interface BillingRecordActionsProps {
   totalAmount: number
   isVoid: boolean
   hasPaidCharges: boolean
+  hasUnpaidCharges?: boolean
   canEdit: boolean
   canVoid: boolean
 }
@@ -30,11 +31,22 @@ export function BillingRecordActions({
   totalAmount,
   isVoid,
   hasPaidCharges,
+  hasUnpaidCharges = false,
   canEdit,
   canVoid,
 }: BillingRecordActionsProps) {
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showVoidDialog, setShowVoidDialog] = useState(false)
+  const [isNotifying, setIsNotifying] = useState(false)
+
+  const handleSendReminder = async () => {
+    setIsNotifying(true)
+    try {
+      await fetch(`/api/billing-records/${billingRecordId}/notify`, { method: 'POST' })
+    } finally {
+      setIsNotifying(false)
+    }
+  }
 
   if (isVoid) {
     return null
@@ -50,11 +62,20 @@ export function BillingRecordActions({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {canEdit && (
-            <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit Description
+          {hasUnpaidCharges && (
+            <DropdownMenuItem onClick={handleSendReminder} disabled={isNotifying}>
+              <Bell className="mr-2 h-4 w-4" />
+              Send Billing Reminder
             </DropdownMenuItem>
+          )}
+          {canEdit && (
+            <>
+              {hasUnpaidCharges && <DropdownMenuSeparator />}
+              <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit Description
+              </DropdownMenuItem>
+            </>
           )}
           {canVoid && (
             <>
