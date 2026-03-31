@@ -6,9 +6,7 @@ describe('BulkActionBar', () => {
   const defaultProps = {
     selectedCount: 3,
     onBillSelected: vi.fn(),
-    onAddFunds: vi.fn(),
     onSendReminders: vi.fn(),
-    onExport: vi.fn(),
     onClearSelection: vi.fn(),
   }
 
@@ -20,9 +18,7 @@ describe('BulkActionBar', () => {
   it('renders all action buttons', () => {
     render(<BulkActionBar {...defaultProps} />)
     expect(screen.getByRole('button', { name: /bill selected/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /add funds/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /send reminders/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /export/i })).toBeInTheDocument()
     // Two clear buttons exist (mobile + desktop), both should render
     expect(screen.getAllByRole('button', { name: /clear/i })).toHaveLength(2)
   })
