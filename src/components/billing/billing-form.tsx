@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { ToggleButtonGroup } from '@/components/ui/toggle-button-group'
 import { useToast } from '@/components/ui/toast'
 import { formatCurrency } from '@/lib/utils'
@@ -45,6 +46,7 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
   const [description, setDescription] = useState('')
   const [billingType, setBillingType] = useState<BillingType>('fixed')
   const [sendNotifications, setSendNotifications] = useState(false)
+  const [scoutSearch, setScoutSearch] = useState('')
 
   // Load saved billing type preference on mount
   useEffect(() => {
@@ -95,14 +97,6 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
       newSelected.add(scoutId)
     }
     setSelectedScouts(newSelected)
-  }
-
-  const selectAll = () => {
-    setSelectedScouts(new Set(scouts.map((s) => s.id)))
-  }
-
-  const selectNone = () => {
-    setSelectedScouts(new Set())
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -214,7 +208,18 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
     }
   }
 
-  // Group scouts by patrol
+  // Filter scouts by search
+  const filteredScouts = useMemo(() => {
+    if (!scoutSearch) return scouts
+    const query = scoutSearch.toLowerCase()
+    return scouts.filter((s) =>
+      `${s.first_name} ${s.last_name}`.toLowerCase().includes(query)
+    )
+  }, [scouts, scoutSearch])
+
+  const filteredScoutIds = useMemo(() => new Set(filteredScouts.map((s) => s.id)), [filteredScouts])
+
+  // Group scouts by patrol (using all scouts for group structure, filtered for visibility)
   const patrolGroups = scouts.reduce(
     (groups, scout) => {
       const patrol = scout.patrols?.name || 'No Patrol'
@@ -227,9 +232,33 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
     {} as Record<string, Scout[]>
   )
 
+  const selectAll = () => {
+    const newSelected = new Set(selectedScouts)
+    filteredScouts.forEach((s) => newSelected.add(s.id))
+    setSelectedScouts(newSelected)
+  }
+
+  const selectNone = () => {
+    const newSelected = new Set(selectedScouts)
+    filteredScouts.forEach((s) => newSelected.delete(s.id))
+    setSelectedScouts(newSelected)
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Billing Type Toggle */}
+      {/* 1. Description */}
+      <div className="space-y-2">
+        <Label htmlFor="description">Description *</Label>
+        <Input
+          id="description"
+          required
+          placeholder={billingType === 'split' ? 'e.g., Summer Camp 2026' : 'e.g., Annual Dues 2026'}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+      </div>
+
+      {/* 2. Billing Type Toggle */}
       <div className="space-y-2">
         <Label>Billing Type</Label>
         <div className="ml-4 mt-3">
@@ -250,43 +279,31 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
         </p>
       </div>
 
-      {/* Amount and Description */}
-      <div className="flex gap-4">
-        <div className="w-40 shrink-0 space-y-2">
-          <Label htmlFor="amount">
-            {billingType === 'split' ? 'Total Amount' : 'Per Scout'} *
-          </Label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 dark:text-stone-400">
-              $
-            </span>
-            <Input
-              id="amount"
-              type="number"
-              step="0.01"
-              min="0"
-              required
-              className="pl-7 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              onWheel={(e) => e.currentTarget.blur()}
-            />
-          </div>
-        </div>
-        <div className="flex-1 space-y-2">
-          <Label htmlFor="description">Description *</Label>
+      {/* 3. Amount */}
+      <div className="w-40 space-y-2">
+        <Label htmlFor="amount">
+          {billingType === 'split' ? 'Total Amount' : 'Per Scout'} *
+        </Label>
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 dark:text-stone-400">
+            $
+          </span>
           <Input
-            id="description"
+            id="amount"
+            type="number"
+            step="0.01"
+            min="0"
             required
-            placeholder={billingType === 'split' ? 'e.g., Summer Camp 2024' : 'e.g., Annual Dues 2024'}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            className="pl-7 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            placeholder="0.00"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            onWheel={(e) => e.currentTarget.blur()}
           />
         </div>
       </div>
 
-      {/* Scout Selection */}
+      {/* 4. Scout Selection */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <Label>Select Scouts ({selectedScouts.size} selected)</Label>
@@ -309,77 +326,81 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
           </div>
         </div>
 
+        <Input
+          placeholder="Search scouts..."
+          value={scoutSearch}
+          onChange={(e) => setScoutSearch(e.target.value)}
+          className="mb-2"
+        />
+
         <div className="max-h-64 overflow-y-auto rounded-lg border border-stone-200 dark:border-stone-700 p-4">
-          {Object.entries(patrolGroups).map(([patrol, patrolScouts]) => (
-            <div key={patrol} className="mb-4 last:mb-0">
-              <h4 className="mb-2 text-sm font-medium text-stone-500 dark:text-stone-400">{patrol}</h4>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {patrolScouts.map((scout) => (
-                  <label
-                    key={scout.id}
-                    className={`flex cursor-pointer items-center gap-2 rounded-md border p-2 transition-colors ${
-                      selectedScouts.has(scout.id)
-                        ? 'border-forest-600 bg-forest-50 dark:border-forest-500 dark:bg-forest-900/30'
-                        : 'border-stone-200 hover:bg-stone-50 dark:border-stone-700 dark:hover:bg-stone-800'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedScouts.has(scout.id)}
-                      onChange={() => toggleScout(scout.id)}
-                      className="checkbox-native"
-                    />
-                    <span className="text-sm text-stone-700 dark:text-stone-200">
-                      {scout.first_name} {scout.last_name}
-                    </span>
-                  </label>
-                ))}
+          {Object.entries(patrolGroups).map(([patrol, patrolScouts]) => {
+            const visiblePatrolScouts = patrolScouts.filter((s) => filteredScoutIds.has(s.id))
+            if (visiblePatrolScouts.length === 0) return null
+
+            const allSelected = visiblePatrolScouts.every((s) => selectedScouts.has(s.id))
+            const someSelected = visiblePatrolScouts.some((s) => selectedScouts.has(s.id))
+
+            return (
+              <div key={patrol} className="mb-4 last:mb-0">
+                <label className="flex items-center gap-2 mb-2 cursor-pointer">
+                  <Checkbox
+                    checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                    onCheckedChange={(checked) => {
+                      const newSelected = new Set(selectedScouts)
+                      visiblePatrolScouts.forEach((s) => {
+                        if (checked) newSelected.add(s.id)
+                        else newSelected.delete(s.id)
+                      })
+                      setSelectedScouts(newSelected)
+                    }}
+                  />
+                  <span className="text-sm font-medium text-stone-700 dark:text-stone-400">
+                    {patrol}
+                  </span>
+                </label>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {visiblePatrolScouts.map((scout) => (
+                    <label
+                      key={scout.id}
+                      className={`flex cursor-pointer items-center gap-2 rounded-md border p-2 transition-colors ${
+                        selectedScouts.has(scout.id)
+                          ? 'border-forest-600 bg-forest-50 dark:border-forest-500 dark:bg-forest-900/30'
+                          : 'border-stone-200 hover:bg-stone-50 dark:border-stone-700 dark:hover:bg-stone-800'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedScouts.has(scout.id)}
+                        onChange={() => toggleScout(scout.id)}
+                        className="checkbox-native"
+                      />
+                      <span className="text-sm text-stone-700 dark:text-stone-200">
+                        {scout.first_name} {scout.last_name}
+                      </span>
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
-      {/* Summary */}
+      {/* 5. Cost Preview */}
       {selectedScouts.size > 0 && parsedAmount > 0 && (
-        <div className="rounded-lg bg-stone-50 dark:bg-stone-800 p-4">
-          <h4 className="font-medium text-stone-900 dark:text-stone-100">Billing Summary</h4>
-          <div className="mt-3 space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-stone-500 dark:text-stone-400">Billing Type:</span>
-              <span className="font-medium text-stone-700 dark:text-stone-200">
-                {billingType === 'split' ? 'Split Total' : 'Fixed Amount Per Scout'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-stone-500 dark:text-stone-400">Scouts Selected:</span>
-              <span className="font-medium text-stone-700 dark:text-stone-200">{selectedScouts.size}</span>
-            </div>
-            <div className="border-t border-stone-200 dark:border-stone-700 pt-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-stone-500 dark:text-stone-400">Amount Per Scout:</span>
-                <span className={`font-medium ${billingType === 'fixed' ? 'text-stone-900 dark:text-stone-100' : 'text-forest-700 dark:text-forest-400'}`}>
-                  {formatCurrency(perScoutAmount)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-stone-500 dark:text-stone-400">Total Amount:</span>
-                <span className={`font-medium ${billingType === 'split' ? 'text-stone-900 dark:text-stone-100' : 'text-forest-700 dark:text-forest-400'}`}>
-                  {formatCurrency(totalAmount)}
-                </span>
-              </div>
-            </div>
-            {billingType === 'split' && (
-              <p className="text-xs text-stone-500 dark:text-stone-400">
-                {formatCurrency(parsedAmount)} ÷ {selectedScouts.size} scouts = {formatCurrency(perScoutAmount)} each
-              </p>
-            )}
-            {billingType === 'fixed' && (
-              <p className="text-xs text-stone-500 dark:text-stone-400">
-                {formatCurrency(parsedAmount)} × {selectedScouts.size} scouts = {formatCurrency(totalAmount)} total
-              </p>
-            )}
-          </div>
+        <div className="rounded-md border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 p-3 text-sm">
+          {billingType === 'fixed' ? (
+            <span className="text-stone-700 dark:text-stone-200">
+              {selectedScouts.size} scout{selectedScouts.size !== 1 ? 's' : ''} selected &middot; {formatCurrency(parsedAmount)} each &middot;{' '}
+              <strong>Total: {formatCurrency(parsedAmount * selectedScouts.size)}</strong>
+            </span>
+          ) : (
+            <span className="text-stone-700 dark:text-stone-200">
+              {selectedScouts.size} scout{selectedScouts.size !== 1 ? 's' : ''} selected &middot; {formatCurrency(parsedAmount)} &divide; {selectedScouts.size} ={' '}
+              <strong>{formatCurrency(parsedAmount / selectedScouts.size)}/scout</strong>
+            </span>
+          )}
         </div>
       )}
 
@@ -390,7 +411,7 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
         </div>
       )}
 
-      {/* Notification Option */}
+      {/* 6. Notification Option */}
       {selectedScouts.size > 0 && parsedAmount > 0 && (
         <div className="rounded-lg border border-stone-200 dark:border-stone-700 p-4">
           <label className="flex items-start gap-3 cursor-pointer">
@@ -410,7 +431,7 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
         </div>
       )}
 
-      {/* Submit */}
+      {/* 7. Submit */}
       <div className="space-y-2">
         <Button
           type="submit"
