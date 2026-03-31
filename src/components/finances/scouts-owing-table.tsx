@@ -121,7 +121,7 @@ export function ScoutsOwingTable({ scouts, onRecordPayment, onSendReminder }: Sc
                               size="sm"
                               onClick={() => onRecordPayment(scout.scoutAccountId)}
                               aria-label={`Record payment for ${scout.scoutName}`}
-                              className="h-7 w-7 p-0 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-500 dark:hover:bg-emerald-950 dark:hover:text-emerald-400"
+                              className="h-7 w-7 p-0"
                             >
                               <DollarSign className="h-4 w-4" />
                             </Button>
@@ -137,7 +137,7 @@ export function ScoutsOwingTable({ scouts, onRecordPayment, onSendReminder }: Sc
                               size="sm"
                               onClick={() => onSendReminder(scout.scoutAccountId)}
                               aria-label={`Send reminder to ${scout.scoutName}`}
-                              className="h-7 w-7 p-0 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:text-blue-500 dark:hover:bg-blue-950 dark:hover:text-blue-400"
+                              className="h-7 w-7 p-0"
                             >
                               <Bell className="h-4 w-4" />
                             </Button>
