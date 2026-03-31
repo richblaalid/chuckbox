@@ -171,7 +171,6 @@ export function UnifiedAccountsView({
         onScoutSelect={handleScoutSelect}
         onSelectionChange={canTakeActions ? setSelectedIds : () => {}}
         onRecordPayment={canTakeActions ? handleRecordPayment : undefined}
-        onCreateBilling={canTakeActions ? handleCreateBilling : undefined}
         onSendReminder={canTakeActions ? handleSendReminder : undefined}
       />
 

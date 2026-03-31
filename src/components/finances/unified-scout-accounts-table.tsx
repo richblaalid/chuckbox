@@ -10,7 +10,7 @@ import { SearchInput } from '@/components/ui/search-input'
 import { ToggleButtonGroup, type ToggleOption } from '@/components/ui/toggle-button-group'
 import { SortIcon, type SortDirection } from '@/components/ui/sort-icon'
 import { formatCurrency, cn } from '@/lib/utils'
-import { CreditCard, Receipt, Bell } from 'lucide-react'
+import { DollarSign, Bell } from 'lucide-react'
 
 export interface ScoutAccountRow {
   id: string
@@ -43,7 +43,6 @@ interface UnifiedScoutAccountsTableProps {
   onScoutSelect: (scout: ScoutAccountRow) => void
   onSelectionChange: (ids: string[]) => void
   onRecordPayment?: (scout: ScoutAccountRow) => void
-  onCreateBilling?: (scout: ScoutAccountRow) => void
   onSendReminder?: (scout: ScoutAccountRow) => void
 }
 
@@ -54,7 +53,6 @@ export function UnifiedScoutAccountsTable({
   onScoutSelect,
   onSelectionChange,
   onRecordPayment,
-  onCreateBilling,
   onSendReminder,
 }: UnifiedScoutAccountsTableProps) {
   const [searchTerm, setSearchTerm] = useState('')
@@ -342,20 +340,17 @@ export function UnifiedScoutAccountsTable({
                     <TooltipProvider delayDuration={200}>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             data-action-button
                             onClick={() => onRecordPayment?.(scout)}
                             disabled={scout.billingBalance >= 0}
-                            className={cn(
-                              "inline-flex h-7 w-7 items-center justify-center rounded-md",
-                              scout.billingBalance >= 0
-                                ? "text-stone-300 cursor-not-allowed dark:text-stone-600"
-                                : "text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 dark:text-emerald-500 dark:hover:bg-emerald-950 dark:hover:text-emerald-400"
-                            )}
+                            className="h-7 w-7 p-0"
                             aria-label={`Record payment for ${scout.scoutName}`}
                           >
-                            <CreditCard className="h-4 w-4" />
-                          </button>
+                            <DollarSign className="h-4 w-4" />
+                          </Button>
                         </TooltipTrigger>
                         <TooltipContent>
                           {scout.billingBalance >= 0 ? "No balance owed" : "Record Payment"}
@@ -365,35 +360,17 @@ export function UnifiedScoutAccountsTable({
                     <TooltipProvider delayDuration={200}>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <button
-                            data-action-button
-                            onClick={() => onCreateBilling?.(scout)}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:text-amber-500 dark:hover:bg-amber-950 dark:hover:text-amber-400"
-                            aria-label={`Create billing for ${scout.scoutName}`}
-                          >
-                            <Receipt className="h-4 w-4" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent>Create Billing</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    <TooltipProvider delayDuration={200}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             data-action-button
                             onClick={() => onSendReminder?.(scout)}
                             disabled={scout.billingBalance >= 0}
-                            className={cn(
-                              "inline-flex h-7 w-7 items-center justify-center rounded-md",
-                              scout.billingBalance >= 0
-                                ? "text-stone-300 cursor-not-allowed dark:text-stone-600"
-                                : "text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:text-blue-500 dark:hover:bg-blue-950 dark:hover:text-blue-400"
-                            )}
+                            className="h-7 w-7 p-0"
                             aria-label={`Send reminder for ${scout.scoutName}`}
                           >
                             <Bell className="h-4 w-4" />
-                          </button>
+                          </Button>
                         </TooltipTrigger>
                         <TooltipContent>
                           {scout.billingBalance >= 0 ? "No balance owed" : "Send Reminder"}
