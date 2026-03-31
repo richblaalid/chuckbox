@@ -10,6 +10,8 @@ import { formatCurrency } from '@/lib/utils'
 import { recordQuickPayment } from '@/app/actions/payments'
 import { SQUARE_FEE_PERCENT, SQUARE_FEE_FIXED_DOLLARS } from '@/lib/billing'
 import { trackPaymentInitiated, trackPaymentCompleted, trackPaymentFailed } from '@/lib/analytics'
+import { ChargeAllocationList } from '@/components/payments/charge-allocation-list'
+import type { OutstandingCharge, Allocation } from '@/lib/payment-allocation'
 import { Banknote, Check, CreditCard, Loader2, X, Wallet } from 'lucide-react'
 import type { SquareCard } from '@/types/square'
 
@@ -41,7 +43,7 @@ interface QuickPaymentFormProps {
 
 const QUICK_AMOUNTS = [10, 20, 50, 100]
 
-type PaymentMethod = 'cash' | 'check' | 'card' | 'balance'
+type PaymentMethod = 'cash' | 'check' | 'card'
 
 export function QuickPaymentForm({
   unitId,
@@ -64,6 +66,14 @@ export function QuickPaymentForm({
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
+  // Outstanding charges & allocation state
+  const [outstandingCharges, setOutstandingCharges] = useState<OutstandingCharge[]>([])
+  const [allocations, setAllocations] = useState<Allocation[]>([])
+
+  // Funds-first split payment state
+  const [fundsToApply, setFundsToApply] = useState('0')
+  const parsedFundsToApply = parseFloat(fundsToApply) || 0
+
   // Square SDK state
   const [sdkReady, setSdkReady] = useState(false)
   const [cardInitialized, setCardInitialized] = useState(false)
@@ -83,20 +93,68 @@ export function QuickPaymentForm({
   const hasFunds = fundsBalance > 0 && currentBalance < 0
   const maxFromFunds = Math.min(fundsBalance, Math.abs(currentBalance))
 
-  // Calculate fees for card payments
+  // Remaining amount after funds are applied
+  const remainingAfterFunds = Math.max(0, parsedAmount - parsedFundsToApply)
+
+  // Funds cover everything — no external payment method needed
+  const fundsCoverAll = parsedFundsToApply > 0 && remainingAfterFunds === 0 && parsedAmount > 0
+
+  // Calculate fees for card payments (only on remaining amount after funds)
   const isCardPayment = method === 'card'
-  const feeAmount = isCardPayment ? parsedAmount * SQUARE_FEE_PERCENT + SQUARE_FEE_FIXED_DOLLARS : 0
-  const netAmount = parsedAmount - feeAmount
+  const feeAmount = isCardPayment && remainingAfterFunds > 0
+    ? remainingAfterFunds * SQUARE_FEE_PERCENT + SQUARE_FEE_FIXED_DOLLARS
+    : 0
+  const netAmount = remainingAfterFunds - feeAmount
 
   // Calculate new balance after payment
   const newBalance = currentBalance + parsedAmount
 
-  // Reset method if switching to scout without funds
+  // Fetch outstanding charges when scout changes
   useEffect(() => {
-    if (method === 'balance' && !hasFunds) {
-      setMethod('cash')
+    if (!selectedScoutId) {
+      setOutstandingCharges([])
+      setAllocations([])
+      setFundsToApply('0')
+      return
     }
-  }, [selectedScoutId, hasFunds, method])
+    const selectedScoutForCharges = scouts.find((s) => s.id === selectedScoutId)
+    const accountId = selectedScoutForCharges?.scout_accounts?.id
+    if (!accountId) return
+
+    // Reset funds when scout changes
+    setFundsToApply('0')
+
+    const fetchCharges = async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('billing_charges')
+        .select(`
+          id,
+          amount,
+          paid_amount,
+          billing_records!inner (id, description, billing_date, created_at)
+        `)
+        .eq('scout_account_id', accountId)
+        .or('is_void.is.null,is_void.eq.false')
+        .order('created_at', { ascending: true })
+
+      if (data) {
+        const charges = data
+          .filter((c) => c.amount - (c.paid_amount || 0) > 0)
+          .map((c) => ({
+            id: c.id,
+            billingRecordId: (c.billing_records as Record<string, string>).id,
+            description: (c.billing_records as Record<string, string>).description,
+            amount: c.amount,
+            paidAmount: c.paid_amount || 0,
+            billingDate: (c.billing_records as Record<string, string>).billing_date,
+            createdAt: (c.billing_records as Record<string, string>).created_at || '',
+          }))
+        setOutstandingCharges(charges)
+      }
+    }
+    fetchCharges()
+  }, [selectedScoutId, scouts])
 
   // Load Square SDK when card method is selected
   useEffect(() => {
@@ -174,10 +232,6 @@ export function QuickPaymentForm({
     }
   }
 
-  const handleUseMaxFunds = () => {
-    setAmount(maxFromFunds.toFixed(2))
-  }
-
   const handleCancel = () => {
     // Clear all form state
     setSelectedScoutId(preselectedScoutId || '')
@@ -185,6 +239,9 @@ export function QuickPaymentForm({
     setMethod('cash')
     setReference('')
     setNotes('')
+    setFundsToApply('0')
+    setOutstandingCharges([])
+    setAllocations([])
     setError(null)
     setSuccess(false)
     onCancel?.()
@@ -240,42 +297,19 @@ export function QuickPaymentForm({
     }
   }
 
-  const handleBalancePayment = async () => {
+  const handleFundsTransfer = async (transferAmount: number) => {
     if (!selectedScout?.scout_accounts?.id) return
 
-    trackPaymentInitiated({
-      amount: parsedAmount,
-      scoutAccountId: selectedScout.scout_accounts.id,
-      method: 'transfer',
+    const supabase = createClient()
+
+    const { error: rpcError } = await supabase.rpc('transfer_funds_to_billing', {
+      p_scout_account_id: selectedScout.scout_accounts.id,
+      p_amount: transferAmount,
+      p_description: notes || 'Transfer from Scout Funds to pay balance',
     })
 
-    try {
-      const supabase = createClient()
-
-      const { error: rpcError } = await supabase.rpc('transfer_funds_to_billing', {
-        p_scout_account_id: selectedScout.scout_accounts.id,
-        p_amount: parsedAmount,
-        p_description: notes || 'Transfer from Scout Funds to pay balance',
-      })
-
-      if (rpcError) {
-        throw new Error(rpcError.message)
-      }
-
-      trackPaymentCompleted({
-        amount: parsedAmount,
-        scoutAccountId: selectedScout.scout_accounts.id,
-        method: 'transfer',
-      })
-
-      return true
-    } catch (err) {
-      trackPaymentFailed({
-        amount: parsedAmount,
-        errorType: err instanceof Error ? err.message : 'Unknown error',
-        scoutAccountId: selectedScout.scout_accounts.id,
-      })
-      throw err
+    if (rpcError) {
+      throw new Error(rpcError.message)
     }
   }
 
@@ -299,6 +333,9 @@ export function QuickPaymentForm({
         method: paymentMethod,
         reference: reference || undefined,
         notes: notes || undefined,
+        allocations: allocations.length > 0
+          ? allocations.map((a) => ({ chargeId: a.chargeId, amount: a.amount }))
+          : undefined,
       })
 
       if (!result.success) {
@@ -333,16 +370,16 @@ export function QuickPaymentForm({
       setError('Please enter a valid amount')
       return
     }
-    if (method === 'card' && parsedAmount < 1) {
-      setError('Minimum card payment is $1.00')
-      return
-    }
-    if (method === 'balance' && parsedAmount > fundsBalance) {
+    if (parsedFundsToApply > fundsBalance) {
       setError(`Insufficient funds. Maximum available: ${formatCurrency(fundsBalance)}`)
       return
     }
-    if (method === 'balance' && parsedAmount > Math.abs(currentBalance)) {
-      setError(`Amount exceeds balance owed: ${formatCurrency(Math.abs(currentBalance))}`)
+    if (parsedFundsToApply > Math.abs(currentBalance)) {
+      setError(`Funds amount exceeds balance owed: ${formatCurrency(Math.abs(currentBalance))}`)
+      return
+    }
+    if (!fundsCoverAll && method === 'card' && remainingAfterFunds < 1) {
+      setError('Minimum card payment is $1.00')
       return
     }
 
@@ -350,12 +387,30 @@ export function QuickPaymentForm({
     setError(null)
 
     try {
-      if (method === 'card') {
-        await handleCardPayment()
-      } else if (method === 'balance') {
-        await handleBalancePayment()
-      } else {
-        await handleManualPayment()
+      const scoutAccountId = selectedScout.scout_accounts.id
+
+      // Step 1: Apply funds transfer if any
+      if (parsedFundsToApply > 0) {
+        trackPaymentInitiated({
+          amount: parsedFundsToApply,
+          scoutAccountId,
+          method: 'transfer',
+        })
+        await handleFundsTransfer(parsedFundsToApply)
+        trackPaymentCompleted({
+          amount: parsedFundsToApply,
+          scoutAccountId,
+          method: 'transfer',
+        })
+      }
+
+      // Step 2: Process remaining amount via external payment method
+      if (!fundsCoverAll && remainingAfterFunds > 0) {
+        if (method === 'card') {
+          await handleCardPayment()
+        } else {
+          await handleManualPayment()
+        }
       }
 
       setSuccess(true)
@@ -442,6 +497,60 @@ export function QuickPaymentForm({
         </div>
       )}
 
+      {/* Outstanding Charges Allocation */}
+      {outstandingCharges.length > 0 && (
+        <div className="space-y-2">
+          <Label>Outstanding Charges</Label>
+          <ChargeAllocationList
+            charges={outstandingCharges}
+            paymentAmount={parsedAmount}
+            onAllocationsChange={setAllocations}
+            onAmountChange={(newAmount) => setAmount(String(newAmount))}
+          />
+        </div>
+      )}
+
+      {/* Apply Scout Funds (split payment first step) */}
+      {hasFunds && (
+        <div className="rounded-md border border-stone-200 p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-sm font-medium">
+              <Wallet className="mr-1.5 inline h-4 w-4" />
+              Apply Scout Funds
+            </Label>
+            <span className="text-sm text-stone-500">Available: {formatCurrency(fundsBalance)}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">$</span>
+              <Input
+                type="number"
+                value={fundsToApply}
+                onChange={(e) => setFundsToApply(e.target.value)}
+                className="w-32 pl-7"
+                min={0}
+                max={maxFromFunds}
+                step="0.01"
+                onWheel={(e) => e.currentTarget.blur()}
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setFundsToApply(String(maxFromFunds))}
+            >
+              Apply All
+            </Button>
+          </div>
+          {parsedFundsToApply > 0 && parsedAmount > 0 && (
+            <p className="text-sm text-stone-600">
+              Remaining after funds: {formatCurrency(remainingAfterFunds)}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Amount with Quick Buttons */}
       <div className="space-y-2">
         <Label htmlFor="quick-amount">Amount</Label>
@@ -477,83 +586,52 @@ export function QuickPaymentForm({
         </div>
       </div>
 
-      {/* Payment Method Toggle */}
-      <div className="space-y-2">
-        <Label>Method</Label>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant={method === 'cash' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setMethod('cash')}
-            disabled={isSubmitting}
-            className="flex-1"
-          >
-            <Banknote className="mr-1.5 h-4 w-4" />
-            Cash
-          </Button>
-          <Button
-            type="button"
-            variant={method === 'check' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setMethod('check')}
-            disabled={isSubmitting}
-            className="flex-1"
-          >
-            <Check className="mr-1.5 h-4 w-4" />
-            Check
-          </Button>
-          {isSquareEnabled && (
+      {/* Payment Method Toggle - hidden when funds cover full amount */}
+      {!fundsCoverAll && (
+        <div className="space-y-2">
+          <Label>{parsedFundsToApply > 0 ? 'Method for Remaining Amount' : 'Method'}</Label>
+          <div className="flex flex-wrap gap-2">
             <Button
               type="button"
-              variant={method === 'card' ? 'default' : 'outline'}
+              variant={method === 'cash' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setMethod('card')}
+              onClick={() => setMethod('cash')}
               disabled={isSubmitting}
               className="flex-1"
             >
-              <CreditCard className="mr-1.5 h-4 w-4" />
-              Card
+              <Banknote className="mr-1.5 h-4 w-4" />
+              Cash
             </Button>
-          )}
-          {hasFunds && (
             <Button
               type="button"
-              variant={method === 'balance' ? 'default' : 'outline'}
+              variant={method === 'check' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => {
-                setMethod('balance')
-                // Auto-fill max amount from funds
-                handleUseMaxFunds()
-              }}
+              onClick={() => setMethod('check')}
               disabled={isSubmitting}
               className="flex-1"
             >
-              <Wallet className="mr-1.5 h-4 w-4" />
-              From Funds
+              <Check className="mr-1.5 h-4 w-4" />
+              Check
             </Button>
-          )}
-        </div>
-      </div>
-
-      {/* From Funds Info */}
-      {method === 'balance' && (
-        <div className="rounded-lg border border-success/20 bg-success/5 p-3">
-          <p className="text-sm text-stone-600">
-            Using Scout Funds to pay balance.{' '}
-            <button
-              type="button"
-              onClick={handleUseMaxFunds}
-              className="font-medium text-forest-600 hover:text-forest-800"
-            >
-              Use max ({formatCurrency(maxFromFunds)})
-            </button>
-          </p>
+            {isSquareEnabled && (
+              <Button
+                type="button"
+                variant={method === 'card' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setMethod('card')}
+                disabled={isSubmitting}
+                className="flex-1"
+              >
+                <CreditCard className="mr-1.5 h-4 w-4" />
+                Card
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Check Reference (only for check) */}
-      {method === 'check' && (
+      {/* Check Reference (only for check, and not when funds cover all) */}
+      {method === 'check' && !fundsCoverAll && (
         <div className="space-y-2">
           <Label htmlFor="quick-reference">Check # (optional)</Label>
           <Input
@@ -568,7 +646,7 @@ export function QuickPaymentForm({
       )}
 
       {/* Card Payment Form */}
-      {method === 'card' && (
+      {method === 'card' && !fundsCoverAll && (
         <div className="space-y-2">
           <Label>Card Details</Label>
           <div
@@ -582,7 +660,7 @@ export function QuickPaymentForm({
               </div>
             )}
           </div>
-          {parsedAmount > 0 && (
+          {remainingAfterFunds > 0 && (
             <p className="text-xs text-stone-500">
               Fee: {formatCurrency(feeAmount)} | Net: {formatCurrency(netAmount)}
             </p>
@@ -646,7 +724,7 @@ export function QuickPaymentForm({
             isSubmitting ||
             !selectedScoutId ||
             parsedAmount <= 0 ||
-            (method === 'card' && !cardInitialized)
+            (!fundsCoverAll && method === 'card' && !cardInitialized)
           }
         >
           {isSubmitting ? (
@@ -654,8 +732,10 @@ export function QuickPaymentForm({
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Processing...
             </>
-          ) : method === 'balance' ? (
-            `Use ${formatCurrency(parsedAmount)} Funds`
+          ) : fundsCoverAll ? (
+            `Apply Funds (${formatCurrency(parsedAmount)})`
+          ) : parsedFundsToApply > 0 ? (
+            `Apply ${formatCurrency(parsedFundsToApply)} Funds + Record ${formatCurrency(remainingAfterFunds)}`
           ) : (
             `Record ${formatCurrency(parsedAmount)}`
           )}
