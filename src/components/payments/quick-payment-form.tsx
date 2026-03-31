@@ -152,15 +152,15 @@ export function QuickPaymentForm({
           id,
           amount,
           paid_amount,
+          is_paid,
           billing_records!inner (id, description, billing_date, created_at)
         `)
         .eq('scout_account_id', accountId)
         .or('is_void.is.null,is_void.eq.false')
-        .order('created_at', { ascending: true })
 
       if (data) {
         const charges = data
-          .filter((c) => c.amount - (c.paid_amount || 0) > 0)
+          .filter((c) => !c.is_paid && c.amount - (c.paid_amount || 0) > 0)
           .map((c) => ({
             id: c.id,
             billingRecordId: (c.billing_records as Record<string, string>).id,
