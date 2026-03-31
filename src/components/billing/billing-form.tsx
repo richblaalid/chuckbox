@@ -11,6 +11,9 @@ import { ToggleButtonGroup } from '@/components/ui/toggle-button-group'
 import { useToast } from '@/components/ui/toast'
 import { formatCurrency } from '@/lib/utils'
 import { trackBillingCreated } from '@/lib/analytics'
+import { validateLineItems, validateDeposit } from '@/lib/billing-validation'
+import type { LineItem } from '@/lib/billing-validation'
+import { Plus, X } from 'lucide-react'
 
 const BILLING_TYPE_KEY = 'chuckbox:billing:lastType'
 
@@ -47,6 +50,11 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
   const [billingType, setBillingType] = useState<BillingType>('fixed')
   const [sendNotifications, setSendNotifications] = useState(false)
   const [scoutSearch, setScoutSearch] = useState('')
+  const [lineItems, setLineItems] = useState<LineItem[]>([])
+  const [showLineItems, setShowLineItems] = useState(false)
+  const [showDeposit, setShowDeposit] = useState(false)
+  const [depositAmount, setDepositAmount] = useState('')
+  const [depositDueDate, setDepositDueDate] = useState('')
 
   // Load saved billing type preference on mount
   useEffect(() => {
@@ -116,6 +124,26 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
       return
     }
 
+    // Validate line items if shown
+    if (showLineItems && lineItems.length > 0) {
+      const lineItemError = validateLineItems(lineItems, parsedAmount)
+      if (lineItemError) {
+        setError(lineItemError)
+        setIsLoading(false)
+        return
+      }
+    }
+
+    // Validate deposit if shown
+    if (showDeposit) {
+      const depositError = validateDeposit(depositAmount, depositDueDate, parsedAmount)
+      if (depositError) {
+        setError(depositError)
+        setIsLoading(false)
+        return
+      }
+    }
+
     const supabase = createClient()
 
     try {
@@ -158,6 +186,25 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
         throw new Error('Failed to create billing record')
       }
 
+      // Persist line items and deposit fields if provided
+      if ((showLineItems && lineItems.length > 0) || (showDeposit && depositAmount)) {
+        const { error: updateError } = await supabase
+          .from('billing_records')
+          .update({
+            line_items: showLineItems && lineItems.length > 0
+              ? lineItems.map((li) => ({ description: li.description, amount: li.amount }))
+              : null,
+            deposit_amount: showDeposit && depositAmount ? parseFloat(depositAmount) : null,
+            deposit_due_date: showDeposit && depositDueDate ? depositDueDate : null,
+          })
+          .eq('id', result.billing_record_id)
+
+        if (updateError) {
+          console.error('Failed to save line items/deposit:', updateError)
+          // Don't fail the whole operation - billing record was created successfully
+        }
+      }
+
       // Track billing event
       trackBillingCreated({
         total: totalAmount,
@@ -189,6 +236,11 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
       setDescription('')
       setSelectedScouts(new Set())
       setSendNotifications(false)
+      setLineItems([])
+      setShowLineItems(false)
+      setShowDeposit(false)
+      setDepositAmount('')
+      setDepositDueDate('')
 
       // Call onSuccess callback or refresh
       if (onSuccess) {
@@ -302,6 +354,160 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
           />
         </div>
       </div>
+
+      {/* 3b. Line Items (optional) */}
+      {!showLineItems ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setShowLineItems(true)
+            setLineItems([{ description: '', amount: 0 }])
+          }}
+        >
+          <Plus className="mr-1 h-4 w-4" />
+          Add itemized breakdown
+        </Button>
+      ) : (
+        <div className="space-y-3 rounded-lg border border-stone-200 dark:border-stone-700 p-4">
+          <div className="flex items-center justify-between">
+            <Label>Line Items</Label>
+            <button
+              type="button"
+              onClick={() => {
+                setShowLineItems(false)
+                setLineItems([])
+              }}
+              className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+              aria-label="Close line items"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          {lineItems.map((item, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <Input
+                placeholder="Description"
+                value={item.description}
+                onChange={(e) => {
+                  const updated = [...lineItems]
+                  updated[index] = { ...updated[index], description: e.target.value }
+                  setLineItems(updated)
+                }}
+                className="flex-1"
+              />
+              <div className="relative w-28">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 dark:text-stone-400">
+                  $
+                </span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={item.amount || ''}
+                  onChange={(e) => {
+                    const updated = [...lineItems]
+                    updated[index] = { ...updated[index], amount: parseFloat(e.target.value) || 0 }
+                    setLineItems(updated)
+                  }}
+                  onWheel={(e) => e.currentTarget.blur()}
+                  className="pl-7 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setLineItems(lineItems.filter((_, i) => i !== index))
+                }}
+                className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+                aria-label="Remove line item"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setLineItems([...lineItems, { description: '', amount: 0 }])}
+          >
+            <Plus className="mr-1 h-4 w-4" />
+            Add line item
+          </Button>
+          {lineItems.length > 0 && (
+            <p
+              className={`text-sm ${
+                Math.abs(lineItems.reduce((sum, li) => sum + li.amount, 0) - parsedAmount) > 0.01
+                  ? 'text-red-600 dark:text-red-400'
+                  : 'text-stone-500 dark:text-stone-400'
+              }`}
+            >
+              Line items total: {formatCurrency(lineItems.reduce((sum, li) => sum + li.amount, 0))}
+              {parsedAmount > 0 && ` / ${formatCurrency(parsedAmount)}`}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* 3c. Deposit Requirement (optional) */}
+      {!showDeposit ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowDeposit(true)}
+        >
+          <Plus className="mr-1 h-4 w-4" />
+          Add deposit requirement
+        </Button>
+      ) : (
+        <div className="flex items-center gap-3 rounded-lg border border-stone-200 dark:border-stone-700 p-4">
+          <div className="space-y-1">
+            <Label htmlFor="deposit-amount">Deposit Amount</Label>
+            <div className="relative w-32">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 dark:text-stone-400">
+                $
+              </span>
+              <Input
+                id="deposit-amount"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={depositAmount}
+                onChange={(e) => setDepositAmount(e.target.value)}
+                onWheel={(e) => e.currentTarget.blur()}
+                className="pl-7 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="deposit-due-date">Due Date</Label>
+            <Input
+              id="deposit-due-date"
+              type="date"
+              value={depositDueDate}
+              onChange={(e) => setDepositDueDate(e.target.value)}
+              className="w-40"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setShowDeposit(false)
+              setDepositAmount('')
+              setDepositDueDate('')
+            }}
+            className="ml-auto self-start text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+            aria-label="Close deposit"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* 4. Scout Selection */}
       <div className="space-y-3">
