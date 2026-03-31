@@ -295,7 +295,7 @@ export async function POST(
           .single()
 
         if (journalError || !journalEntry) {
-          errors.push(`${scoutName}: Failed to create journal entry`)
+          errors.push(`${scoutName}: Failed to create journal entry - ${journalError?.message || 'unknown error'}`)
           continue
         }
 
@@ -372,7 +372,7 @@ export async function POST(
             .insert(journalLines)
 
           if (linesError) {
-            errors.push(`${scoutName}: Failed to create journal lines`)
+            errors.push(`${scoutName}: Failed to create journal lines - ${linesError.message}`)
             continue
           }
         }
