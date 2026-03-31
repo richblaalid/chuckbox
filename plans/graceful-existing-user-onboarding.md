@@ -164,18 +164,18 @@ flowchart TD
 ### Phase 1: Public Onboarding Improvements
 
 #### 1.1 Existing User Detection UI
-- [ ] **1.1.1** Create `ExistingUserNotice` component
+- [x] **1.1.1** Create `ExistingUserNotice` component
   - Files: `src/components/onboarding/existing-user-notice.tsx`
   - Details: Card showing "You already have a ChuckBox account" with info about existing unit(s). Two CTAs: "Sign In to Continue" (primary) and "Back" (secondary). Sign-in link includes `?next=/create-unit` so after login, user lands on the in-app unit creation flow.
   - Test: Component renders with sign-in link
 
-- [ ] **1.1.2** Update SignupWizard to handle `account_exists` response
+- [x] **1.1.2** Update SignupWizard to handle `account_exists` response
   - Files: `src/components/onboarding/signup-wizard.tsx`
   - Details: When `provisionUnit()` returns `account_exists`, show `ExistingUserNotice` instead of "check your email". Pass the error code through state.
   - Test: Manual — enter existing email in signup, see notice instead of email prompt
 
 #### 1.2 Authenticated User Bypass
-- [ ] **1.2.1** Detect authenticated user in signup page and redirect
+- [x] **1.2.1** Detect authenticated user in signup page and redirect
   - Files: `src/lib/supabase/middleware.ts`
   - Details: Currently `/signup` is a public route — authenticated users can navigate there freely (confirmed in middleware). Add a redirect in `updateSession()`: if user is authenticated and path is `/signup`, redirect to `/create-unit`. This matches the existing pattern that redirects authenticated `/login` users to `/scouts` (line 54).
   - Test: Logged-in user visiting `/signup` redirects to `/create-unit`
@@ -272,7 +272,7 @@ flowchart TD
 | Phase | Total | Complete | Status |
 |-------|-------|----------|--------|
 | Phase 0 | 4 | 4 | Complete (0.1.1 dropped) |
-| Phase 1 | 3 | 0 | Not Started |
+| Phase 1 | 3 | 3 | Complete |
 | Phase 2 | 4 | 0 | Not Started |
 
 ---
@@ -284,7 +284,10 @@ flowchart TD
 | 0.1.1 | 2026-03-27 | — | DROPPED: automated auth user deletion too risky |
 | 0.2.1 | 2026-03-27 | ce52d74 | checkEmailExists() added with 3 unit tests |
 | 0.2.2 | 2026-03-27 | 14a889f | provisionUnit() returns account_exists for existing emails |
-| 0.2.3 | 2026-03-27 | pending | provisionUnitAuthenticated() for logged-in users, 2 tests |
+| 0.2.3 | 2026-03-27 | 41c4947 | provisionUnitAuthenticated() for logged-in users, 2 tests |
+| 1.1.1 | 2026-03-30 | pending | ExistingUserNotice component |
+| 1.1.2 | 2026-03-30 | pending | SignupWizard handles account_exists code |
+| 1.2.1 | 2026-03-30 | pending | Middleware redirects authenticated /signup to /create-unit |
 
 ---
 
