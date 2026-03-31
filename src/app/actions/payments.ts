@@ -11,6 +11,7 @@ interface QuickPaymentParams {
   method: 'cash' | 'check'
   reference?: string
   notes?: string
+  allocations?: Array<{ chargeId: string; amount: number }>
 }
 
 interface ActionResult {
@@ -167,6 +168,40 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
     if (paymentError) {
       console.error('Failed to create payment record:', paymentError)
       // Don't rollback journal - the accounting is correct
+    }
+
+    // Persist charge allocations (supplementary — does not fail the payment)
+    if (params.allocations && params.allocations.length > 0 && payment?.id) {
+      const allocationRows = params.allocations.map((alloc) => ({
+        payment_id: payment.id,
+        billing_charge_id: alloc.chargeId,
+        amount: alloc.amount,
+      }))
+
+      const { error: allocError } = await supabase
+        .from('payment_allocations')
+        .insert(allocationRows)
+
+      if (allocError) {
+        console.error('Failed to create payment allocations:', allocError)
+        // Don't fail the payment — allocations are supplementary
+      }
+
+      // Update paid_amount on each billing charge
+      for (const alloc of params.allocations) {
+        const { data: charge } = await supabase
+          .from('billing_charges')
+          .select('paid_amount')
+          .eq('id', alloc.chargeId)
+          .single()
+
+        if (charge) {
+          await supabase
+            .from('billing_charges')
+            .update({ paid_amount: (charge.paid_amount || 0) + alloc.amount })
+            .eq('id', alloc.chargeId)
+        }
+      }
     }
 
     // Check for overpayment and auto-transfer to Scout Funds
