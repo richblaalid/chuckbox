@@ -43,18 +43,10 @@ type Step = 'upload' | 'map' | 'preview' | 'importing' | 'complete'
 
 type ImportMode = 'set' | 'adjust'
 
-interface ImportResultRow {
-  scoutId: string
-  scoutName: string
-  billingBalance?: number
-  fundsBalance?: number
-  error?: string
-}
-
 interface ImportResult {
   imported: number
   skipped: number
-  errors: ImportResultRow[]
+  errors: string[]
 }
 
 // ============================================
@@ -220,7 +212,8 @@ export function BalanceImportWizard({ scouts, onComplete }: BalanceImportWizardP
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Import failed')
+        const errorMsg = errorData.errors?.join(', ') || 'Import failed'
+        throw new Error(errorMsg)
       }
 
       const data = await response.json()
@@ -457,9 +450,7 @@ export function BalanceImportWizard({ scouts, onComplete }: BalanceImportWizardP
                   <h4 className="font-medium text-red-800 mb-2">Errors:</h4>
                   <ul className="space-y-1 text-sm text-red-700">
                     {result.errors.map((err, i) => (
-                      <li key={i}>
-                        <span className="font-medium">{err.scoutName}:</span> {err.error}
-                      </li>
+                      <li key={i}>{err}</li>
                     ))}
                   </ul>
                 </div>
