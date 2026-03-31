@@ -8,6 +8,7 @@ import { FadeIn } from '@/components/ui/page-transition'
 import { parseRosterWithMetadata, type ParsedRoster, type UnitMetadata } from '@/lib/import/bsa-roster-parser'
 import { extractUnitFromCSV, provisionUnit } from '@/app/actions/onboarding'
 import { RosterPreview } from './roster-preview'
+import { ExistingUserNotice } from './existing-user-notice'
 
 const STEPS_CSV = [
   { id: 'upload', label: 'Upload Roster' },
@@ -30,6 +31,7 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isComplete, setIsComplete] = useState(false)
+  const [accountExists, setAccountExists] = useState(false)
   const [duplicateWarning, setDuplicateWarning] = useState<{
     existingUnitName: string
     existingUnitType?: string
@@ -217,6 +219,11 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
       }
 
       if (!result.success) {
+        if (result.code === 'account_exists') {
+          setAccountExists(true)
+          setIsLoading(false)
+          return
+        }
         setError(result.error || 'Failed to create unit')
         setIsLoading(false)
         return
@@ -234,6 +241,18 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
   // ============================================
   // Render: Success State
   // ============================================
+
+  if (accountExists) {
+    return (
+      <ExistingUserNotice
+        email={adminInfo.email}
+        onBack={() => {
+          setAccountExists(false)
+          setError(null)
+        }}
+      />
+    )
+  }
 
   if (isComplete) {
     return (

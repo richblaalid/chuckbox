@@ -56,6 +56,12 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(dashboardUrl)
   }
 
+  // If user is authenticated and trying to access signup, redirect to in-app unit creation
+  if (user && pathname === '/signup') {
+    const createUnitUrl = new URL('/create-unit', request.url)
+    return NextResponse.redirect(createUnitUrl)
+  }
+
   // Redirect /signup to /early-access if self-signup is not enabled
   if (pathname === '/signup' && process.env.NEXT_PUBLIC_ENABLE_SELF_SIGNUP !== 'true') {
     const earlyAccessUrl = new URL('/early-access', request.url)

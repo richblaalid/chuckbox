@@ -47,6 +47,7 @@ interface ProvisionUnitInput {
 interface ProvisionResult {
   success: boolean
   error?: string
+  code?: 'account_exists'
   unitId?: string
   profileId?: string
   duplicateWarning?: {
@@ -67,6 +68,30 @@ interface VerifyProvisionResult {
     adultsImported: number
     scoutsImported: number
     patrolsCreated: number
+  }
+}
+
+// ============================================
+// Email Existence Check
+// ============================================
+
+export async function checkEmailExists(email: string): Promise<{ exists: boolean }> {
+  try {
+    const adminSupabase = createAdminClient()
+    const { data, error } = await adminSupabase.auth.admin.listUsers()
+
+    if (error || !data?.users) {
+      return { exists: false }
+    }
+
+    const normalizedEmail = email.toLowerCase()
+    const found = data.users.some(
+      (u) => u.email?.toLowerCase() === normalizedEmail
+    )
+
+    return { exists: found }
+  } catch {
+    return { exists: false }
   }
 }
 
@@ -282,6 +307,16 @@ export async function provisionUnit(input: ProvisionUnitInput, ipAddress: string
     }
   }
 
+  // Check if admin email already exists in auth
+  const emailCheck = await checkEmailExists(admin.email)
+  if (emailCheck.exists) {
+    return {
+      success: false,
+      code: 'account_exists',
+      error: 'An account with this email already exists. Please sign in to create a new unit.',
+    }
+  }
+
   const adminSupabase = createAdminClient()
 
   try {
@@ -410,6 +445,138 @@ export async function provisionUnit(input: ProvisionUnitInput, ipAddress: string
     }
   } catch (err) {
     console.error('Error provisioning unit:', err)
+    return { success: false, error: 'An unexpected error occurred. Please try again.' }
+  }
+}
+
+// ============================================
+// Provision Unit (Authenticated User)
+// ============================================
+
+interface ProvisionAuthenticatedInput {
+  unitMetadata: UnitMetadata
+  parsedAdults: ParsedAdult[]
+  parsedScouts: ParsedScout[]
+  signupPath?: 'csv' | 'manual'
+}
+
+export async function provisionUnitAuthenticated(input: ProvisionAuthenticatedInput): Promise<ProvisionResult> {
+  const { unitMetadata, parsedAdults, parsedScouts } = input
+
+  // 1. Verify the caller is authenticated
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user || !user.email) {
+    return { success: false, error: 'You must be authenticated to create a unit.' }
+  }
+
+  // 2. Validate required fields
+  if (!unitMetadata.unitType || !unitMetadata.unitNumber) {
+    return { success: false, error: 'Unit type and number are required' }
+  }
+
+  // 3. Check for duplicate unit
+  const duplicateCheck = await checkDuplicateUnit(unitMetadata)
+  if (duplicateCheck.exists) {
+    return {
+      success: false,
+      duplicateWarning: {
+        exists: true,
+        existingUnitName: duplicateCheck.unitName || 'Unknown',
+        existingUnitType: duplicateCheck.unitType,
+        existingUnitNumber: duplicateCheck.unitNumber,
+        existingCouncil: duplicateCheck.council,
+      },
+    }
+  }
+
+  const adminSupabase = createAdminClient()
+
+  try {
+    // 4. Build unit name
+    const unitTypeName = unitMetadata.unitType.charAt(0).toUpperCase() + unitMetadata.unitType.slice(1)
+    const unitName = unitMetadata.unitSuffix
+      ? `${unitTypeName} ${unitMetadata.unitNumber}${unitMetadata.unitSuffix}`
+      : `${unitTypeName} ${unitMetadata.unitNumber}`
+
+    const needsSetup = input.signupPath === 'manual'
+
+    // 5. Create unit
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: unit, error: unitError } = await adminSupabase
+      .from('units')
+      .insert({
+        name: unitName,
+        unit_number: unitMetadata.unitNumber,
+        unit_type: unitMetadata.unitType,
+        council: unitMetadata.council,
+        district: unitMetadata.district,
+        needs_setup: needsSetup,
+        signup_path: input.signupPath || 'csv',
+      } as any)
+      .select('id')
+      .single()
+
+    if (unitError || !unit) {
+      console.error('Error creating unit:', unitError)
+      return { success: false, error: 'Failed to create unit. Please try again.' }
+    }
+
+    // 6. Find existing profile for this user
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
+
+    const profileId = existingProfile?.id
+
+    if (!profileId) {
+      // Cleanup
+      await adminSupabase.from('units').delete().eq('id', unit.id)
+      return { success: false, error: 'Could not find your profile. Please try again.' }
+    }
+
+    // 7. Create membership with active status (no invite needed)
+    const { error: membershipError } = await adminSupabase.from('unit_memberships').insert({
+      unit_id: unit.id,
+      profile_id: profileId,
+      role: 'admin',
+      status: 'active',
+      joined_at: new Date().toISOString(),
+    })
+
+    if (membershipError) {
+      console.error('Error creating membership:', membershipError)
+      await adminSupabase.from('units').delete().eq('id', unit.id)
+      return { success: false, error: 'Failed to create membership. Please try again.' }
+    }
+
+    // 8. Stage roster data for import on /setup
+    if (parsedAdults.length > 0 || parsedScouts.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: stageError } = await adminSupabase.from('staged_roster_imports').insert({
+        unit_id: unit.id,
+        profile_id: profileId,
+        parsed_adults: parsedAdults as unknown as Json,
+        parsed_scouts: parsedScouts as unknown as Json,
+        unit_metadata: unitMetadata as unknown as Json,
+      } as any)
+
+      if (stageError) {
+        console.error('Error staging roster data:', stageError)
+        // Non-fatal — unit is still created
+      }
+    }
+
+    return {
+      success: true,
+      unitId: unit.id,
+      profileId,
+    }
+  } catch (err) {
+    console.error('Error provisioning unit (authenticated):', err)
     return { success: false, error: 'An unexpected error occurred. Please try again.' }
   }
 }
