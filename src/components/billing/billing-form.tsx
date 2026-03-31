@@ -271,18 +271,28 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
 
   const filteredScoutIds = useMemo(() => new Set(filteredScouts.map((s) => s.id)), [filteredScouts])
 
-  // Group scouts by patrol (using all scouts for group structure, filtered for visibility)
-  const patrolGroups = scouts.reduce(
-    (groups, scout) => {
+  // Group scouts by patrol, sorted alphabetically (No Patrol last), scouts by last name
+  const patrolGroups = useMemo(() => {
+    const groups: Record<string, Scout[]> = {}
+    for (const scout of scouts) {
       const patrol = scout.patrols?.name || 'No Patrol'
-      if (!groups[patrol]) {
-        groups[patrol] = []
-      }
+      if (!groups[patrol]) groups[patrol] = []
       groups[patrol].push(scout)
-      return groups
-    },
-    {} as Record<string, Scout[]>
-  )
+    }
+    // Sort scouts within each patrol by last name, then first name
+    for (const patrol of Object.keys(groups)) {
+      groups[patrol].sort((a, b) =>
+        a.last_name.localeCompare(b.last_name) || a.first_name.localeCompare(b.first_name)
+      )
+    }
+    // Return entries sorted: alphabetical patrols first, "No Patrol" last
+    const sorted = Object.entries(groups).sort(([a], [b]) => {
+      if (a === 'No Patrol') return 1
+      if (b === 'No Patrol') return -1
+      return a.localeCompare(b)
+    })
+    return Object.fromEntries(sorted)
+  }, [scouts])
 
   const selectAll = () => {
     const newSelected = new Set(selectedScouts)

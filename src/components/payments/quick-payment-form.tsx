@@ -86,8 +86,12 @@ export function QuickPaymentForm({
 
   const isSquareEnabled = !!squareConfig?.locationId
 
-  // Filter to scouts who owe money
-  const scoutsOwing = scouts.filter((s) => (s.scout_accounts?.billing_balance || 0) < 0)
+  // Sort scouts by last name, then first name
+  const sortByName = (a: Scout, b: Scout) =>
+    a.last_name.localeCompare(b.last_name) || a.first_name.localeCompare(b.first_name)
+
+  // Filter to scouts who owe money, sorted by name
+  const scoutsOwing = scouts.filter((s) => (s.scout_accounts?.billing_balance || 0) < 0).sort(sortByName)
 
   const selectedScout = scouts.find((s) => s.id === selectedScoutId)
   const currentBalance = selectedScout?.scout_accounts?.billing_balance || 0
@@ -517,6 +521,7 @@ export function QuickPaymentForm({
               <optgroup label="Paid up">
                 {scouts
                   .filter((s) => (s.scout_accounts?.billing_balance || 0) >= 0)
+                  .sort(sortByName)
                   .map((scout) => (
                     <option key={scout.id} value={scout.id}>
                       {scout.first_name} {scout.last_name} (paid up)
