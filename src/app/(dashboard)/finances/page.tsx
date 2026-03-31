@@ -4,13 +4,11 @@ import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
 import { canAccessPage, isFinancialRole } from '@/lib/roles'
-import { isFeatureEnabled, FeatureFlag } from '@/lib/feature-flags'
 import { FinanceSubnav } from '@/components/finances/finance-subnav'
-import { QuickActionsCard } from '@/components/finances/quick-actions-card'
+import { OverviewActions } from '@/components/finances/overview-actions'
+import type { ScoutOwing } from '@/components/finances/scouts-owing-table'
 import { Receipt, CreditCard, TrendingDown, PiggyBank, AlertTriangle } from 'lucide-react'
-import { BankWidget } from '@/components/plaid/bank-widget'
 import { BankBalanceCard } from '@/components/plaid/bank-balance-card'
-import { OutstandingBillsCard, type BillingRecordSummary } from '@/components/finances/outstanding-bills-card'
 
 interface ScoutAccount {
   id: string
@@ -180,6 +178,23 @@ export default async function FinancesOverviewPage() {
 
   const recentPayments = (paymentsData as PaymentWithScout[]) || []
 
+  // Build a map of last payment date per scout_account_id from recent payments
+  // We query more payments to cover all accounts that owe money
+  const { data: allPaymentsData } = await supabase
+    .from('payments')
+    .select('scout_account_id, created_at')
+    .eq('unit_id', membership.unit_id)
+    .eq('status', 'completed')
+    .is('voided_at', null)
+    .order('created_at', { ascending: false })
+
+  const lastPaymentByAccount = new Map<string, string>()
+  for (const payment of (allPaymentsData as Array<{ scout_account_id: string; created_at: string }>) || []) {
+    if (!lastPaymentByAccount.has(payment.scout_account_id)) {
+      lastPaymentByAccount.set(payment.scout_account_id, payment.created_at)
+    }
+  }
+
   // Get recent billing records with per-scout charge details (used by both Outstanding Bills and Recent Activity)
   const { data: billingRecordsData } = await supabase
     .from('billing_records')
@@ -235,6 +250,23 @@ export default async function FinancesOverviewPage() {
 
   // Group billing records that share the same batch OR same description+date into single entries
   // This collapses 20 individual "Summer Camp" charges into one grouped row
+  interface BillingRecordSummary {
+    id: string
+    description: string
+    billing_date: string
+    created_at: string | null
+    total_amount: number
+    is_void: boolean | null
+    charges: Array<{
+      id: string
+      amount: number
+      is_paid: boolean | null
+      scout_account_id: string
+      scout_first_name: string
+      scout_last_name: string
+    }>
+  }
+
   const groupedMap = new Map<string, BillingRecordSummary>()
 
   for (const record of rawBillingRecords) {
@@ -339,9 +371,9 @@ export default async function FinancesOverviewPage() {
         scoutAccountId,
       }
     }),
-  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10)
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5)
 
-  // Transform accounts into scouts format for QuickActionsCard
+  // Transform accounts into scouts format for FinanceActionBar
   const scoutsForActions = accounts
     .filter((acc) => acc.scouts)
     .map((acc) => ({
@@ -356,6 +388,38 @@ export default async function FinancesOverviewPage() {
       },
       patrols: acc.scouts!.patrols,
     }))
+
+  // Build ScoutOwing[] for the scouts-owing table
+  // Group unpaid charges by scout_account_id to find the oldest charge date
+  const oldestUnpaidByAccount = new Map<string, string>()
+  for (const charge of unpaidCharges) {
+    const existing = oldestUnpaidByAccount.get(charge.scout_account_id)
+    if (!existing || charge.billing_records.billing_date < existing) {
+      oldestUnpaidByAccount.set(charge.scout_account_id, charge.billing_records.billing_date)
+    }
+  }
+
+  const scoutsOwingData: ScoutOwing[] = scoutsOwing
+    .filter((acc) => acc.scouts)
+    .map((acc) => {
+      const oldestChargeDate = oldestUnpaidByAccount.get(acc.id)
+      let daysOverdue = 0
+      if (oldestChargeDate) {
+        const chargeDate = new Date(oldestChargeDate)
+        chargeDate.setHours(0, 0, 0, 0)
+        daysOverdue = Math.max(0, Math.floor((today.getTime() - chargeDate.getTime()) / (1000 * 60 * 60 * 24)))
+      }
+
+      return {
+        scoutId: acc.scouts!.id,
+        scoutAccountId: acc.id,
+        scoutName: `${acc.scouts!.first_name} ${acc.scouts!.last_name}`,
+        amountOwed: Math.abs(acc.billing_balance || 0),
+        lastPaymentDate: lastPaymentByAccount.get(acc.id) || null,
+        daysOverdue,
+      }
+    })
+    .sort((a, b) => b.amountOwed - a.amountOwed)
 
   return (
     <div className="space-y-6">
@@ -430,83 +494,83 @@ export default async function FinancesOverviewPage() {
         />
       </div>
 
-      {/* Quick Actions (for admin/treasurer only) */}
+      {/* Action Bar + Scouts Owing Table (for admin/treasurer only) */}
       {canTakeActions && (
-        <QuickActionsCard
+        <OverviewActions
           unitId={membership.unit_id}
           unitName={membership.units?.name || 'your unit'}
           scouts={scoutsForActions}
+          scoutsOwing={scoutsOwingData}
         />
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Outstanding Bills */}
-        <OutstandingBillsCard
-          billingRecords={billingRecordsSummary}
-          totalScoutsOwing={scoutsOwing.length}
-        />
-
-        {/* Recent Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Latest payments and billing</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {recentActivity.length > 0 ? (
-              <div className="space-y-3">
-                {recentActivity.map((activity) => (
-                  <div key={`${activity.type}-${activity.id}`} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`rounded-full p-1.5 ${
-                        activity.type === 'payment'
-                          ? 'bg-success/10 text-success'
-                          : 'bg-stone-100 text-stone-600'
-                      }`}>
-                        {activity.type === 'payment' ? (
-                          <CreditCard className="h-4 w-4" />
-                        ) : (
-                          <Receipt className="h-4 w-4" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">
-                          {activity.scoutAccountId ? (
-                            <Link
-                              href={`/finances/accounts/${activity.scoutAccountId}`}
-                              className="text-forest-600 hover:text-forest-800 hover:underline"
-                            >
-                              {activity.scoutName}
-                            </Link>
-                          ) : (
-                            activity.scoutName
-                          )}
-                        </p>
-                        <p className="text-xs text-stone-500">
-                          {activity.type === 'billing' && (
-                            <span>{activity.description} · </span>
-                          )}
-                          {new Date(activity.date).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <span className={`font-medium ${
-                      activity.type === 'payment' ? 'text-success' : 'text-stone-700'
+      {/* Recent Activity */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Recent Activity</CardTitle>
+              <CardDescription>Latest payments and billing</CardDescription>
+            </div>
+            <Link
+              href="/finances/accounts"
+              className="text-sm text-forest-600 hover:text-forest-800 hover:underline"
+            >
+              View all
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {recentActivity.length > 0 ? (
+            <div className="space-y-3">
+              {recentActivity.map((activity) => (
+                <div key={`${activity.type}-${activity.id}`} className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`rounded-full p-1.5 ${
+                      activity.type === 'payment'
+                        ? 'bg-success/10 text-success'
+                        : 'bg-stone-100 text-stone-600'
                     }`}>
-                      {activity.type === 'payment' ? '+' : ''}{formatCurrency(activity.amount)}
-                    </span>
+                      {activity.type === 'payment' ? (
+                        <CreditCard className="h-4 w-4" />
+                      ) : (
+                        <Receipt className="h-4 w-4" />
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">
+                        {activity.scoutAccountId ? (
+                          <Link
+                            href={`/finances/accounts/${activity.scoutAccountId}`}
+                            className="text-forest-600 hover:text-forest-800 hover:underline"
+                          >
+                            {activity.scoutName}
+                          </Link>
+                        ) : (
+                          activity.scoutName
+                        )}
+                      </p>
+                      <p className="text-xs text-stone-500">
+                        {activity.type === 'billing' && (
+                          <span>{activity.description} · </span>
+                        )}
+                        {new Date(activity.date).toLocaleDateString()}
+                      </p>
+                    </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-stone-500">No recent activity</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Bank Account Widget (admin/treasurer only, when enabled) */}
-        {canTakeActions && isFeatureEnabled(FeatureFlag.BANK_INTEGRATION) && <BankWidget />}
-      </div>
+                  <span className={`font-medium ${
+                    activity.type === 'payment' ? 'text-success' : 'text-stone-700'
+                  }`}>
+                    {activity.type === 'payment' ? '+' : ''}{formatCurrency(activity.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-stone-500">No recent activity</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
