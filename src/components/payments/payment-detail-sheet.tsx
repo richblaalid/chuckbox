@@ -342,7 +342,10 @@ export function PaymentDetailSheet({
             scout_name: row.scout_name ?? undefined,
           }}
           open={voidDialogOpen}
-          onOpenChange={setVoidDialogOpen}
+          onOpenChange={(open) => {
+            setVoidDialogOpen(open)
+            if (!open) onOpenChange(false)
+          }}
         />
       )}
 

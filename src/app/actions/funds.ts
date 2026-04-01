@@ -204,8 +204,10 @@ export async function voidPayment(
     return { success: false, error: result.error || 'Failed to void payment' }
   }
 
-  revalidatePath('/payments')
-  revalidatePath('/accounts')
+  revalidatePath('/finances')
+  revalidatePath('/finances/payments')
+  revalidatePath('/finances/accounts')
+  revalidatePath('/dashboard')
 
   return { success: true, data: result }
 }
