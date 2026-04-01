@@ -262,3 +262,52 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
     return { success: false, error: 'An unexpected error occurred' }
   }
 }
+
+export async function updatePaymentNotes(
+  paymentId: string,
+  notes: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Not authenticated' }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (!profile) return { success: false, error: 'Profile not found' }
+
+  // Get payment to check unit
+  const { data: payment } = await supabase
+    .from('payments')
+    .select('unit_id, voided_at')
+    .eq('id', paymentId)
+    .single()
+  if (!payment) return { success: false, error: 'Payment not found' }
+  if (payment.voided_at) return { success: false, error: 'Cannot edit voided payment' }
+
+  // Check permission
+  const { data: membership } = await supabase
+    .from('unit_memberships')
+    .select('role')
+    .eq('unit_id', payment.unit_id)
+    .eq('profile_id', profile.id)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  if (!membership || !['admin', 'treasurer'].includes(membership.role)) {
+    return { success: false, error: 'Permission denied' }
+  }
+
+  const { error } = await supabase
+    .from('payments')
+    .update({ notes: notes.trim() || null })
+    .eq('id', paymentId)
+
+  if (error) return { success: false, error: 'Failed to update notes' }
+
+  revalidatePath('/finances/payments')
+  return { success: true }
+}
