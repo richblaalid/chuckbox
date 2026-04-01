@@ -1,4 +1,4 @@
--- Fix void_payment to handle payments without journal entries (legacy data)
+-- Fix void_payment: include entry_date in reversal journal entry
 CREATE OR REPLACE FUNCTION void_payment(
     p_payment_id UUID,
     p_voided_by UUID,
