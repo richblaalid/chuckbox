@@ -154,7 +154,10 @@ export function VoidPaymentDialog({
             Cancel
           </AlertDialogCancel>
           <AlertDialogAction
-            onClick={handleVoid}
+            onClick={(e) => {
+              e.preventDefault()
+              handleVoid()
+            }}
             disabled={!reason.trim() || isProcessing}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
