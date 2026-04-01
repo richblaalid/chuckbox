@@ -678,7 +678,7 @@ describe('Funds Actions', () => {
       expect(result.error).toBe('Cannot void Square payments - use Square dashboard for refunds')
     })
 
-    it('should return error when user is not admin', async () => {
+    it('should return error when user is not admin or treasurer', async () => {
       mockSupabase.auth.getUser.mockResolvedValue({
         data: { user: { id: 'user-123' } },
       })
@@ -716,7 +716,7 @@ describe('Funds Actions', () => {
             select: vi.fn().mockReturnThis(),
             eq: vi.fn().mockReturnThis(),
             maybeSingle: vi.fn().mockResolvedValue({
-              data: { role: 'treasurer' },
+              data: { role: 'leader' },
               error: null,
             }),
           }
@@ -731,7 +731,7 @@ describe('Funds Actions', () => {
       const result = await voidPayment('payment-123', 'Test reason')
 
       expect(result.success).toBe(false)
-      expect(result.error).toBe('Only admins can void payments')
+      expect(result.error).toBe('Only admins and treasurers can void payments')
     })
 
     it('should successfully void payment when admin', async () => {
