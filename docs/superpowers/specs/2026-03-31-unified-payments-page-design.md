@@ -62,7 +62,7 @@ A unified Payments page that is always visible to admin/treasurer roles, showing
 
 ### Filters
 
-- **Payment method**: All, Cash, Check, Card
+- **Payment method**: All, Cash, Check, Card, Square (shows all Square-linked transactions — both reconciled and unreconciled — useful for cross-referencing with Square's dashboard)
 - **Status**: All, Completed, Voided, Needs Reconciliation
 - **Date range**: 7 days, 30 days, 90 days, YTD, All Time (default: 30 days)
 - **Scout search**: Type-ahead text input to filter by scout name
