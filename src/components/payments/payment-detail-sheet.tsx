@@ -361,6 +361,7 @@ export function PaymentDetailSheet({
           }}
           open={reconcileDialogOpen}
           onOpenChange={setReconcileDialogOpen}
+          onReconciled={() => onOpenChange(false)}
           scouts={scouts}
           unitId={unitId}
         />

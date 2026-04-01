@@ -50,6 +50,7 @@ interface ReconcilePaymentDialogProps {
     } | null
   }>
   unitId: string
+  onReconciled?: () => void
 }
 
 interface OutstandingCharge {
@@ -111,6 +112,7 @@ export function ReconcilePaymentDialog({
   onOpenChange,
   scouts,
   unitId,
+  onReconciled,
 }: ReconcilePaymentDialogProps) {
   const router = useRouter()
 
@@ -236,6 +238,7 @@ export function ReconcilePaymentDialog({
 
       router.refresh()
       onOpenChange(false)
+      onReconciled?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -268,6 +271,7 @@ export function ReconcilePaymentDialog({
 
       router.refresh()
       onOpenChange(false)
+      onReconciled?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
