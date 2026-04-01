@@ -122,11 +122,11 @@ export function PaymentDetailSheet({
     ? row.scout_name || 'General Payment'
     : row.cardholder_name || 'Square Payment'
 
-  const amount = isPaymentRow(row) ? row.amount : row.amount_money
+  const amount = isPaymentRow(row) ? row.amount : row.amount_money / 100
   const date = isPaymentRow(row) ? row.created_at : row.square_created_at
   const notes = isPaymentRow(row) ? row.notes : row.note
-  const feeAmount = isPaymentRow(row) ? row.fee_amount : row.fee_money
-  const netAmount = isPaymentRow(row) ? row.net_amount : row.net_money
+  const feeAmount = isPaymentRow(row) ? row.fee_amount : (row.fee_money ?? 0) / 100
+  const netAmount = isPaymentRow(row) ? row.net_amount : row.net_money / 100
   const receiptUrl = isPaymentRow(row) ? row.square_receipt_url : row.receipt_url
   const isVoided = isPaymentRow(row) && !!row.voided_at
   const method = isPaymentRow(row) ? row.payment_method : (row.card_brand ? `${row.card_brand} ****${row.last_4}` : 'Card')
