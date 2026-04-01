@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { QuickPaymentDialog } from '@/components/payments/quick-payment-dialog'
+import { PaymentDetailSheet } from '@/components/payments/payment-detail-sheet'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import {
   RefreshCw,
@@ -445,10 +446,6 @@ export function UnifiedPaymentsList({
   const totalReceived = completedPayments.reduce((sum, p) => sum + p.amount, 0)
   const unreconciledCount = unreconciledSquareTransactions.length
 
-  // Keep selectedRow and sheetOpen referenced so TypeScript doesn't warn
-  void selectedRow
-  void sheetOpen
-
   return (
     <div className="space-y-6">
       {/* Square CTA Banner (no connection) */}
@@ -778,6 +775,16 @@ export function UnifiedPaymentsList({
           )}
         </CardContent>
       </Card>
+
+      {/* Payment Detail Sheet */}
+      <PaymentDetailSheet
+        row={selectedRow}
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        scouts={scouts}
+        unitId={unitId}
+        userRole={userRole}
+      />
     </div>
   )
 }

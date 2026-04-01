@@ -14,6 +14,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { canPerformAction } from '@/lib/roles'
 import { updatePaymentNotes } from '@/app/actions/payments'
 import { VoidPaymentDialog } from '@/components/payments/void-payment-dialog'
+import { ReconcilePaymentDialog } from '@/components/payments/reconcile-payment-dialog'
 import type { UnifiedRow, PaymentRow, UnreconciledRow } from '@/components/payments/unified-payments-list'
 import {
   Banknote,
@@ -95,8 +96,8 @@ export function PaymentDetailSheet({
   row,
   open,
   onOpenChange,
-  scouts: _scouts,
-  unitId: _unitId,
+  scouts,
+  unitId,
   userRole,
 }: PaymentDetailSheetProps) {
   const router = useRouter()
@@ -326,8 +327,6 @@ export function PaymentDetailSheet({
             )}
           </div>
 
-          {/* Placeholder: ReconcilePaymentDialog will be added in Task 11 */}
-          {reconcileDialogOpen && null}
         </SheetContent>
       </Sheet>
 
@@ -344,6 +343,26 @@ export function PaymentDetailSheet({
           }}
           open={voidDialogOpen}
           onOpenChange={setVoidDialogOpen}
+        />
+      )}
+
+      {/* Reconcile Dialog */}
+      {isUnreconciledRow(row) && (
+        <ReconcilePaymentDialog
+          transaction={{
+            id: row.id,
+            square_payment_id: row.square_payment_id,
+            amount_money: row.amount_money,
+            fee_money: row.fee_money,
+            net_money: row.net_money,
+            receipt_url: row.receipt_url,
+            cardholder_name: row.cardholder_name,
+            note: row.note,
+          }}
+          open={reconcileDialogOpen}
+          onOpenChange={setReconcileDialogOpen}
+          scouts={scouts}
+          unitId={unitId}
         />
       )}
     </>
