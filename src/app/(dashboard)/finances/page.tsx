@@ -430,7 +430,7 @@ export default async function FinancesOverviewPage() {
         </p>
       </div>
 
-      <FinanceSubnav showPaymentsTab={hasPaymentProcessor} />
+      <FinanceSubnav />
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">

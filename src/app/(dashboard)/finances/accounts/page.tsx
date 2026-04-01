@@ -329,7 +329,7 @@ export default async function AccountsPage() {
         </p>
       </div>
 
-      <FinanceSubnav showPaymentsTab={hasPaymentProcessor} />
+      <FinanceSubnav />
 
       {/* Undo Banner for recent imports */}
       {isFinancialRole(role) && latestBatch && canUndo && (

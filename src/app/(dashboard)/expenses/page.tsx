@@ -103,7 +103,7 @@ export default async function ExpensesPage() {
         </Button>
       </div>
 
-      <FinanceSubnav showPaymentsTab={hasPaymentProcessor} />
+      <FinanceSubnav />
 
       {/* Summary Cards for Financial Roles */}
       {hasFinancialRole && expenses && expenses.length > 0 && (

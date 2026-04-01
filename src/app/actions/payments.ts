@@ -185,6 +185,7 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
         payment_method: method,
         status: 'completed',
         journal_entry_id: journalEntry.id,
+        recorded_by: profile.id,
         notes: [reference ? `Check #${reference}` : null, notes].filter(Boolean).join(' - ') || null,
       })
       .select('id')

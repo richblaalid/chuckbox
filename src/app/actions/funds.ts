@@ -184,8 +184,8 @@ export async function voidPayment(
     return { success: false, error: 'Failed to verify permissions' }
   }
 
-  if (!membership || membership.role !== 'admin') {
-    return { success: false, error: 'Only admins can void payments' }
+  if (!membership || !['admin', 'treasurer'].includes(membership.role)) {
+    return { success: false, error: 'Only admins and treasurers can void payments' }
   }
 
   // Call the RPC function

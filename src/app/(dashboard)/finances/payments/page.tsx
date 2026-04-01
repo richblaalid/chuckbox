@@ -67,7 +67,7 @@ export default async function PaymentsPage() {
         </p>
       </div>
 
-      <FinanceSubnav showPaymentsTab />
+      <FinanceSubnav />
 
       <SquareHistoryTab unitId={membership.unit_id} />
     </div>

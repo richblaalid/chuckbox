@@ -1980,6 +1980,8 @@ export type Database = {
           void_reason: string | null
           voided_at: string | null
           voided_by: string | null
+          recorded_by: string | null
+          reconciliation_status: string | null
         }
         Insert: {
           amount: number
@@ -1998,6 +2000,8 @@ export type Database = {
           void_reason?: string | null
           voided_at?: string | null
           voided_by?: string | null
+          recorded_by?: string | null
+          reconciliation_status?: string | null
         }
         Update: {
           amount?: number
@@ -2016,6 +2020,8 @@ export type Database = {
           void_reason?: string | null
           voided_at?: string | null
           voided_by?: string | null
+          recorded_by?: string | null
+          reconciliation_status?: string | null
         }
         Relationships: [
           {
@@ -2042,6 +2048,13 @@ export type Database = {
           {
             foreignKeyName: "payments_voided_by_fkey"
             columns: ["voided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_recorded_by_fkey"
+            columns: ["recorded_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

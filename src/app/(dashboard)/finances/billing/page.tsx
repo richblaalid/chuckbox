@@ -196,7 +196,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
         </p>
       </div>
 
-      <FinanceSubnav showPaymentsTab={hasPaymentProcessor} />
+      <FinanceSubnav />
 
       {canTakeActions ? (
         <BillingManagementView
