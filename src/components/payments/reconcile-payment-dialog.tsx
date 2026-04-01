@@ -33,6 +33,7 @@ interface ReconcilePaymentDialogProps {
     amount_money: number
     fee_money: number | null
     net_money: number
+    square_created_at: string
     receipt_url: string | null
     cardholder_name: string | null
     note: string | null
@@ -225,6 +226,7 @@ export function ReconcilePaymentDialog({
         feeAmount: (transaction.fee_money || 0) / 100,
         netAmount: transaction.net_money / 100,
         squarePaymentId: transaction.square_payment_id,
+        squareCreatedAt: transaction.square_created_at,
         receiptUrl: transaction.receipt_url,
         allocations,
         notes: scoutNotes || undefined,
@@ -259,6 +261,7 @@ export function ReconcilePaymentDialog({
         feeAmount: (transaction.fee_money || 0) / 100,
         netAmount: transaction.net_money / 100,
         squarePaymentId: transaction.square_payment_id,
+        squareCreatedAt: transaction.square_created_at,
         receiptUrl: transaction.receipt_url,
         notes: notScoutNotes || undefined,
       })

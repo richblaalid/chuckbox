@@ -13,6 +13,7 @@ interface ReconcileToScoutParams {
   feeAmount: number    // in dollars
   netAmount: number    // in dollars
   squarePaymentId: string
+  squareCreatedAt: string  // original transaction date
   receiptUrl: string | null
   allocations?: Array<{ chargeId: string; amount: number }>
   notes?: string
@@ -26,6 +27,7 @@ interface ReconcileNotScoutParams {
   feeAmount: number
   netAmount: number
   squarePaymentId: string
+  squareCreatedAt: string  // original transaction date
   receiptUrl: string | null
   notes?: string
 }
@@ -153,6 +155,7 @@ export async function reconcileSquareTransaction(params: ReconcileParams): Promi
         net_amount: params.netAmount,
         payment_method: 'card',
         status: 'completed',
+        created_at: params.squareCreatedAt,
         journal_entry_id: journalEntry.id,
         square_payment_id: params.squarePaymentId,
         square_receipt_url: params.receiptUrl,

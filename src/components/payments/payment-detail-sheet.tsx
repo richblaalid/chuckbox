@@ -355,6 +355,7 @@ export function PaymentDetailSheet({
             amount_money: row.amount_money,
             fee_money: row.fee_money,
             net_money: row.net_money,
+            square_created_at: row.square_created_at,
             receipt_url: row.receipt_url,
             cardholder_name: row.cardholder_name,
             note: row.note,
