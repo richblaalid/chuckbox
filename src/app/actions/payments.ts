@@ -123,8 +123,9 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
 
     if (journalError || !journalEntry) {
       console.error('Failed to create journal entry:', journalError)
-      return { success: false, error: 'Failed to create payment record' }
+      return { success: false, error: 'Failed to create journal entry: ' + (journalError?.message || 'unknown') }
     }
+    console.log('Journal entry created:', journalEntry.id)
 
     // Get required accounts (bank and accounts receivable)
     const { data: accounts } = await supabase
@@ -193,7 +194,7 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
 
     if (paymentError) {
       console.error('Failed to create payment record:', paymentError)
-      // Don't rollback journal - the accounting is correct
+      return { success: false, error: 'Failed to create payment record: ' + paymentError.message }
     }
 
     // Persist charge allocations (supplementary — does not fail the payment)
