@@ -230,6 +230,7 @@ export function ReconcilePaymentDialog({
         receiptUrl: transaction.receipt_url,
         allocations,
         notes: scoutNotes || undefined,
+        entryDate: new Date().toLocaleDateString('en-CA'),
       })
 
       if (!result.success) {
@@ -264,6 +265,7 @@ export function ReconcilePaymentDialog({
         squareCreatedAt: transaction.square_created_at,
         receiptUrl: transaction.receipt_url,
         notes: notScoutNotes || undefined,
+        entryDate: new Date().toLocaleDateString('en-CA'),
       })
 
       if (!result.success) {

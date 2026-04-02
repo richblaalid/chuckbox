@@ -359,6 +359,7 @@ export function QuickPaymentForm({
         allocations: effectiveAllocations.length > 0
           ? effectiveAllocations.map((a) => ({ chargeId: a.chargeId, amount: a.amount }))
           : undefined,
+        entryDate: new Date().toLocaleDateString('en-CA'),
       })
 
       if (!result.success) {

@@ -3,8 +3,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { formatCurrency } from '@/lib/utils'
-import { todayLocalDate } from '@/lib/date-utils'
-
 interface QuickPaymentParams {
   unitId: string
   scoutAccountId: string
@@ -14,6 +12,7 @@ interface QuickPaymentParams {
   reference?: string
   notes?: string
   allocations?: Array<{ chargeId: string; amount: number }>
+  entryDate?: string  // YYYY-MM-DD from client's local timezone
 }
 
 interface ActionResult {
@@ -82,7 +81,7 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
   }
 
   try {
-    const paymentDate = todayLocalDate()
+    const paymentDate = params.entryDate || new Date().toISOString().split('T')[0]
 
     // Build enriched description with allocation details when charges are specified
     let journalDescription = `${method.charAt(0).toUpperCase() + method.slice(1)} payment from ${scoutName}`

@@ -2,7 +2,6 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { todayLocalDate } from '@/lib/date-utils'
 
 interface ReconcileToScoutParams {
   type: 'scout'
@@ -18,6 +17,7 @@ interface ReconcileToScoutParams {
   receiptUrl: string | null
   allocations?: Array<{ chargeId: string; amount: number }>
   notes?: string
+  entryDate?: string  // YYYY-MM-DD from client's local timezone
 }
 
 interface ReconcileNotScoutParams {
@@ -31,6 +31,7 @@ interface ReconcileNotScoutParams {
   squareCreatedAt: string  // original transaction date
   receiptUrl: string | null
   notes?: string
+  entryDate?: string  // YYYY-MM-DD from client's local timezone
 }
 
 type ReconcileParams = ReconcileToScoutParams | ReconcileNotScoutParams
@@ -79,7 +80,7 @@ export async function reconcileSquareTransaction(params: ReconcileParams): Promi
   if (sqTxn.payment_id) return { success: false, error: 'Transaction already reconciled' }
 
   try {
-    const paymentDate = todayLocalDate()
+    const paymentDate = params.entryDate || new Date().toISOString().split('T')[0]
 
     const isScout = params.type === 'scout'
     const creditAccountCode = isScout ? '1200' : '4900'
