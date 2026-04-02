@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { revalidatePath } from 'next/cache'
 
 // Mock Next.js cache functions
 vi.mock('next/cache', () => ({
@@ -858,6 +859,190 @@ describe('Funds Actions', () => {
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('RPC failed')
+    })
+
+    it('should successfully void payment when treasurer', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'user-123' } },
+      })
+
+      let callCount = 0
+      mockSupabase.from.mockImplementation((table: string) => {
+        callCount++
+        if (table === 'profiles' && callCount === 1) {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: 'profile-123' },
+              error: null,
+            }),
+          }
+        }
+        if (table === 'payments') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                id: 'payment-123',
+                unit_id: 'unit-456',
+                voided_at: null,
+                square_payment_id: null,
+              },
+              error: null,
+            }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { role: 'treasurer' },
+              error: null,
+            }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      mockSupabase.rpc.mockResolvedValue({
+        data: { success: true, reversal_entry_id: 'reversal-456' },
+        error: null,
+      })
+
+      const result = await voidPayment('payment-123', 'Test reason')
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should return error when RPC returns failure result', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'user-123' } },
+      })
+
+      let callCount = 0
+      mockSupabase.from.mockImplementation((table: string) => {
+        callCount++
+        if (table === 'profiles' && callCount === 1) {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: 'profile-123' },
+              error: null,
+            }),
+          }
+        }
+        if (table === 'payments') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                id: 'payment-123',
+                unit_id: 'unit-456',
+                voided_at: null,
+                square_payment_id: null,
+              },
+              error: null,
+            }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { role: 'admin' },
+              error: null,
+            }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      mockSupabase.rpc.mockResolvedValue({
+        data: { success: false, error: 'Payment not found' },
+        error: null,
+      })
+
+      const result = await voidPayment('payment-123', 'Test reason')
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Payment not found')
+    })
+
+    it('should revalidate correct finance paths after successful void', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'user-123' } },
+      })
+
+      let callCount = 0
+      mockSupabase.from.mockImplementation((table: string) => {
+        callCount++
+        if (table === 'profiles' && callCount === 1) {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: 'profile-123' },
+              error: null,
+            }),
+          }
+        }
+        if (table === 'payments') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                id: 'payment-123',
+                unit_id: 'unit-456',
+                voided_at: null,
+                square_payment_id: null,
+              },
+              error: null,
+            }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { role: 'admin' },
+              error: null,
+            }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      mockSupabase.rpc.mockResolvedValue({
+        data: { success: true, reversal_entry_id: 'reversal-789' },
+        error: null,
+      })
+
+      await voidPayment('payment-123', 'Test reason')
+
+      expect(revalidatePath).toHaveBeenCalledWith('/finances')
+      expect(revalidatePath).toHaveBeenCalledWith('/finances/payments')
+      expect(revalidatePath).toHaveBeenCalledWith('/finances/accounts')
+      expect(revalidatePath).toHaveBeenCalledWith('/dashboard')
     })
   })
 })
