@@ -406,6 +406,10 @@ export function QuickPaymentForm({
       setError('Minimum card payment is $1.00')
       return
     }
+    if (chargesLoaded && outstandingCharges.length === 0 && !inlineBillingDescription.trim()) {
+      setError('Please create a billing record for this payment')
+      return
+    }
 
     setIsSubmitting(true)
     setError(null)
@@ -575,33 +579,31 @@ export function QuickPaymentForm({
         </div>
       )}
 
-      {/* Inline Billing Creation (shown when scout has no outstanding charges) */}
+      {/* Inline Billing Creation (required when scout has no outstanding charges) */}
       {selectedScoutId && chargesLoaded && outstandingCharges.length === 0 && (
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-2">
-          <p className="text-sm text-amber-800">No outstanding bill found for this scout.</p>
-          {!showInlineBilling ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowInlineBilling(true)}
-            >
-              Create billing record for this payment
-            </Button>
-          ) : (
-            <div className="space-y-2">
-              <Input
-                placeholder="Description (e.g., Summer Camp Deposit)"
-                value={inlineBillingDescription}
-                onChange={(e) => setInlineBillingDescription(e.target.value)}
-              />
-              <Input
-                type="date"
-                value={inlineBillingDate}
-                onChange={(e) => setInlineBillingDate(e.target.value)}
-              />
-            </div>
-          )}
+          <p className="text-sm font-medium text-amber-800">
+            A billing record is required for this payment.
+          </p>
+          <p className="text-xs text-amber-700">
+            Describe what this payment is for so it can be tracked and reversed if needed.
+          </p>
+          <div className="space-y-2">
+            <Input
+              placeholder="Description (e.g., Summer Camp Deposit)"
+              value={inlineBillingDescription}
+              onChange={(e) => {
+                setInlineBillingDescription(e.target.value)
+                if (!showInlineBilling) setShowInlineBilling(true)
+              }}
+              required
+            />
+            <Input
+              type="date"
+              value={inlineBillingDate}
+              onChange={(e) => setInlineBillingDate(e.target.value)}
+            />
+          </div>
         </div>
       )}
 
@@ -822,7 +824,8 @@ export function QuickPaymentForm({
               isSubmitting ||
               !selectedScoutId ||
               parsedAmount <= 0 ||
-              (!fundsCoverAll && method === 'card' && !cardInitialized)
+              (!fundsCoverAll && method === 'card' && !cardInitialized) ||
+              (chargesLoaded && outstandingCharges.length === 0 && !inlineBillingDescription.trim())
             }
           >
             {isSubmitting ? (
