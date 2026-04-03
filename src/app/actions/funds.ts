@@ -104,13 +104,21 @@ export async function adjustScoutFunds(
     : `${fundraiserTypeName} ${directionLabel} - ${scoutName}`
 
   // Call the appropriate RPC based on direction
-  const rpcName = direction === 'remove' ? 'debit_funds_from_scout' : 'credit_fundraising_to_scout'
-  const { data, error } = await supabase.rpc(rpcName, {
-    p_scout_account_id: scoutAccountId,
-    p_amount: amount,
-    p_description: description,
-    p_fundraiser_type: fundraiserTypeName,
-  })
+  // Note: debit_funds_from_scout is not yet in generated types — cast needed until types are regenerated
+  const { data, error } = direction === 'remove'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ? await (supabase as any).rpc('debit_funds_from_scout', {
+        p_scout_account_id: scoutAccountId,
+        p_amount: amount,
+        p_description: description,
+        p_fundraiser_type: fundraiserTypeName,
+      })
+    : await supabase.rpc('credit_fundraising_to_scout', {
+        p_scout_account_id: scoutAccountId,
+        p_amount: amount,
+        p_description: description,
+        p_fundraiser_type: fundraiserTypeName,
+      })
 
   if (error) {
     return { success: false, error: error.message }

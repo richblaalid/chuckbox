@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { PaymentModal } from './payment-modal'
 import { SendPaymentRequestModal } from './send-payment-request-modal'
 import { UseFundsModal } from './use-funds-modal'
-import { AddFundsModal } from './add-funds-modal'
+import { AdjustFundsModal } from './adjust-funds-modal'
 import { QuickPaymentDialog } from '@/components/payments/quick-payment-dialog'
 import { Wallet } from 'lucide-react'
 
@@ -124,9 +124,9 @@ export function AccountActions({
             />
           )}
 
-          {/* Financial role: Add Funds - always available */}
+          {/* Financial role: Adjust Funds - always available */}
           {isFinancialRole && unitId && (
-            <AddFundsModal
+            <AdjustFundsModal
               scoutAccountId={scoutAccountId}
               scoutName={scoutName}
               currentFundsBalance={fundsBalance}

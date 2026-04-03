@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/utils'
-import { addFundsToScout } from '@/app/actions/funds'
+import { adjustScoutFunds } from '@/app/actions/funds'
 import { AlertCircle, CheckCircle2, Plus } from 'lucide-react'
 
 interface Scout {
@@ -107,9 +107,10 @@ export function AddFundsForm({
     setError(null)
 
     try {
-      const result = await addFundsToScout(
+      const result = await adjustScoutFunds(
         scoutAccount.id,
         parsedAmount,
+        'add',
         fundraiserTypeId || undefined,
         notes.trim() || undefined
       )
