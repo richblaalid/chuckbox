@@ -144,12 +144,12 @@ describe('roles', () => {
     })
 
     describe('void_payments', () => {
-      it('should only allow admin to void payments', () => {
+      it('should allow admin and treasurer to void payments', () => {
         expect(canPerformAction('admin', 'void_payments')).toBe(true)
+        expect(canPerformAction('treasurer', 'void_payments')).toBe(true)
       })
 
-      it('should deny all other roles from voiding payments', () => {
-        expect(canPerformAction('treasurer', 'void_payments')).toBe(false)
+      it('should deny non-financial roles from voiding payments', () => {
         expect(canPerformAction('leader', 'void_payments')).toBe(false)
         expect(canPerformAction('parent', 'void_payments')).toBe(false)
         expect(canPerformAction('scout', 'void_payments')).toBe(false)

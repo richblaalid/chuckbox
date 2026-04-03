@@ -1,23 +1,19 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import { Receipt, PiggyBank, Bell, Download, X } from 'lucide-react'
+import { Receipt, Bell, X } from 'lucide-react'
 
 interface BulkActionBarProps {
   selectedCount: number
   onBillSelected: () => void
-  onAddFunds: () => void
   onSendReminders: () => void
-  onExport: () => void
   onClearSelection: () => void
 }
 
 export function BulkActionBar({
   selectedCount,
   onBillSelected,
-  onAddFunds,
   onSendReminders,
-  onExport,
   onClearSelection,
 }: BulkActionBarProps) {
   if (selectedCount === 0) {
@@ -50,20 +46,10 @@ export function BulkActionBar({
           <span className="hidden sm:inline">Bill Selected</span>
           <span className="sm:hidden">Bill</span>
         </Button>
-        <Button variant="outline" size="sm" onClick={onAddFunds}>
-          <PiggyBank className="h-3.5 w-3.5 sm:mr-1.5" />
-          <span className="hidden sm:inline">Add Funds</span>
-          <span className="sm:hidden">Funds</span>
-        </Button>
         <Button variant="outline" size="sm" onClick={onSendReminders}>
           <Bell className="h-3.5 w-3.5 sm:mr-1.5" />
           <span className="hidden sm:inline">Send Reminders</span>
           <span className="sm:hidden">Remind</span>
-        </Button>
-        <Button variant="outline" size="sm" onClick={onExport}>
-          <Download className="h-3.5 w-3.5 sm:mr-1.5" />
-          <span className="hidden sm:inline">Export</span>
-          <span className="sm:hidden">Export</span>
         </Button>
         {/* Clear button visible on desktop */}
         <Button

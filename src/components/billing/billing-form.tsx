@@ -1,15 +1,19 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { ToggleButtonGroup } from '@/components/ui/toggle-button-group'
 import { useToast } from '@/components/ui/toast'
 import { formatCurrency } from '@/lib/utils'
 import { trackBillingCreated } from '@/lib/analytics'
+import { validateLineItems, validateDeposit } from '@/lib/billing-validation'
+import type { LineItem } from '@/lib/billing-validation'
+import { Plus, X } from 'lucide-react'
 
 const BILLING_TYPE_KEY = 'chuckbox:billing:lastType'
 
@@ -45,6 +49,12 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
   const [description, setDescription] = useState('')
   const [billingType, setBillingType] = useState<BillingType>('fixed')
   const [sendNotifications, setSendNotifications] = useState(false)
+  const [scoutSearch, setScoutSearch] = useState('')
+  const [lineItems, setLineItems] = useState<LineItem[]>([])
+  const [showLineItems, setShowLineItems] = useState(false)
+  const [showDeposit, setShowDeposit] = useState(false)
+  const [depositAmount, setDepositAmount] = useState('')
+  const [depositDueDate, setDepositDueDate] = useState('')
 
   // Load saved billing type preference on mount
   useEffect(() => {
@@ -97,14 +107,6 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
     setSelectedScouts(newSelected)
   }
 
-  const selectAll = () => {
-    setSelectedScouts(new Set(scouts.map((s) => s.id)))
-  }
-
-  const selectNone = () => {
-    setSelectedScouts(new Set())
-  }
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
@@ -120,6 +122,26 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
       setError('Please enter a valid amount')
       setIsLoading(false)
       return
+    }
+
+    // Validate line items if shown
+    if (showLineItems && lineItems.length > 0) {
+      const lineItemError = validateLineItems(lineItems, parsedAmount)
+      if (lineItemError) {
+        setError(lineItemError)
+        setIsLoading(false)
+        return
+      }
+    }
+
+    // Validate deposit if shown
+    if (showDeposit) {
+      const depositError = validateDeposit(depositAmount, depositDueDate, parsedAmount)
+      if (depositError) {
+        setError(depositError)
+        setIsLoading(false)
+        return
+      }
     }
 
     const supabase = createClient()
@@ -164,6 +186,25 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
         throw new Error('Failed to create billing record')
       }
 
+      // Persist line items and deposit fields if provided
+      if ((showLineItems && lineItems.length > 0) || (showDeposit && depositAmount)) {
+        const { error: updateError } = await supabase
+          .from('billing_records')
+          .update({
+            line_items: showLineItems && lineItems.length > 0
+              ? lineItems.map((li) => ({ description: li.description, amount: li.amount }))
+              : null,
+            deposit_amount: showDeposit && depositAmount ? parseFloat(depositAmount) : null,
+            deposit_due_date: showDeposit && depositDueDate ? depositDueDate : null,
+          })
+          .eq('id', result.billing_record_id)
+
+        if (updateError) {
+          console.error('Failed to save line items/deposit:', updateError)
+          // Don't fail the whole operation - billing record was created successfully
+        }
+      }
+
       // Track billing event
       trackBillingCreated({
         total: totalAmount,
@@ -195,6 +236,11 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
       setDescription('')
       setSelectedScouts(new Set())
       setSendNotifications(false)
+      setLineItems([])
+      setShowLineItems(false)
+      setShowDeposit(false)
+      setDepositAmount('')
+      setDepositDueDate('')
 
       // Call onSuccess callback or refresh
       if (onSuccess) {
@@ -214,22 +260,69 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
     }
   }
 
-  // Group scouts by patrol
-  const patrolGroups = scouts.reduce(
-    (groups, scout) => {
+  // Filter scouts by search
+  const filteredScouts = useMemo(() => {
+    if (!scoutSearch) return scouts
+    const query = scoutSearch.toLowerCase()
+    return scouts.filter((s) =>
+      `${s.first_name} ${s.last_name}`.toLowerCase().includes(query)
+    )
+  }, [scouts, scoutSearch])
+
+  const filteredScoutIds = useMemo(() => new Set(filteredScouts.map((s) => s.id)), [filteredScouts])
+
+  // Group scouts by patrol, sorted alphabetically (No Patrol last), scouts by last name
+  const patrolGroups = useMemo(() => {
+    const groups: Record<string, Scout[]> = {}
+    for (const scout of scouts) {
       const patrol = scout.patrols?.name || 'No Patrol'
-      if (!groups[patrol]) {
-        groups[patrol] = []
-      }
+      if (!groups[patrol]) groups[patrol] = []
       groups[patrol].push(scout)
-      return groups
-    },
-    {} as Record<string, Scout[]>
-  )
+    }
+    // Sort scouts within each patrol by last name, then first name
+    for (const patrol of Object.keys(groups)) {
+      groups[patrol].sort((a, b) =>
+        a.last_name.localeCompare(b.last_name) || a.first_name.localeCompare(b.first_name)
+      )
+    }
+    // Return entries sorted: alphabetical patrols first, "No Patrol" last
+    const sorted = Object.entries(groups).sort(([a], [b]) => {
+      if (a === 'No Patrol') return 1
+      if (b === 'No Patrol') return -1
+      return a.localeCompare(b)
+    })
+    return Object.fromEntries(sorted)
+  }, [scouts])
+
+  const selectAll = () => {
+    const newSelected = new Set(selectedScouts)
+    filteredScouts.forEach((s) => newSelected.add(s.id))
+    setSelectedScouts(newSelected)
+  }
+
+  const selectNone = () => {
+    const newSelected = new Set(selectedScouts)
+    filteredScouts.forEach((s) => newSelected.delete(s.id))
+    setSelectedScouts(newSelected)
+  }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Billing Type Toggle */}
+    <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+      {/* Scrollable form body */}
+      <div className="flex-1 overflow-y-auto space-y-6 pr-1">
+      {/* 1. Description */}
+      <div className="space-y-2">
+        <Label htmlFor="description">Description *</Label>
+        <Input
+          id="description"
+          required
+          placeholder={billingType === 'split' ? 'e.g., Summer Camp 2026' : 'e.g., Annual Dues 2026'}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
+      </div>
+
+      {/* 2. Billing Type Toggle */}
       <div className="space-y-2">
         <Label>Billing Type</Label>
         <div className="ml-4 mt-3">
@@ -250,43 +343,185 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
         </p>
       </div>
 
-      {/* Amount and Description */}
-      <div className="flex gap-4">
-        <div className="w-40 shrink-0 space-y-2">
-          <Label htmlFor="amount">
-            {billingType === 'split' ? 'Total Amount' : 'Per Scout'} *
-          </Label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 dark:text-stone-400">
-              $
-            </span>
-            <Input
-              id="amount"
-              type="number"
-              step="0.01"
-              min="0"
-              required
-              className="pl-7 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              onWheel={(e) => e.currentTarget.blur()}
-            />
-          </div>
-        </div>
-        <div className="flex-1 space-y-2">
-          <Label htmlFor="description">Description *</Label>
+      {/* 3. Amount */}
+      <div className="w-40 space-y-2">
+        <Label htmlFor="amount">
+          {billingType === 'split' ? 'Total Amount' : 'Per Scout'} *
+        </Label>
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 dark:text-stone-400">
+            $
+          </span>
           <Input
-            id="description"
+            id="amount"
+            type="number"
+            step="0.01"
+            min="0"
             required
-            placeholder={billingType === 'split' ? 'e.g., Summer Camp 2024' : 'e.g., Annual Dues 2024'}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            className="pl-7 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            placeholder="0.00"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            onWheel={(e) => e.currentTarget.blur()}
           />
         </div>
       </div>
 
-      {/* Scout Selection */}
+      {/* 3b. Line Items (optional) */}
+      {!showLineItems ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            setShowLineItems(true)
+            setLineItems([{ description: '', amount: 0 }])
+          }}
+        >
+          <Plus className="mr-1 h-4 w-4" />
+          Add itemized breakdown
+        </Button>
+      ) : (
+        <div className="space-y-3 rounded-lg border border-stone-200 dark:border-stone-700 p-4">
+          <div className="flex items-center justify-between">
+            <Label>Line Items</Label>
+            <button
+              type="button"
+              onClick={() => {
+                setShowLineItems(false)
+                setLineItems([])
+              }}
+              className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+              aria-label="Close line items"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          {lineItems.map((item, index) => (
+            <div key={index} className="flex items-center gap-2">
+              <Input
+                placeholder="Description"
+                value={item.description}
+                onChange={(e) => {
+                  const updated = [...lineItems]
+                  updated[index] = { ...updated[index], description: e.target.value }
+                  setLineItems(updated)
+                }}
+                className="flex-1"
+              />
+              <div className="relative w-28">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 dark:text-stone-400">
+                  $
+                </span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={item.amount || ''}
+                  onChange={(e) => {
+                    const updated = [...lineItems]
+                    updated[index] = { ...updated[index], amount: parseFloat(e.target.value) || 0 }
+                    setLineItems(updated)
+                  }}
+                  onWheel={(e) => e.currentTarget.blur()}
+                  className="pl-7 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setLineItems(lineItems.filter((_, i) => i !== index))
+                }}
+                className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+                aria-label="Remove line item"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setLineItems([...lineItems, { description: '', amount: 0 }])}
+          >
+            <Plus className="mr-1 h-4 w-4" />
+            Add line item
+          </Button>
+          {lineItems.length > 0 && (
+            <p
+              className={`text-sm ${
+                Math.abs(lineItems.reduce((sum, li) => sum + li.amount, 0) - parsedAmount) > 0.01
+                  ? 'text-red-600 dark:text-red-400'
+                  : 'text-stone-500 dark:text-stone-400'
+              }`}
+            >
+              Line items total: {formatCurrency(lineItems.reduce((sum, li) => sum + li.amount, 0))}
+              {parsedAmount > 0 && ` / ${formatCurrency(parsedAmount)}`}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* 3c. Deposit Requirement (optional) */}
+      {!showDeposit ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowDeposit(true)}
+        >
+          <Plus className="mr-1 h-4 w-4" />
+          Add deposit requirement
+        </Button>
+      ) : (
+        <div className="flex items-center gap-3 rounded-lg border border-stone-200 dark:border-stone-700 p-4">
+          <div className="space-y-1">
+            <Label htmlFor="deposit-amount">Deposit Amount</Label>
+            <div className="relative w-32">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 dark:text-stone-400">
+                $
+              </span>
+              <Input
+                id="deposit-amount"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+                value={depositAmount}
+                onChange={(e) => setDepositAmount(e.target.value)}
+                onWheel={(e) => e.currentTarget.blur()}
+                className="pl-7 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="deposit-due-date">Due Date</Label>
+            <Input
+              id="deposit-due-date"
+              type="date"
+              value={depositDueDate}
+              onChange={(e) => setDepositDueDate(e.target.value)}
+              className="w-40"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setShowDeposit(false)
+              setDepositAmount('')
+              setDepositDueDate('')
+            }}
+            className="ml-auto self-start text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+            aria-label="Close deposit"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* 4. Scout Selection */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <Label>Select Scouts ({selectedScouts.size} selected)</Label>
@@ -309,77 +544,81 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
           </div>
         </div>
 
+        <Input
+          placeholder="Search scouts..."
+          value={scoutSearch}
+          onChange={(e) => setScoutSearch(e.target.value)}
+          className="mb-2"
+        />
+
         <div className="max-h-64 overflow-y-auto rounded-lg border border-stone-200 dark:border-stone-700 p-4">
-          {Object.entries(patrolGroups).map(([patrol, patrolScouts]) => (
-            <div key={patrol} className="mb-4 last:mb-0">
-              <h4 className="mb-2 text-sm font-medium text-stone-500 dark:text-stone-400">{patrol}</h4>
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {patrolScouts.map((scout) => (
-                  <label
-                    key={scout.id}
-                    className={`flex cursor-pointer items-center gap-2 rounded-md border p-2 transition-colors ${
-                      selectedScouts.has(scout.id)
-                        ? 'border-forest-600 bg-forest-50 dark:border-forest-500 dark:bg-forest-900/30'
-                        : 'border-stone-200 hover:bg-stone-50 dark:border-stone-700 dark:hover:bg-stone-800'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedScouts.has(scout.id)}
-                      onChange={() => toggleScout(scout.id)}
-                      className="checkbox-native"
-                    />
-                    <span className="text-sm text-stone-700 dark:text-stone-200">
-                      {scout.first_name} {scout.last_name}
-                    </span>
-                  </label>
-                ))}
+          {Object.entries(patrolGroups).map(([patrol, patrolScouts]) => {
+            const visiblePatrolScouts = patrolScouts.filter((s) => filteredScoutIds.has(s.id))
+            if (visiblePatrolScouts.length === 0) return null
+
+            const allSelected = visiblePatrolScouts.every((s) => selectedScouts.has(s.id))
+            const someSelected = visiblePatrolScouts.some((s) => selectedScouts.has(s.id))
+
+            return (
+              <div key={patrol} className="mb-4 last:mb-0">
+                <label className="flex items-center gap-2 mb-2 cursor-pointer">
+                  <Checkbox
+                    checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                    onCheckedChange={(checked) => {
+                      const newSelected = new Set(selectedScouts)
+                      visiblePatrolScouts.forEach((s) => {
+                        if (checked) newSelected.add(s.id)
+                        else newSelected.delete(s.id)
+                      })
+                      setSelectedScouts(newSelected)
+                    }}
+                  />
+                  <span className="text-sm font-medium text-stone-700 dark:text-stone-400">
+                    {patrol}
+                  </span>
+                </label>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {visiblePatrolScouts.map((scout) => (
+                    <label
+                      key={scout.id}
+                      className={`flex cursor-pointer items-center gap-2 rounded-md border p-2 transition-colors ${
+                        selectedScouts.has(scout.id)
+                          ? 'border-forest-600 bg-forest-50 dark:border-forest-500 dark:bg-forest-900/30'
+                          : 'border-stone-200 hover:bg-stone-50 dark:border-stone-700 dark:hover:bg-stone-800'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedScouts.has(scout.id)}
+                        onChange={() => toggleScout(scout.id)}
+                        className="checkbox-native"
+                      />
+                      <span className="text-sm text-stone-700 dark:text-stone-200">
+                        {scout.first_name} {scout.last_name}
+                      </span>
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
-      {/* Summary */}
+      {/* 5. Cost Preview */}
       {selectedScouts.size > 0 && parsedAmount > 0 && (
-        <div className="rounded-lg bg-stone-50 dark:bg-stone-800 p-4">
-          <h4 className="font-medium text-stone-900 dark:text-stone-100">Billing Summary</h4>
-          <div className="mt-3 space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-stone-500 dark:text-stone-400">Billing Type:</span>
-              <span className="font-medium text-stone-700 dark:text-stone-200">
-                {billingType === 'split' ? 'Split Total' : 'Fixed Amount Per Scout'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-stone-500 dark:text-stone-400">Scouts Selected:</span>
-              <span className="font-medium text-stone-700 dark:text-stone-200">{selectedScouts.size}</span>
-            </div>
-            <div className="border-t border-stone-200 dark:border-stone-700 pt-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-stone-500 dark:text-stone-400">Amount Per Scout:</span>
-                <span className={`font-medium ${billingType === 'fixed' ? 'text-stone-900 dark:text-stone-100' : 'text-forest-700 dark:text-forest-400'}`}>
-                  {formatCurrency(perScoutAmount)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-stone-500 dark:text-stone-400">Total Amount:</span>
-                <span className={`font-medium ${billingType === 'split' ? 'text-stone-900 dark:text-stone-100' : 'text-forest-700 dark:text-forest-400'}`}>
-                  {formatCurrency(totalAmount)}
-                </span>
-              </div>
-            </div>
-            {billingType === 'split' && (
-              <p className="text-xs text-stone-500 dark:text-stone-400">
-                {formatCurrency(parsedAmount)} ÷ {selectedScouts.size} scouts = {formatCurrency(perScoutAmount)} each
-              </p>
-            )}
-            {billingType === 'fixed' && (
-              <p className="text-xs text-stone-500 dark:text-stone-400">
-                {formatCurrency(parsedAmount)} × {selectedScouts.size} scouts = {formatCurrency(totalAmount)} total
-              </p>
-            )}
-          </div>
+        <div className="rounded-md border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 p-3 text-sm">
+          {billingType === 'fixed' ? (
+            <span className="text-stone-700 dark:text-stone-200">
+              {selectedScouts.size} scout{selectedScouts.size !== 1 ? 's' : ''} selected &middot; {formatCurrency(parsedAmount)} each &middot;{' '}
+              <strong>Total: {formatCurrency(parsedAmount * selectedScouts.size)}</strong>
+            </span>
+          ) : (
+            <span className="text-stone-700 dark:text-stone-200">
+              {selectedScouts.size} scout{selectedScouts.size !== 1 ? 's' : ''} selected &middot; {formatCurrency(parsedAmount)} &divide; {selectedScouts.size} ={' '}
+              <strong>{formatCurrency(parsedAmount / selectedScouts.size)}/scout</strong>
+            </span>
+          )}
         </div>
       )}
 
@@ -389,10 +628,12 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
           {error}
         </div>
       )}
+      </div>
 
-      {/* Notification Option */}
-      {selectedScouts.size > 0 && parsedAmount > 0 && (
-        <div className="rounded-lg border border-stone-200 dark:border-stone-700 p-4">
+      {/* Sticky footer — always visible */}
+      <div className="shrink-0 border-t border-stone-200 dark:border-stone-700 pt-4 mt-4 space-y-3">
+        {/* 6. Notification Option */}
+        {selectedScouts.size > 0 && parsedAmount > 0 && (
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
@@ -401,17 +642,15 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
               className="checkbox-native mt-0.5"
             />
             <div>
-              <span className="font-medium text-stone-900 dark:text-stone-100">Send payment notifications to parents</span>
-              <p className="text-sm text-stone-500 dark:text-stone-400 mt-0.5">
+              <span className="text-sm font-medium text-stone-900 dark:text-stone-100">Send payment notifications to parents</span>
+              <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
                 Each parent will receive an email with the charge details and a payment link
               </p>
             </div>
           </label>
-        </div>
-      )}
+        )}
 
-      {/* Submit */}
-      <div className="space-y-2">
+        {/* 7. Submit */}
         <Button
           type="submit"
           loading={isLoading}
@@ -422,7 +661,7 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
           Create Billing
         </Button>
         <p className="text-xs text-center text-stone-400 dark:text-stone-500">
-          Tip: Press ⌘+Enter (Mac) or Ctrl+Enter to submit
+          ⌘+Enter to submit
         </p>
       </div>
     </form>

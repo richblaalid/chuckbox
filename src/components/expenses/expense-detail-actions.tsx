@@ -50,15 +50,15 @@ export function ExpenseDetailActions({
         {canReview && (
           <>
             <Button
-              className="border-green-200 text-green-700 hover:bg-green-50 hover:text-green-800"
-              variant="outline"
+              variant="default"
+              size="sm"
               onClick={() => setApprovalMode('approve')}
             >
               Approve
             </Button>
             <Button
-              className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
-              variant="outline"
+              variant="destructive"
+              size="sm"
               onClick={() => setApprovalMode('reject')}
             >
               Reject
@@ -67,8 +67,8 @@ export function ExpenseDetailActions({
         )}
         {canMarkPaid && (
           <Button
-            className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
-            variant="outline"
+            variant="default"
+            size="sm"
             onClick={() => setShowPaymentDialog(true)}
           >
             Mark Paid

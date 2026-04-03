@@ -6,12 +6,13 @@ import Link from 'next/link'
 import { UnifiedScoutAccountsTable, ScoutAccountRow } from './unified-scout-accounts-table'
 import { BulkActionBar } from './bulk-action-bar'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { BillingForm } from '@/components/billing/billing-form'
 import { QuickPaymentForm } from '@/components/payments/quick-payment-form'
 import { BulkReminderWrapper } from './bulk-reminder-wrapper'
 import { SendPaymentRequestModal } from '@/components/accounts/send-payment-request-modal'
-import { Receipt, Upload } from 'lucide-react'
+import { AdjustFundsModal } from '@/components/accounts/adjust-funds-modal'
+import { Upload } from 'lucide-react'
 
 interface Scout {
   id: string
@@ -66,22 +67,12 @@ export function UnifiedAccountsView({
   // Individual action dialog states
   const [actionScout, setActionScout] = useState<ScoutAccountRow | null>(null)
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
-  const [isIndividualBillingOpen, setIsIndividualBillingOpen] = useState(false)
   const [isIndividualReminderOpen, setIsIndividualReminderOpen] = useState(false)
+  const [isAdjustFundsOpen, setIsAdjustFundsOpen] = useState(false)
 
   // Navigate to account detail on row click
   const handleScoutSelect = (scout: ScoutAccountRow) => {
     router.push(`/finances/accounts/${scout.id}`)
-  }
-
-  const handleBillSelected = () => {
-    setIsBillingOpen(true)
-  }
-
-  const handleSuccess = () => {
-    router.refresh()
-    setIsBillingOpen(false)
-    setSelectedIds([])
   }
 
   // Individual action handlers
@@ -90,21 +81,21 @@ export function UnifiedAccountsView({
     setIsPaymentOpen(true)
   }
 
-  const handleCreateBilling = (scout: ScoutAccountRow) => {
-    setActionScout(scout)
-    setIsIndividualBillingOpen(true)
-  }
-
   const handleSendReminder = (scout: ScoutAccountRow) => {
     setActionScout(scout)
     setIsIndividualReminderOpen(true)
   }
 
+  const handleAdjustFunds = (scout: ScoutAccountRow) => {
+    setActionScout(scout)
+    setIsAdjustFundsOpen(true)
+  }
+
   const handleActionSuccess = () => {
     router.refresh()
     setIsPaymentOpen(false)
-    setIsIndividualBillingOpen(false)
     setIsIndividualReminderOpen(false)
+    setIsAdjustFundsOpen(false)
     setActionScout(null)
   }
 
@@ -113,35 +104,11 @@ export function UnifiedAccountsView({
     ? scoutsForPayment.find((s) => s.id === actionScout.scoutId)
     : null
 
-  // Find the scout for billing form
-  const selectedBillingScout = actionScout
-    ? scoutsForBilling.find((s) => s.id === actionScout.scoutId)
-    : null
-
   return (
     <div className="space-y-4">
-      {/* Header with Create Billing button */}
+      {/* Header actions */}
       {canTakeActions && (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Dialog open={isBillingOpen} onOpenChange={setIsBillingOpen}>
-              <DialogTrigger asChild>
-                <Button variant="accent">
-                  <Receipt className="mr-2 h-4 w-4" />
-                  Create Billing
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Create Billing</DialogTitle>
-                </DialogHeader>
-                <BillingForm
-                  unitId={unitId}
-                  scouts={scoutsForBilling}
-                />
-              </DialogContent>
-            </Dialog>
-          </div>
+        <div className="flex items-center justify-end">
           <Link href="/settings/import/balances">
             <Button variant="outline">
               <Upload className="mr-2 h-4 w-4" />
@@ -155,10 +122,8 @@ export function UnifiedAccountsView({
       {canTakeActions && (
         <BulkActionBar
           selectedCount={selectedIds.length}
-          onBillSelected={handleBillSelected}
-          onAddFunds={() => {/* TODO: implement bulk add funds */}}
+          onBillSelected={() => setIsBillingOpen(true)}
           onSendReminders={() => setIsReminderOpen(true)}
-          onExport={() => {/* TODO: implement export */}}
           onClearSelection={() => setSelectedIds([])}
         />
       )}
@@ -171,13 +136,13 @@ export function UnifiedAccountsView({
         onScoutSelect={handleScoutSelect}
         onSelectionChange={canTakeActions ? setSelectedIds : () => {}}
         onRecordPayment={canTakeActions ? handleRecordPayment : undefined}
-        onCreateBilling={canTakeActions ? handleCreateBilling : undefined}
         onSendReminder={canTakeActions ? handleSendReminder : undefined}
+        onAdjustFunds={canTakeActions ? handleAdjustFunds : undefined}
       />
 
       {/* Individual Payment Dialog */}
       <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
-        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>
               Record Payment{actionScout ? ` for ${actionScout.scoutName}` : ''}
@@ -196,20 +161,16 @@ export function UnifiedAccountsView({
         </DialogContent>
       </Dialog>
 
-      {/* Individual Billing Dialog */}
-      <Dialog open={isIndividualBillingOpen} onOpenChange={setIsIndividualBillingOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      {/* Bulk Billing Dialog */}
+      <Dialog open={isBillingOpen} onOpenChange={setIsBillingOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader>
-            <DialogTitle>
-              Create Billing{actionScout ? ` for ${actionScout.scoutName}` : ''}
-            </DialogTitle>
+            <DialogTitle>Create Billing</DialogTitle>
           </DialogHeader>
-          {selectedBillingScout && (
-            <BillingForm
-              unitId={unitId}
-              scouts={[selectedBillingScout]}
-            />
-          )}
+          <BillingForm
+            unitId={unitId}
+            scouts={scoutsForBilling}
+          />
         </DialogContent>
       </Dialog>
 
@@ -222,6 +183,26 @@ export function UnifiedAccountsView({
           scoutId={actionScout.scoutId}
           scoutName={actionScout.scoutName}
           balance={actionScout.billingBalance}
+          hideTrigger
+          onSuccess={handleActionSuccess}
+        />
+      )}
+
+      {/* Individual Adjust Funds Dialog */}
+      {actionScout && (
+        <AdjustFundsModal
+          scoutAccountId={actionScout.id}
+          scoutName={actionScout.scoutName}
+          currentFundsBalance={actionScout.fundsBalance}
+          unitId={unitId}
+          open={isAdjustFundsOpen}
+          onOpenChange={(open) => {
+            setIsAdjustFundsOpen(open)
+            if (!open) {
+              setActionScout(null)
+              router.refresh()
+            }
+          }}
           hideTrigger
           onSuccess={handleActionSuccess}
         />

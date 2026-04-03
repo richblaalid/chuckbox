@@ -254,7 +254,7 @@ describe('Payments Actions', () => {
 
       const result = await recordQuickPayment(validParams)
       expect(result.success).toBe(false)
-      expect(result.error).toBe('Failed to create payment record')
+      expect(result.error).toBe('Failed to create journal entry: Insert failed')
     })
 
     it('should rollback when required accounts not found', async () => {

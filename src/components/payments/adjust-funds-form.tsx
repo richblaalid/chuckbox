@@ -14,8 +14,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/utils'
-import { addFundsToScout } from '@/app/actions/funds'
-import { AlertCircle, CheckCircle2, Plus } from 'lucide-react'
+import { adjustScoutFunds } from '@/app/actions/funds'
+import { AlertCircle, CheckCircle2, Minus, Plus } from 'lucide-react'
 
 interface Scout {
   id: string
@@ -34,7 +34,7 @@ interface FundraiserType {
   description: string | null
 }
 
-interface AddFundsFormProps {
+interface AdjustFundsFormProps {
   // Required
   unitId: string
   scouts: Scout[]
@@ -50,7 +50,7 @@ interface AddFundsFormProps {
   onCancel?: () => void
 }
 
-export function AddFundsForm({
+export function AdjustFundsForm({
   unitId,
   scouts,
   fundraiserTypes,
@@ -59,7 +59,7 @@ export function AddFundsForm({
   currentFundsBalance,
   onSuccess,
   onCancel,
-}: AddFundsFormProps) {
+}: AdjustFundsFormProps) {
   const router = useRouter()
 
   // Form state
@@ -67,6 +67,7 @@ export function AddFundsForm({
   const [amount, setAmount] = useState('')
   const [fundraiserTypeId, setFundraiserTypeId] = useState('')
   const [notes, setNotes] = useState('')
+  const [direction, setDirection] = useState<'add' | 'remove'>('add')
 
   // UI state
   const [isProcessing, setIsProcessing] = useState(false)
@@ -94,11 +95,19 @@ export function AddFundsForm({
     ? { id: scoutAccountId!, funds_balance: currentFundsBalance || 0 }
     : selectedScout?.scout_accounts
 
-  // Validation - fundraiser type is optional
+  // Derived state
+  const isRemove = direction === 'remove'
+  const currentBalance =
+    scoutAccount && 'funds_balance' in scoutAccount ? scoutAccount.funds_balance || 0 : 0
   const parsedAmount = parseFloat(amount) || 0
+  const exceedsBalance = isRemove && parsedAmount > currentBalance
+  const notesRequired = isRemove && !notes.trim()
+
   const isValid =
     (isSingleScoutMode || selectedScoutId) &&
-    parsedAmount > 0
+    parsedAmount > 0 &&
+    !exceedsBalance &&
+    (!isRemove || !notesRequired)
 
   const handleSubmit = async () => {
     if (!isValid || !scoutAccount) return
@@ -107,15 +116,16 @@ export function AddFundsForm({
     setError(null)
 
     try {
-      const result = await addFundsToScout(
+      const result = await adjustScoutFunds(
         scoutAccount.id,
         parsedAmount,
+        direction,
         fundraiserTypeId || undefined,
         notes.trim() || undefined
       )
 
       if (!result.success) {
-        setError(result.error || 'Failed to add funds')
+        setError(result.error || 'Failed to adjust funds')
         setIsProcessing(false)
         return
       }
@@ -135,6 +145,7 @@ export function AddFundsForm({
         setSuccess(false)
         setAmount('')
         setNotes('')
+        setDirection('add')
         if (!isSingleScoutMode) {
           setSelectedScoutId('')
         }
@@ -157,9 +168,12 @@ export function AddFundsForm({
       <div className="text-center py-8 space-y-4">
         <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto" />
         <div>
-          <p className="font-medium text-lg">Funds Added Successfully!</p>
+          <p className="font-medium text-lg">
+            Funds {direction === 'remove' ? 'Removed' : 'Added'} Successfully!
+          </p>
           <p className="text-muted-foreground">
-            {formatCurrency(parsedAmount)} has been credited to the scout account.
+            {formatCurrency(parsedAmount)} has been{' '}
+            {direction === 'remove' ? 'removed from' : 'credited to'} the scout account.
           </p>
         </div>
       </div>
@@ -199,6 +213,37 @@ export function AddFundsForm({
           </p>
         </div>
       )}
+
+      {/* Direction Toggle */}
+      <div className="space-y-2">
+        <Label>Action</Label>
+        <div className="flex rounded-lg border border-stone-200 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setDirection('add')}
+            disabled={isProcessing}
+            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              direction === 'add'
+                ? 'bg-forest-600 text-white'
+                : 'bg-white text-stone-600 hover:bg-stone-50'
+            }`}
+          >
+            Add
+          </button>
+          <button
+            type="button"
+            onClick={() => setDirection('remove')}
+            disabled={isProcessing}
+            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              direction === 'remove'
+                ? 'bg-red-600 text-white'
+                : 'bg-white text-stone-600 hover:bg-stone-50'
+            }`}
+          >
+            Remove
+          </button>
+        </div>
+      </div>
 
       {/* Amount */}
       <div className="space-y-2">
@@ -251,7 +296,7 @@ export function AddFundsForm({
 
       {/* Notes */}
       <div className="space-y-2">
-        <Label htmlFor="notes">Notes (optional)</Label>
+        <Label htmlFor="notes">Notes {isRemove ? '(required)' : '(optional)'}</Label>
         <Textarea
           id="notes"
           placeholder="e.g., Wreath order #123, 5 wreaths sold"
@@ -262,18 +307,30 @@ export function AddFundsForm({
         />
       </div>
 
+      {/* Balance exceeded error */}
+      {exceedsBalance && (
+        <div className="flex items-center gap-2 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4" />
+          <span>Amount exceeds current balance of {formatCurrency(currentBalance)}</span>
+        </div>
+      )}
+
       {/* Summary */}
       {parsedAmount > 0 && (
         <div className="rounded-lg border p-4 space-y-2">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Amount to Credit</span>
+            <span className="text-muted-foreground">
+              Amount to {isRemove ? 'Remove' : 'Credit'}
+            </span>
             <span className="font-medium">{formatCurrency(parsedAmount)}</span>
           </div>
           {scoutAccount && 'funds_balance' in scoutAccount && (
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>New Funds Balance</span>
-              <span className="text-green-600">
-                {formatCurrency((scoutAccount.funds_balance || 0) + parsedAmount)}
+              <span className={isRemove ? 'text-red-600' : 'text-green-600'}>
+                {formatCurrency(
+                  isRemove ? currentBalance - parsedAmount : currentBalance + parsedAmount
+                )}
               </span>
             </div>
           )}
@@ -306,11 +363,11 @@ export function AddFundsForm({
           className="flex-1"
         >
           {isProcessing ? (
-            'Adding Funds...'
+            isRemove ? 'Removing Funds...' : 'Adding Funds...'
           ) : (
             <>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Funds
+              {isRemove ? <Minus className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+              {isRemove ? 'Remove Funds' : 'Add Funds'}
             </>
           )}
         </Button>

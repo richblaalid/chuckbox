@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { canAccessPage } from '@/lib/roles'
 import { FinanceSubnav } from '@/components/finances/finance-subnav'
-import { SquareHistoryTab } from '@/components/payments/square-history-tab'
+import { UnifiedPaymentsList } from '@/components/payments/unified-payments-list'
 
 export default async function PaymentsPage() {
   const supabase = await createClient()
@@ -10,20 +10,14 @@ export default async function PaymentsPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
+  if (!user) redirect('/login')
 
   const { data: profile } = await supabase
     .from('profiles')
     .select('id')
     .eq('user_id', user.id)
     .single()
-
-  if (!profile) {
-    redirect('/login')
-  }
+  if (!profile) redirect('/login')
 
   const { data: membershipData } = await supabase
     .from('unit_memberships')
@@ -38,25 +32,110 @@ export default async function PaymentsPage() {
     units: { name: string } | null
   } | null
 
-  if (!membership) {
-    redirect('/login')
+  if (!membership) redirect('/login')
+  if (!canAccessPage(membership.role, 'payments')) redirect('/roster')
+
+  // Fetch payments with related data
+  const { data: payments } = await supabase
+    .from('payments')
+    .select(`
+      id,
+      amount,
+      fee_amount,
+      net_amount,
+      payment_method,
+      status,
+      created_at,
+      notes,
+      square_payment_id,
+      square_receipt_url,
+      journal_entry_id,
+      scout_account_id,
+      voided_at,
+      voided_by,
+      void_reason,
+      recorded_by,
+      reconciliation_status,
+      scout_account:scout_accounts(
+        id,
+        scout:scouts(id, first_name, last_name)
+      )
+    `)
+    .eq('unit_id', membership.unit_id)
+    .order('created_at', { ascending: false })
+
+  // Fetch recorded_by profile names separately
+  const recordedByIds = [
+    ...new Set(
+      (payments || [])
+        .map((p) => p.recorded_by)
+        .filter((id): id is string => id !== null)
+    ),
+  ]
+
+  let recordedByMap: Record<string, string> = {}
+  if (recordedByIds.length > 0) {
+    const { data: recordedByProfiles } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', recordedByIds)
+    if (recordedByProfiles) {
+      recordedByMap = Object.fromEntries(
+        recordedByProfiles.map((p) => [p.id, p.full_name || 'Unknown'])
+      )
+    }
   }
 
-  if (!canAccessPage(membership.role, 'finances')) {
-    redirect('/roster')
+  // Fetch voided_by profile names separately
+  const voidedByIds = [
+    ...new Set(
+      (payments || [])
+        .map((p) => p.voided_by)
+        .filter((id): id is string => id !== null)
+    ),
+  ]
+
+  let voidedByMap: Record<string, string> = {}
+  if (voidedByIds.length > 0) {
+    const { data: voidedByProfiles } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', voidedByIds)
+    if (voidedByProfiles) {
+      voidedByMap = Object.fromEntries(
+        voidedByProfiles.map((p) => [p.id, p.full_name || 'Unknown'])
+      )
+    }
   }
 
-  // Verify unit has an active Square connection
+  // Fetch unreconciled Square transactions
+  const { data: unreconciledSquare } = await supabase
+    .from('square_transactions')
+    .select('*')
+    .eq('unit_id', membership.unit_id)
+    .is('payment_id', null)
+    .order('square_created_at', { ascending: false })
+
+  // Check Square connection status
   const { data: squareCredentials } = await supabase
     .from('unit_square_credentials')
     .select('id')
     .eq('unit_id', membership.unit_id)
     .eq('is_active', true)
-    .single()
+    .maybeSingle()
 
-  if (!squareCredentials) {
-    redirect('/finances')
-  }
+  // Fetch scouts for dialogs (Record Payment, Reconcile)
+  const { data: scouts } = await supabase
+    .from('scouts')
+    .select(`
+      id,
+      first_name,
+      last_name,
+      scout_accounts(id, billing_balance, funds_balance)
+    `)
+    .eq('unit_id', membership.unit_id)
+    .eq('is_active', true)
+    .order('last_name')
 
   return (
     <div className="space-y-6">
@@ -67,9 +146,18 @@ export default async function PaymentsPage() {
         </p>
       </div>
 
-      <FinanceSubnav showPaymentsTab />
+      <FinanceSubnav />
 
-      <SquareHistoryTab unitId={membership.unit_id} />
+      <UnifiedPaymentsList
+        payments={payments || []}
+        recordedByMap={recordedByMap}
+        voidedByMap={voidedByMap}
+        unreconciledSquareTransactions={unreconciledSquare || []}
+        hasSquareConnection={!!squareCredentials}
+        scouts={scouts || []}
+        unitId={membership.unit_id}
+        userRole={membership.role}
+      />
     </div>
   )
 }

@@ -1908,9 +1908,9 @@ CREATE POLICY "Admins can view audit log"
 -- ============================================
 -- UNIT SQUARE CREDENTIALS POLICIES
 -- ============================================
-CREATE POLICY "Admins can view Square credentials"
+CREATE POLICY "Admins and treasurers can view Square credentials"
     ON unit_square_credentials FOR SELECT
-    USING (user_has_role(unit_id, ARRAY['admin']));
+    USING (user_has_role(unit_id, ARRAY['admin', 'treasurer']::membership_role[]));
 
 CREATE POLICY "Admins can manage Square credentials"
     ON unit_square_credentials FOR ALL

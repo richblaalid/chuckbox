@@ -87,6 +87,8 @@ export function PaginatedTransactionHistory({
             )
           `)
           .eq('scout_account_id', scoutAccountId)
+          .order('journal_entries(entry_date)', { ascending: false })
+          .order('journal_entries(created_at)', { ascending: false })
           .range(from, to)
 
         if (dataError) throw dataError

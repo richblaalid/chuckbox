@@ -95,7 +95,7 @@ export function QuickActionsCard({ unitId, unitName, scouts, squareConfig }: Qui
               <CreditCard className="h-4 w-4" />
               Record Payment
             </Button>
-            <Button variant="accent" className="gap-2" onClick={() => setIsBillingOpen(true)}>
+            <Button variant="default" className="gap-2" onClick={() => setIsBillingOpen(true)}>
               <Receipt className="h-4 w-4" />
               Create Billing
             </Button>

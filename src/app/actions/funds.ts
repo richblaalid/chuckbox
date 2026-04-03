@@ -9,9 +9,10 @@ interface ActionResult {
   data?: unknown
 }
 
-export async function addFundsToScout(
+export async function adjustScoutFunds(
   scoutAccountId: string,
   amount: number,
+  direction: 'add' | 'remove' = 'add',
   fundraiserTypeId?: string,
   notes?: string
 ): Promise<ActionResult> {
@@ -67,12 +68,16 @@ export async function addFundsToScout(
   }
 
   if (!membership || !['admin', 'treasurer'].includes(membership.role)) {
-    return { success: false, error: 'Only admins and treasurers can add funds' }
+    return { success: false, error: 'Only admins and treasurers can adjust funds' }
   }
 
   // Validate amount
   if (amount <= 0) {
     return { success: false, error: 'Amount must be greater than 0' }
+  }
+
+  if (direction === 'remove' && (!notes || !notes.trim())) {
+    return { success: false, error: 'Notes are required when removing funds' }
   }
 
   // Get fundraiser type name for description (if provided)
@@ -93,17 +98,27 @@ export async function addFundsToScout(
   // Build description
   const scout = scoutAccount.scout as { first_name: string; last_name: string } | null
   const scoutName = scout ? `${scout.first_name} ${scout.last_name}` : 'Unknown Scout'
+  const directionLabel = direction === 'remove' ? 'removal' : 'credit'
   const description = notes
-    ? `${fundraiserTypeName}: ${notes} - ${scoutName}`
-    : `${fundraiserTypeName} credit - ${scoutName}`
+    ? `${fundraiserTypeName} ${directionLabel}: ${notes} - ${scoutName}`
+    : `${fundraiserTypeName} ${directionLabel} - ${scoutName}`
 
-  // Use the existing RPC function
-  const { data, error } = await supabase.rpc('credit_fundraising_to_scout', {
-    p_scout_account_id: scoutAccountId,
-    p_amount: amount,
-    p_description: description,
-    p_fundraiser_type: fundraiserTypeName,
-  })
+  // Call the appropriate RPC based on direction
+  // Note: debit_funds_from_scout is not yet in generated types — cast needed until types are regenerated
+  const { data, error } = direction === 'remove'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ? await (supabase as any).rpc('debit_funds_from_scout', {
+        p_scout_account_id: scoutAccountId,
+        p_amount: amount,
+        p_description: description,
+        p_fundraiser_type: fundraiserTypeName,
+      })
+    : await supabase.rpc('credit_fundraising_to_scout', {
+        p_scout_account_id: scoutAccountId,
+        p_amount: amount,
+        p_description: description,
+        p_fundraiser_type: fundraiserTypeName,
+      })
 
   if (error) {
     return { success: false, error: error.message }
@@ -184,8 +199,8 @@ export async function voidPayment(
     return { success: false, error: 'Failed to verify permissions' }
   }
 
-  if (!membership || membership.role !== 'admin') {
-    return { success: false, error: 'Only admins can void payments' }
+  if (!membership || !['admin', 'treasurer'].includes(membership.role)) {
+    return { success: false, error: 'Only admins and treasurers can void payments' }
   }
 
   // Call the RPC function
@@ -204,8 +219,10 @@ export async function voidPayment(
     return { success: false, error: result.error || 'Failed to void payment' }
   }
 
-  revalidatePath('/payments')
-  revalidatePath('/accounts')
+  revalidatePath('/finances')
+  revalidatePath('/finances/payments')
+  revalidatePath('/finances/accounts')
+  revalidatePath('/dashboard')
 
   return { success: true, data: result }
 }

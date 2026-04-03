@@ -31,12 +31,14 @@ interface VoidPaymentDialogProps {
   payment: Payment
   open: boolean
   onOpenChange: (open: boolean) => void
+  onVoided?: () => void
 }
 
 export function VoidPaymentDialog({
   payment,
   open,
   onOpenChange,
+  onVoided,
 }: VoidPaymentDialogProps) {
   const router = useRouter()
   const [reason, setReason] = useState('')
@@ -61,8 +63,9 @@ export function VoidPaymentDialog({
         return
       }
 
-      // Refresh the page data and close dialog
+      // Refresh the page data, notify parent, and close dialog
       router.refresh()
+      onVoided?.()
       onOpenChange(false)
       setReason('')
     } catch (err) {
@@ -151,7 +154,10 @@ export function VoidPaymentDialog({
             Cancel
           </AlertDialogCancel>
           <AlertDialogAction
-            onClick={handleVoid}
+            onClick={(e) => {
+              e.preventDefault()
+              handleVoid()
+            }}
             disabled={!reason.trim() || isProcessing}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >

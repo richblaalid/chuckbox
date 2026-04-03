@@ -212,7 +212,7 @@ export default async function AccountDetailPage({ params }: AccountPageProps) {
         </div>
       </div>
 
-      <FinanceSubnav showPaymentsTab={hasPaymentProcessor} />
+      <FinanceSubnav />
 
       {/* Transaction History with Pagination */}
       <PaginatedTransactionHistory

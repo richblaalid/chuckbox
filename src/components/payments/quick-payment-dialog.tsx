@@ -64,7 +64,7 @@ export function QuickPaymentDialog({ unitId, scouts, squareConfig, preselectedSc
           Record Payment
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>Record Payment</DialogTitle>
           <DialogDescription>

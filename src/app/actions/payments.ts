@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-
+import { formatCurrency } from '@/lib/utils'
 interface QuickPaymentParams {
   unitId: string
   scoutAccountId: string
@@ -11,6 +11,8 @@ interface QuickPaymentParams {
   method: 'cash' | 'check'
   reference?: string
   notes?: string
+  allocations?: Array<{ chargeId: string; amount: number }>
+  entryDate?: string  // YYYY-MM-DD from client's local timezone
 }
 
 interface ActionResult {
@@ -79,7 +81,31 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
   }
 
   try {
-    const paymentDate = new Date().toISOString().split('T')[0]
+    const paymentDate = params.entryDate || new Date().toISOString().split('T')[0]
+
+    // Build enriched description with allocation details when charges are specified
+    let journalDescription = `${method.charAt(0).toUpperCase() + method.slice(1)} payment from ${scoutName}`
+    if (params.allocations && params.allocations.length > 0) {
+      const chargeIds = params.allocations.map((a) => a.chargeId)
+      const { data: charges } = await supabase
+        .from('billing_charges')
+        .select('id, billing_records(description)')
+        .in('id', chargeIds)
+
+      if (charges && charges.length > 0) {
+        const allocationDetails = params.allocations
+          .map((alloc) => {
+            const charge = charges.find((c) => c.id === alloc.chargeId)
+            const chargeDescription = (charge?.billing_records as { description: string } | null)?.description
+            return chargeDescription ? `${chargeDescription} (${formatCurrency(alloc.amount)})` : null
+          })
+          .filter(Boolean)
+
+        if (allocationDetails.length > 0) {
+          journalDescription += ` — ${allocationDetails.join(', ')}`
+        }
+      }
+    }
 
     // Create journal entry
     const { data: journalEntry, error: journalError } = await supabase
@@ -87,7 +113,7 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
       .insert({
         unit_id: unitId,
         entry_date: paymentDate,
-        description: `${method.charAt(0).toUpperCase() + method.slice(1)} payment from ${scoutName}`,
+        description: journalDescription,
         entry_type: 'payment',
         reference: reference || null,
         is_posted: true,
@@ -97,8 +123,9 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
 
     if (journalError || !journalEntry) {
       console.error('Failed to create journal entry:', journalError)
-      return { success: false, error: 'Failed to create payment record' }
+      return { success: false, error: 'Failed to create journal entry: ' + (journalError?.message || 'unknown') }
     }
+    console.log('Journal entry created:', journalEntry.id)
 
     // Get required accounts (bank and accounts receivable)
     const { data: accounts } = await supabase
@@ -159,6 +186,7 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
         payment_method: method,
         status: 'completed',
         journal_entry_id: journalEntry.id,
+        recorded_by: profile.id,
         notes: [reference ? `Check #${reference}` : null, notes].filter(Boolean).join(' - ') || null,
       })
       .select('id')
@@ -166,7 +194,41 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
 
     if (paymentError) {
       console.error('Failed to create payment record:', paymentError)
-      // Don't rollback journal - the accounting is correct
+      return { success: false, error: 'Failed to create payment record: ' + paymentError.message }
+    }
+
+    // Persist charge allocations (supplementary — does not fail the payment)
+    if (params.allocations && params.allocations.length > 0 && payment?.id) {
+      const allocationRows = params.allocations.map((alloc) => ({
+        payment_id: payment.id,
+        billing_charge_id: alloc.chargeId,
+        amount: alloc.amount,
+      }))
+
+      const { error: allocError } = await supabase
+        .from('payment_allocations')
+        .insert(allocationRows)
+
+      if (allocError) {
+        console.error('Failed to create payment allocations:', allocError)
+        // Don't fail the payment — allocations are supplementary
+      }
+
+      // Update paid_amount on each billing charge
+      for (const alloc of params.allocations) {
+        const { data: charge } = await supabase
+          .from('billing_charges')
+          .select('paid_amount')
+          .eq('id', alloc.chargeId)
+          .single()
+
+        if (charge) {
+          await supabase
+            .from('billing_charges')
+            .update({ paid_amount: (charge.paid_amount || 0) + alloc.amount })
+            .eq('id', alloc.chargeId)
+        }
+      }
     }
 
     // Check for overpayment and auto-transfer to Scout Funds
@@ -200,4 +262,53 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
     console.error('recordQuickPayment error:', err)
     return { success: false, error: 'An unexpected error occurred' }
   }
+}
+
+export async function updatePaymentNotes(
+  paymentId: string,
+  notes: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Not authenticated' }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('user_id', user.id)
+    .maybeSingle()
+  if (!profile) return { success: false, error: 'Profile not found' }
+
+  // Get payment to check unit
+  const { data: payment } = await supabase
+    .from('payments')
+    .select('unit_id, voided_at')
+    .eq('id', paymentId)
+    .single()
+  if (!payment) return { success: false, error: 'Payment not found' }
+  if (payment.voided_at) return { success: false, error: 'Cannot edit voided payment' }
+
+  // Check permission
+  const { data: membership } = await supabase
+    .from('unit_memberships')
+    .select('role')
+    .eq('unit_id', payment.unit_id)
+    .eq('profile_id', profile.id)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  if (!membership || !['admin', 'treasurer'].includes(membership.role)) {
+    return { success: false, error: 'Permission denied' }
+  }
+
+  const { error } = await supabase
+    .from('payments')
+    .update({ notes: notes.trim() || null })
+    .eq('id', paymentId)
+
+  if (error) return { success: false, error: 'Failed to update notes' }
+
+  revalidatePath('/finances/payments')
+  return { success: true }
 }

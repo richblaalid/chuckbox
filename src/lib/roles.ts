@@ -36,6 +36,8 @@ export type AppAction =
   | 'view_all_accounts'  // View all scout accounts
   | 'adjust_accounts'    // Make manual account adjustments
   | 'export_reports'     // Export report data
+  | 'reconcile_payments' // Reconcile Square transactions
+  | 'edit_payment_notes' // Edit notes on existing payments
 
 // Page access by role
 const PAGE_ACCESS: Record<AppPage, MemberRole[]> = {
@@ -59,11 +61,13 @@ const ACTION_ACCESS: Record<AppAction, MemberRole[]> = {
   edit_billing: ['admin', 'treasurer'],
   void_billing: ['admin', 'treasurer'],
   record_payments: ['admin', 'treasurer'],
-  void_payments: ['admin'],
+  void_payments: ['admin', 'treasurer'],
   manage_members: ['admin'],
   view_all_accounts: ['admin', 'treasurer', 'leader'],
   adjust_accounts: ['admin', 'treasurer'],
   export_reports: ['admin', 'treasurer', 'leader'],
+  reconcile_payments: ['admin', 'treasurer'],
+  edit_payment_notes: ['admin', 'treasurer'],
 }
 
 // Navigation item type
