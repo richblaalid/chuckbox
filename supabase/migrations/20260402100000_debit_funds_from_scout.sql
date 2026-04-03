@@ -1,3 +1,6 @@
+-- Add new entry type for fund adjustments
+ALTER TYPE journal_entry_type ADD VALUE IF NOT EXISTS 'funds_adjustment';
+
 -- Debit funds from scout account (reverse of credit_fundraising_to_scout)
 CREATE OR REPLACE FUNCTION debit_funds_from_scout(
     p_scout_account_id UUID,
