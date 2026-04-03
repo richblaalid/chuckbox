@@ -37,6 +37,12 @@ interface QuickPaymentFormProps {
   }
   /** Pre-select a specific scout (for account detail page) */
   preselectedScoutId?: string
+  /** Pre-fill the amount (e.g., from a billing charge) */
+  initialAmount?: number
+  /** Pre-select a specific charge in the allocations list */
+  initialChargeId?: string
+  /** Lock the scout selector (prevent changing) */
+  lockedScoutId?: boolean
   onSuccess?: () => void
   onCancel?: () => void
 }
@@ -50,6 +56,9 @@ export function QuickPaymentForm({
   scouts,
   squareConfig,
   preselectedScoutId,
+  initialAmount,
+  initialChargeId,
+  lockedScoutId,
   onSuccess,
   onCancel,
 }: QuickPaymentFormProps) {
@@ -58,7 +67,7 @@ export function QuickPaymentForm({
   const cardRef = useRef<SquareCard | null>(null)
 
   const [selectedScoutId, setSelectedScoutId] = useState(preselectedScoutId || '')
-  const [amount, setAmount] = useState('')
+  const [amount, setAmount] = useState(initialAmount ? initialAmount.toFixed(2) : '')
   const [method, setMethod] = useState<PaymentMethod>('cash')
   const [reference, setReference] = useState('')
   const [notes, setNotes] = useState('')
@@ -171,12 +180,24 @@ export function QuickPaymentForm({
             createdAt: (c.billing_records as Record<string, string>).created_at || '',
           }))
         setOutstandingCharges(charges)
+
+        // Pre-select initial charge if provided
+        if (initialChargeId) {
+          const matchingCharge = charges.find(c => c.id === initialChargeId)
+          if (matchingCharge) {
+            const remaining = matchingCharge.amount - matchingCharge.paidAmount
+            setAllocations([{
+              chargeId: matchingCharge.id,
+              amount: remaining,
+            }])
+          }
+        }
       }
       setChargesLoading(false)
       setChargesLoaded(true)
     }
     fetchCharges()
-  }, [selectedScoutId, scouts])
+  }, [selectedScoutId, scouts, initialChargeId])
 
   // Load Square SDK when card method is selected
   useEffect(() => {
@@ -511,7 +532,7 @@ export function QuickPaymentForm({
           <select
             id="quick-scout"
             required
-            disabled={isSubmitting}
+            disabled={isSubmitting || lockedScoutId}
             className="flex h-10 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-forest-600 focus-visible:ring-offset-2 disabled:opacity-50"
             value={selectedScoutId}
             onChange={(e) => setSelectedScoutId(e.target.value)}

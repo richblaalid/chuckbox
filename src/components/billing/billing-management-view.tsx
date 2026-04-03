@@ -18,10 +18,12 @@ import {
   Trash2,
   Loader2,
   ClipboardList,
+  DollarSign,
 } from 'lucide-react'
 import { BillingForm } from '@/components/billing/billing-form'
 import { BillingRecordActions } from '@/components/billing/billing-record-actions'
 import { VoidBillingDialog } from '@/components/billing/void-billing-dialog'
+import { QuickPaymentForm } from '@/components/payments/quick-payment-form'
 
 // ============================================
 // Types
@@ -35,6 +37,8 @@ interface ChargeDetail {
   scout_account_id: string
   scout_first_name: string
   scout_last_name: string
+  payment_method: string | null
+  check_ref: string | null
 }
 
 export interface BillingRecordEntry {
@@ -62,6 +66,11 @@ interface BillingManagementViewProps {
   scouts: Scout[]
   unitId: string
   initialStatus?: StatusFilter
+  squareConfig?: {
+    applicationId: string
+    locationId: string
+    environment: 'sandbox' | 'production'
+  }
 }
 
 type StatusFilter = 'all' | 'unpaid' | 'paid' | 'voided'
@@ -72,7 +81,7 @@ type SortOrder = 'asc' | 'desc'
 // Component
 // ============================================
 
-export function BillingManagementView({ records, scouts, unitId, initialStatus }: BillingManagementViewProps) {
+export function BillingManagementView({ records, scouts, unitId, initialStatus, squareConfig }: BillingManagementViewProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -122,6 +131,12 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus }
   const [isBillingOpen, setIsBillingOpen] = useState(false)
   const [voidRecord, setVoidRecord] = useState<BillingRecordEntry | null>(null)
   const [notifyResult, setNotifyResult] = useState<{ id: string; sent: number; error?: string } | null>(null)
+  const [paymentCharge, setPaymentCharge] = useState<{
+    chargeId: string
+    scoutAccountId: string
+    amount: number
+    description: string
+  } | null>(null)
 
   // ============================================
   // Filtering & Sorting
@@ -285,6 +300,19 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus }
     setSelectedIds(new Set())
     router.refresh()
   }
+
+  const handleRecordPaymentForCharge = (charge: ChargeDetail, description: string) => {
+    setPaymentCharge({
+      chargeId: charge.id,
+      scoutAccountId: charge.scout_account_id,
+      amount: charge.amount,
+      description,
+    })
+  }
+
+  const paymentScout = paymentCharge
+    ? scouts.find(s => s.scout_accounts?.id === paymentCharge.scoutAccountId)
+    : null
 
   const getRecordStatus = (record: BillingRecordEntry): 'voided' | 'paid' | 'partial' | 'unpaid' => {
     if (record.is_void) return 'voided'
@@ -626,11 +654,33 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus }
                                   ) : charge.is_paid ? (
                                     <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 text-xs px-1.5 py-0">
                                       Paid
+                                      {charge.payment_method && (
+                                        <span className="text-green-500 font-normal">
+                                          {' · '}{charge.payment_method === 'check' && charge.check_ref
+                                            ? `Check #${charge.check_ref}`
+                                            : charge.payment_method === 'check'
+                                              ? 'Check'
+                                              : charge.payment_method === 'card'
+                                                ? 'Card'
+                                                : charge.payment_method.charAt(0).toUpperCase() + charge.payment_method.slice(1)}
+                                        </span>
+                                      )}
                                     </Badge>
                                   ) : (
                                     <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 text-xs px-1.5 py-0">
                                       Unpaid
                                     </Badge>
+                                  )}
+                                  {!charge.is_void && !charge.is_paid && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 px-2 text-xs text-forest-600 hover:text-forest-800"
+                                      onClick={() => handleRecordPaymentForCharge(charge, record.description)}
+                                    >
+                                      <DollarSign className="h-3 w-3 mr-1" />
+                                      Record Payment
+                                    </Button>
                                   )}
                                 </div>
                               </div>
@@ -672,6 +722,33 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus }
           amount={voidRecord.total_amount}
           type="record"
         />
+      )}
+
+      {/* Record Payment for Charge Dialog */}
+      {paymentCharge && paymentScout && (
+        <Dialog open={!!paymentCharge} onOpenChange={(open) => { if (!open) setPaymentCharge(null) }}>
+          <DialogContent className="max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
+            <DialogHeader>
+              <DialogTitle>
+                Record Payment for: {paymentCharge.description}
+              </DialogTitle>
+            </DialogHeader>
+            <QuickPaymentForm
+              unitId={unitId}
+              scouts={[paymentScout]}
+              squareConfig={squareConfig}
+              preselectedScoutId={paymentScout.id}
+              initialAmount={paymentCharge.amount}
+              initialChargeId={paymentCharge.chargeId}
+              lockedScoutId
+              onSuccess={() => {
+                setPaymentCharge(null)
+                router.refresh()
+              }}
+              onCancel={() => setPaymentCharge(null)}
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   )

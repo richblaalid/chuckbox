@@ -57,7 +57,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
   // Check if unit has an active payment processor connection
   const { data: squareCredentials } = await supabase
     .from('unit_square_credentials')
-    .select('id')
+    .select('id, location_id')
     .eq('unit_id', membership.unit_id)
     .eq('is_active', true)
     .single()
@@ -87,6 +87,12 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
             first_name,
             last_name
           )
+        ),
+        payment_allocations (
+          payments (
+            payment_method,
+            notes
+          )
         )
       )
     `)
@@ -113,6 +119,12 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
           last_name: string
         }
       } | null
+      payment_allocations: Array<{
+        payments: {
+          payment_method: string | null
+          notes: string | null
+        } | null
+      }>
     }>
   }
 
@@ -126,15 +138,31 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       ? `batch:${record.billing_import_batch_id}`
       : `record:${record.id}`
 
-    const charges = (record.billing_charges || []).map((charge) => ({
-      id: charge.id,
-      amount: charge.amount,
-      is_paid: charge.is_paid,
-      is_void: charge.is_void,
-      scout_account_id: charge.scout_account_id,
-      scout_first_name: charge.scout_accounts?.scouts?.first_name || 'Unknown',
-      scout_last_name: charge.scout_accounts?.scouts?.last_name || '',
-    }))
+    const charges = (record.billing_charges || []).map((charge) => {
+      // Get payment method from first allocation (if exists)
+      const firstAllocation = charge.payment_allocations?.[0]
+      const paymentMethod = firstAllocation?.payments?.payment_method || null
+      const paymentNotes = firstAllocation?.payments?.notes || null
+
+      // Extract check reference from notes (format: "Check #1234" or "Check #1234 - notes")
+      let checkRef: string | null = null
+      if (paymentMethod === 'check' && paymentNotes) {
+        const match = paymentNotes.match(/Check #(\S+)/)
+        if (match) checkRef = match[1]
+      }
+
+      return {
+        id: charge.id,
+        amount: charge.amount,
+        is_paid: charge.is_paid,
+        is_void: charge.is_void,
+        scout_account_id: charge.scout_account_id,
+        scout_first_name: charge.scout_accounts?.scouts?.first_name || 'Unknown',
+        scout_last_name: charge.scout_accounts?.scouts?.last_name || '',
+        payment_method: paymentMethod,
+        check_ref: checkRef,
+      }
+    })
 
     const existing = groupedMap.get(groupKey)
     if (existing) {
@@ -204,6 +232,11 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
           scouts={scouts}
           unitId={membership.unit_id}
           initialStatus={initialStatus}
+          squareConfig={hasPaymentProcessor ? {
+            applicationId: process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID || '',
+            locationId: squareCredentials?.location_id || '',
+            environment: (process.env.NEXT_PUBLIC_SQUARE_ENVIRONMENT as 'sandbox' | 'production') || 'sandbox',
+          } : undefined}
         />
       ) : (
         <div className="text-center py-12 text-stone-500">
