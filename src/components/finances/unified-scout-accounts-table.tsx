@@ -10,7 +10,7 @@ import { SearchInput } from '@/components/ui/search-input'
 import { ToggleButtonGroup, type ToggleOption } from '@/components/ui/toggle-button-group'
 import { SortIcon, type SortDirection } from '@/components/ui/sort-icon'
 import { formatCurrency, cn } from '@/lib/utils'
-import { DollarSign, Bell } from 'lucide-react'
+import { DollarSign, Bell, Wallet } from 'lucide-react'
 
 export interface ScoutAccountRow {
   id: string
@@ -44,6 +44,7 @@ interface UnifiedScoutAccountsTableProps {
   onSelectionChange: (ids: string[]) => void
   onRecordPayment?: (scout: ScoutAccountRow) => void
   onSendReminder?: (scout: ScoutAccountRow) => void
+  onAdjustFunds?: (scout: ScoutAccountRow) => void
 }
 
 export function UnifiedScoutAccountsTable({
@@ -54,6 +55,7 @@ export function UnifiedScoutAccountsTable({
   onSelectionChange,
   onRecordPayment,
   onSendReminder,
+  onAdjustFunds,
 }: UnifiedScoutAccountsTableProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [patrolFilter, setPatrolFilter] = useState<string>('all')
@@ -377,6 +379,25 @@ export function UnifiedScoutAccountsTable({
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
+                    {onAdjustFunds && (
+                      <TooltipProvider delayDuration={200}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              data-action-button
+                              onClick={() => onAdjustFunds(scout)}
+                              className="h-7 w-7 p-0"
+                              aria-label={`Adjust funds for ${scout.scoutName}`}
+                            >
+                              <Wallet className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Adjust Funds</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
                   </div>
                 </td>
               </tr>

@@ -11,6 +11,7 @@ import { BillingForm } from '@/components/billing/billing-form'
 import { QuickPaymentForm } from '@/components/payments/quick-payment-form'
 import { BulkReminderWrapper } from './bulk-reminder-wrapper'
 import { SendPaymentRequestModal } from '@/components/accounts/send-payment-request-modal'
+import { AdjustFundsModal } from '@/components/accounts/adjust-funds-modal'
 import { Upload } from 'lucide-react'
 
 interface Scout {
@@ -67,6 +68,7 @@ export function UnifiedAccountsView({
   const [actionScout, setActionScout] = useState<ScoutAccountRow | null>(null)
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
   const [isIndividualReminderOpen, setIsIndividualReminderOpen] = useState(false)
+  const [isAdjustFundsOpen, setIsAdjustFundsOpen] = useState(false)
 
   // Navigate to account detail on row click
   const handleScoutSelect = (scout: ScoutAccountRow) => {
@@ -84,10 +86,16 @@ export function UnifiedAccountsView({
     setIsIndividualReminderOpen(true)
   }
 
+  const handleAdjustFunds = (scout: ScoutAccountRow) => {
+    setActionScout(scout)
+    setIsAdjustFundsOpen(true)
+  }
+
   const handleActionSuccess = () => {
     router.refresh()
     setIsPaymentOpen(false)
     setIsIndividualReminderOpen(false)
+    setIsAdjustFundsOpen(false)
     setActionScout(null)
   }
 
@@ -129,6 +137,7 @@ export function UnifiedAccountsView({
         onSelectionChange={canTakeActions ? setSelectedIds : () => {}}
         onRecordPayment={canTakeActions ? handleRecordPayment : undefined}
         onSendReminder={canTakeActions ? handleSendReminder : undefined}
+        onAdjustFunds={canTakeActions ? handleAdjustFunds : undefined}
       />
 
       {/* Individual Payment Dialog */}
@@ -174,6 +183,26 @@ export function UnifiedAccountsView({
           scoutId={actionScout.scoutId}
           scoutName={actionScout.scoutName}
           balance={actionScout.billingBalance}
+          hideTrigger
+          onSuccess={handleActionSuccess}
+        />
+      )}
+
+      {/* Individual Adjust Funds Dialog */}
+      {actionScout && (
+        <AdjustFundsModal
+          scoutAccountId={actionScout.id}
+          scoutName={actionScout.scoutName}
+          currentFundsBalance={actionScout.fundsBalance}
+          unitId={unitId}
+          open={isAdjustFundsOpen}
+          onOpenChange={(open) => {
+            setIsAdjustFundsOpen(open)
+            if (!open) {
+              setActionScout(null)
+              router.refresh()
+            }
+          }}
           hideTrigger
           onSuccess={handleActionSuccess}
         />
