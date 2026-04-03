@@ -20,18 +20,18 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 // Import after mocking
-import { addFundsToScout, voidPayment } from '@/app/actions/funds'
+import { adjustScoutFunds, voidPayment } from '@/app/actions/funds'
 
 describe('Funds Actions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  describe('addFundsToScout', () => {
+  describe('adjustScoutFunds', () => {
     it('should return error when not authenticated', async () => {
       mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
 
-      const result = await addFundsToScout('account-123', 100, 'fundraiser-1', 'Test notes')
+      const result = await adjustScoutFunds('account-123', 100, 'add', 'fundraiser-1', 'Test notes')
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('Not authenticated')
@@ -48,7 +48,7 @@ describe('Funds Actions', () => {
         maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
       })
 
-      const result = await addFundsToScout('account-123', 100, 'fundraiser-1', 'Test notes')
+      const result = await adjustScoutFunds('account-123', 100, 'add', 'fundraiser-1', 'Test notes')
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('Profile not found')
@@ -86,7 +86,7 @@ describe('Funds Actions', () => {
         }
       })
 
-      const result = await addFundsToScout('account-123', 100, 'fundraiser-1', 'Test notes')
+      const result = await adjustScoutFunds('account-123', 100, 'add', 'fundraiser-1', 'Test notes')
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('Scout account not found')
@@ -127,7 +127,7 @@ describe('Funds Actions', () => {
         }
       })
 
-      const result = await addFundsToScout('account-123', 100, 'fundraiser-1', 'Test notes')
+      const result = await adjustScoutFunds('account-123', 100, 'add', 'fundraiser-1', 'Test notes')
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('Failed to find scout account')
@@ -182,10 +182,10 @@ describe('Funds Actions', () => {
         }
       })
 
-      const result = await addFundsToScout('account-123', 100, 'fundraiser-1', 'Test notes')
+      const result = await adjustScoutFunds('account-123', 100, 'add', 'fundraiser-1', 'Test notes')
 
       expect(result.success).toBe(false)
-      expect(result.error).toBe('Only admins and treasurers can add funds')
+      expect(result.error).toBe('Only admins and treasurers can adjust funds')
     })
 
     it('should return error when membership check fails', async () => {
@@ -237,7 +237,7 @@ describe('Funds Actions', () => {
         }
       })
 
-      const result = await addFundsToScout('account-123', 100, 'fundraiser-1', 'Test notes')
+      const result = await adjustScoutFunds('account-123', 100, 'add', 'fundraiser-1', 'Test notes')
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('Failed to verify permissions')
@@ -292,7 +292,7 @@ describe('Funds Actions', () => {
         }
       })
 
-      const result = await addFundsToScout('account-123', 0, 'fundraiser-1', 'Test notes')
+      const result = await adjustScoutFunds('account-123', 0, 'add', 'fundraiser-1', 'Test notes')
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('Amount must be greater than 0')
@@ -354,7 +354,7 @@ describe('Funds Actions', () => {
         }
       })
 
-      const result = await addFundsToScout('account-123', 100, 'fundraiser-1', 'Test notes')
+      const result = await adjustScoutFunds('account-123', 100, 'add', 'fundraiser-1', 'Test notes')
 
       expect(result.success).toBe(false)
       expect(result.error).toBe('Invalid fundraiser type')
@@ -430,13 +430,13 @@ describe('Funds Actions', () => {
         error: null,
       })
 
-      const result = await addFundsToScout('account-123', 100, 'fundraiser-1', 'Test notes')
+      const result = await adjustScoutFunds('account-123', 100, 'add', 'fundraiser-1', 'Test notes')
 
       expect(result.success).toBe(true)
       expect(mockSupabase.rpc).toHaveBeenCalledWith('credit_fundraising_to_scout', {
         p_scout_account_id: 'account-123',
         p_amount: 100,
-        p_description: 'Popcorn Sales: Test notes - John Scout',
+        p_description: 'Popcorn Sales credit: Test notes - John Scout',
         p_fundraiser_type: 'Popcorn Sales',
       })
     })
@@ -511,7 +511,7 @@ describe('Funds Actions', () => {
         error: null,
       })
 
-      await addFundsToScout('account-123', 50, 'fundraiser-1')
+      await adjustScoutFunds('account-123', 50, 'add', 'fundraiser-1')
 
       expect(mockSupabase.rpc).toHaveBeenCalledWith('credit_fundraising_to_scout', {
         p_scout_account_id: 'account-123',
@@ -519,6 +519,142 @@ describe('Funds Actions', () => {
         p_description: 'Car Wash credit - Jane Doe',
         p_fundraiser_type: 'Car Wash',
       })
+    })
+
+    it('should call debit_funds_from_scout RPC when direction is remove', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'user-123' } },
+      })
+
+      let callCount = 0
+      mockSupabase.from.mockImplementation((table: string) => {
+        callCount++
+        if (table === 'profiles' && callCount === 1) {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: 'profile-123' },
+              error: null,
+            }),
+          }
+        }
+        if (table === 'scout_accounts') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                id: 'account-123',
+                unit_id: 'unit-456',
+                scout: { first_name: 'John', last_name: 'Scout' },
+              },
+              error: null,
+            }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { role: 'admin' },
+              error: null,
+            }),
+          }
+        }
+        if (table === 'fundraiser_types') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { name: 'Popcorn Sales' },
+              error: null,
+            }),
+          }
+        }
+        if (table === 'journal_entries') {
+          return {
+            update: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockResolvedValue({ error: null }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      mockSupabase.rpc.mockResolvedValue({
+        data: { success: true, journal_entry_id: 'journal-123' },
+        error: null,
+      })
+
+      const result = await adjustScoutFunds('account-123', 50, 'remove', 'fundraiser-1', 'Correcting credit error')
+
+      expect(result.success).toBe(true)
+      expect(mockSupabase.rpc).toHaveBeenCalledWith('debit_funds_from_scout', {
+        p_scout_account_id: 'account-123',
+        p_amount: 50,
+        p_description: 'Popcorn Sales removal: Correcting credit error - John Scout',
+        p_fundraiser_type: 'Popcorn Sales',
+      })
+    })
+
+    it('should require notes when direction is remove', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'user-123' } },
+      })
+
+      let callCount = 0
+      mockSupabase.from.mockImplementation((table: string) => {
+        callCount++
+        if (table === 'profiles' && callCount === 1) {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: 'profile-123' },
+              error: null,
+            }),
+          }
+        }
+        if (table === 'scout_accounts') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                id: 'account-123',
+                unit_id: 'unit-456',
+                scout: { first_name: 'John', last_name: 'Scout' },
+              },
+              error: null,
+            }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { role: 'admin' },
+              error: null,
+            }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockReturnThis(),
+          maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+        }
+      })
+
+      const result = await adjustScoutFunds('account-123', 50, 'remove', undefined, undefined)
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Notes are required when removing funds')
     })
   })
 

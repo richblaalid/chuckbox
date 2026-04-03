@@ -9,9 +9,10 @@ interface ActionResult {
   data?: unknown
 }
 
-export async function addFundsToScout(
+export async function adjustScoutFunds(
   scoutAccountId: string,
   amount: number,
+  direction: 'add' | 'remove' = 'add',
   fundraiserTypeId?: string,
   notes?: string
 ): Promise<ActionResult> {
@@ -67,12 +68,16 @@ export async function addFundsToScout(
   }
 
   if (!membership || !['admin', 'treasurer'].includes(membership.role)) {
-    return { success: false, error: 'Only admins and treasurers can add funds' }
+    return { success: false, error: 'Only admins and treasurers can adjust funds' }
   }
 
   // Validate amount
   if (amount <= 0) {
     return { success: false, error: 'Amount must be greater than 0' }
+  }
+
+  if (direction === 'remove' && (!notes || !notes.trim())) {
+    return { success: false, error: 'Notes are required when removing funds' }
   }
 
   // Get fundraiser type name for description (if provided)
@@ -93,12 +98,14 @@ export async function addFundsToScout(
   // Build description
   const scout = scoutAccount.scout as { first_name: string; last_name: string } | null
   const scoutName = scout ? `${scout.first_name} ${scout.last_name}` : 'Unknown Scout'
+  const directionLabel = direction === 'remove' ? 'removal' : 'credit'
   const description = notes
-    ? `${fundraiserTypeName}: ${notes} - ${scoutName}`
-    : `${fundraiserTypeName} credit - ${scoutName}`
+    ? `${fundraiserTypeName} ${directionLabel}: ${notes} - ${scoutName}`
+    : `${fundraiserTypeName} ${directionLabel} - ${scoutName}`
 
-  // Use the existing RPC function
-  const { data, error } = await supabase.rpc('credit_fundraising_to_scout', {
+  // Call the appropriate RPC based on direction
+  const rpcName = direction === 'remove' ? 'debit_funds_from_scout' : 'credit_fundraising_to_scout'
+  const { data, error } = await supabase.rpc(rpcName, {
     p_scout_account_id: scoutAccountId,
     p_amount: amount,
     p_description: description,
