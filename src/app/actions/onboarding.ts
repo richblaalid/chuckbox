@@ -458,6 +458,7 @@ interface ProvisionAuthenticatedInput {
   parsedAdults: ParsedAdult[]
   parsedScouts: ParsedScout[]
   signupPath?: 'csv' | 'manual'
+  confirmDuplicateOverride?: boolean
 }
 
 export async function provisionUnitAuthenticated(input: ProvisionAuthenticatedInput): Promise<ProvisionResult> {
@@ -478,7 +479,7 @@ export async function provisionUnitAuthenticated(input: ProvisionAuthenticatedIn
 
   // 3. Check for duplicate unit
   const duplicateCheck = await checkDuplicateUnit(unitMetadata)
-  if (duplicateCheck.exists) {
+  if (duplicateCheck.exists && !input.confirmDuplicateOverride) {
     return {
       success: false,
       duplicateWarning: {

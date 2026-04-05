@@ -6,7 +6,7 @@ import { Settings, LogOut, PanelLeftClose, PanelLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getVisibleNavItems, isFinancialRole } from '@/lib/roles'
 import { Logo } from '@/components/ui/logo'
-import { UnitLogo } from './unit-logo'
+import { UnitSwitcher } from './unit-switcher'
 import { useUnit } from '@/components/providers/unit-context'
 import { useSidebar } from '@/components/providers/sidebar-context'
 import { Button } from '@/components/ui/button'
@@ -108,9 +108,7 @@ export function Sidebar({ user, userName, className }: SidebarProps) {
         {/* Unit Section - hidden when collapsed */}
         {!isCollapsed && (
           <div className="border-b border-sidebar-border px-4 py-4">
-            <div className="flex flex-col items-center gap-3">
-              <UnitLogo size="md" />
-            </div>
+            <UnitSwitcher />
           </div>
         )}
 

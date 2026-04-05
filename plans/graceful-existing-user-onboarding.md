@@ -1,6 +1,6 @@
 # Graceful Existing User Onboarding
 
-> **Status:** In Progress
+> **Status:** Complete
 > **Created:** 2026-03-25
 > **Author:** Claude
 
@@ -187,23 +187,23 @@ flowchart TD
 ### Phase 2: In-App Unit Creation
 
 #### 2.1 Create Unit Route
-- [ ] **2.1.1** Create `/create-unit` page
+- [x] **2.1.1** Create `/create-unit` page
   - Files: `src/app/(dashboard)/create-unit/page.tsx`
   - Details: Protected route. Reuses CSV uploader and onboarding form components. Calls `provisionUnitAuthenticated()` instead of `provisionUnit()`. Skips email step entirely.
   - Test: Authenticated user can create a second unit, lands on `/setup`
 
-- [ ] **2.1.2** Create `CreateUnitWizard` component
+- [x] **2.1.2** Create `CreateUnitWizard` component
   - Files: `src/components/onboarding/create-unit-wizard.tsx`
   - Details: Simplified wizard — unit info + CSV upload + confirm. No email/auth steps. Reuses `csv-uploader.tsx` and `roster-preview.tsx`.
   - Test: Component renders, submits, creates unit
 
 #### 2.2 Navigation
-- [ ] **2.2.1** Add "Create New Unit" link in Settings page
+- [x] **2.2.1** Add "Create New Unit" link in Settings page
   - Files: Settings page component (identify exact file)
   - Details: Add a "Create New Unit" link under an "Account" or "Units" section in Settings. This is a rare, infrequent action — Settings is the appropriate home. Keep it low-prominence (text link or small card, not a primary CTA). **Future:** This is where a payment gate would be inserted when unit creation becomes paid.
   - Test: Link visible in Settings, navigates to `/create-unit`
 
-- [ ] **2.2.2** Add unit switcher UI (conditional — multi-unit users only)
+- [x] **2.2.2** Add unit switcher UI (conditional — multi-unit users only)
   - Files: `src/components/dashboard/sidebar.tsx`, new `src/components/dashboard/unit-switcher.tsx`
   - Details: Replace the static `UnitLogo` in the sidebar with a clickable unit switcher dropdown — but **only when the user has 2+ units**. Single-unit users see the current static logo. The dropdown lists all units and includes a muted "+ Add another unit" link at the bottom. Wires into the existing `UnitContext.switchUnit()` method.
   - Test: Single-unit user sees static logo. Multi-unit user sees dropdown with unit list + create link.
@@ -273,7 +273,7 @@ flowchart TD
 |-------|-------|----------|--------|
 | Phase 0 | 4 | 4 | Complete (0.1.1 dropped) |
 | Phase 1 | 3 | 3 | Complete |
-| Phase 2 | 4 | 0 | Not Started |
+| Phase 2 | 4 | 4 | Complete |
 
 ---
 
@@ -287,7 +287,11 @@ flowchart TD
 | 0.2.3 | 2026-03-27 | 41c4947 | provisionUnitAuthenticated() for logged-in users, 2 tests |
 | 1.1.1 | 2026-03-30 | pending | ExistingUserNotice component |
 | 1.1.2 | 2026-03-30 | pending | SignupWizard handles account_exists code |
-| 1.2.1 | 2026-03-30 | pending | Middleware redirects authenticated /signup to /create-unit |
+| 1.2.1 | 2026-03-30 | b5a9d51 | Middleware redirects authenticated /signup to /create-unit |
+| 2.1.1 | 2026-04-05 | pending | /create-unit page with CreateUnitWizard |
+| 2.1.2 | 2026-04-05 | pending | CreateUnitWizard — simplified, no auth steps |
+| 2.2.1 | 2026-04-05 | pending | "Create another unit" link in Settings |
+| 2.2.2 | 2026-04-05 | pending | UnitSwitcher component in sidebar |
 
 ---
 
