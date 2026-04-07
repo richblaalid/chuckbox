@@ -1,11 +1,12 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership, getCurrentUnit } from '@/lib/data/cached-queries'
 import { canAccessPage, isFinancialRole } from '@/lib/roles'
 import { FinanceSubnav } from '@/components/finances/finance-subnav'
 import { BillingManagementView, type BillingRecordEntry } from '@/components/billing/billing-management-view'
 
 interface BillingPageProps {
-  searchParams: Promise<{ status?: string }>
+  searchParams: Promise<{ status?: string; unit?: string }>
 }
 
 export default async function BillingPage({ searchParams }: BillingPageProps) {
@@ -23,29 +24,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
     redirect('/login')
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
-    redirect('/login')
-  }
-
-  const { data: membershipData } = await supabase
-    .from('unit_memberships')
-    .select('unit_id, role, units:units!unit_memberships_unit_id_fkey(name)')
-    .eq('profile_id', profile.id)
-    .eq('status', 'active')
-    .single()
-
-  const membership = membershipData as {
-    unit_id: string
-    role: string
-    units: { name: string } | null
-  } | null
-
+  const membership = await getCurrentMembership(params.unit)
   if (!membership) {
     redirect('/login')
   }
@@ -53,6 +32,8 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
   if (!canAccessPage(membership.role, 'finances')) {
     redirect('/roster')
   }
+
+  const currentUnit = await getCurrentUnit(params.unit)
 
   // Check if unit has an active payment processor connection
   const { data: squareCredentials } = await supabase
@@ -220,7 +201,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       <div>
         <h1 className="text-3xl font-bold text-stone-900">Finances</h1>
         <p className="mt-1 text-stone-600">
-          Financial overview for {membership.units?.name || 'your unit'}
+          Financial overview for {currentUnit?.name || 'your unit'}
         </p>
       </div>
 

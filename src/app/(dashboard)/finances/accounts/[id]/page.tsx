@@ -1,4 +1,5 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getCurrentMembership } from '@/lib/data/cached-queries'
 import { formatCurrency } from '@/lib/utils'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
@@ -10,10 +11,12 @@ import { FinanceSubnav } from '@/components/finances/finance-subnav'
 
 interface AccountPageProps {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ unit?: string }>
 }
 
-export default async function AccountDetailPage({ params }: AccountPageProps) {
+export default async function AccountDetailPage({ params, searchParams }: AccountPageProps) {
   const { id } = await params
+  const { unit: requestedUnitId } = await searchParams
   const supabase = await createClient()
 
   const {
@@ -22,7 +25,9 @@ export default async function AccountDetailPage({ params }: AccountPageProps) {
 
   if (!user) return null
 
-  // Get user's profile (profile_id is now separate from auth user id)
+  // Note: membership may be null for guardians who have scout_guardians rows
+  // but no unit_memberships row. RLS on scout_accounts still gates access.
+  // We need the profile lookup separately for the guardian check below.
   const { data: profile } = await supabase
     .from('profiles')
     .select('id')
@@ -31,14 +36,7 @@ export default async function AccountDetailPage({ params }: AccountPageProps) {
 
   if (!profile) return null
 
-  // Get user's membership role and unit info
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select('role, unit_id')
-    .eq('profile_id', profile.id)
-    .eq('status', 'active')
-    .single()
-
+  const membership = await getCurrentMembership(requestedUnitId)
   const userRole = membership?.role || 'parent'
   const unitId = membership?.unit_id
   const canRecordPayment = isFinancialRole(userRole)

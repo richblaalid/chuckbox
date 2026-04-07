@@ -245,23 +245,23 @@ flowchart TD
 
 > Each task follows the same mechanical change. Migrate one file, verify build, verify the page loads with both `?unit=A` and `?unit=B`, commit.
 
-- [ ] **2.1.1** `/finances` page
+- [x] **2.1.1** `/finances` page
   - Files: `src/app/(dashboard)/finances/page.tsx`
   - Test: Manual — page loads, shows correct unit's data with `?unit=` param
 
-- [ ] **2.1.2** `/finances/accounts` page
+- [x] **2.1.2** `/finances/accounts` page
   - Files: `src/app/(dashboard)/finances/accounts/page.tsx`
   - Test: Manual
 
-- [ ] **2.1.3** `/finances/accounts/[id]` page
+- [x] **2.1.3** `/finances/accounts/[id]` page
   - Files: `src/app/(dashboard)/finances/accounts/[id]/page.tsx`
   - Test: Manual
 
-- [ ] **2.1.4** `/finances/billing` page
+- [x] **2.1.4** `/finances/billing` page
   - Files: `src/app/(dashboard)/finances/billing/page.tsx`
   - Test: Manual
 
-- [ ] **2.1.5** `/finances/payments` page
+- [x] **2.1.5** `/finances/payments` page
   - Files: `src/app/(dashboard)/finances/payments/page.tsx`
   - Test: Manual
 
@@ -452,7 +452,7 @@ At the end of every phase, the following must hold:
 |-------|-------|----------|--------|
 | Phase 0: Feature flag | 4 | 4 | Complete |
 | Phase 1: Helper | 3 | 3 | Complete |
-| Phase 2: Finances pages | 6 | 0 | Not Started |
+| Phase 2: Finances pages | 6 | 5 | In Progress (2.1.6 pending) |
 | Phase 3: Other pages | 11 | 0 | Not Started |
 | Phase 4: API routes | 13 | 0 | Not Started |
 | Phase 5: Lint rule | 1 | 0 | Not Started |
@@ -475,7 +475,12 @@ At the end of every phase, the following must hold:
 | 0.2.4 | 2026-04-06 | a25d697 | CLAUDE.md feature flag table updated |
 | 1.1.1 | 2026-04-06 | pending | cached getCurrentMembership extended, 6 tests |
 | 1.1.2 | 2026-04-06 | pending | lib/auth getCurrentMembership extended, 6 tests |
-| 1.1.3 | 2026-04-06 | pending | getRequestedUnitId helper added, 4 tests |
+| 1.1.3 | 2026-04-06 | 80f54d0 | getRequestedUnitId helper added, 4 tests |
+| 2.1.1 | 2026-04-06 | pending | /finances migrated |
+| 2.1.2 | 2026-04-06 | pending | /finances/accounts migrated |
+| 2.1.3 | 2026-04-06 | pending | /finances/accounts/[id] — preserves null-membership fallback for guardians |
+| 2.1.4 | 2026-04-06 | pending | /finances/billing migrated |
+| 2.1.5 | 2026-04-06 | pending | /finances/payments migrated |
 
 ---
 
