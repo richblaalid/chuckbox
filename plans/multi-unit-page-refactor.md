@@ -223,18 +223,18 @@ flowchart TD
 ### Phase 1: Shared Helper
 
 #### 1.1 Extend `getCurrentMembership()`
-- [ ] **1.1.1** Add `requestedUnitId` param to cached helper
+- [x] **1.1.1** Add `requestedUnitId` param to cached helper
   - Files: `src/lib/data/cached-queries.ts`
   - Details: New signature: `getCurrentMembership(requestedUnitId?: string)`. Fetches all active memberships (no `.single()`), returns matching one or first. Update `getCurrentUnit()` to pass through.
   - Test: Unit test — single membership returns it; multiple memberships returns matched or first
   - **Cache concern:** Since `cache()` keys on arguments, `getCurrentMembership(undefined)` and `getCurrentMembership('uuid')` are separate cache entries per request. That's correct behavior.
 
-- [ ] **1.1.2** Add `requestedUnitId` param to non-cached helper
+- [x] **1.1.2** Add `requestedUnitId` param to non-cached helper
   - Files: `src/lib/auth.ts`
   - Details: Same signature change for `getCurrentMembership()` here. Used by API routes.
   - Test: Unit test — same as 1.1.1
 
-- [ ] **1.1.3** Add helper for reading `?unit=` from request URL (API routes)
+- [x] **1.1.3** Add helper for reading `?unit=` from request URL (API routes)
   - Files: `src/lib/auth.ts`
   - Details: Small `getRequestedUnitId(request: Request | NextRequest): string | undefined` helper. Reads from `nextUrl.searchParams.get('unit')`. One-liner but consistent across all API routes.
   - Test: Unit test — returns string or undefined
@@ -451,7 +451,7 @@ At the end of every phase, the following must hold:
 | Phase | Total | Complete | Status |
 |-------|-------|----------|--------|
 | Phase 0: Feature flag | 4 | 4 | Complete |
-| Phase 1: Helper | 3 | 0 | Not Started |
+| Phase 1: Helper | 3 | 3 | Complete |
 | Phase 2: Finances pages | 6 | 0 | Not Started |
 | Phase 3: Other pages | 11 | 0 | Not Started |
 | Phase 4: API routes | 13 | 0 | Not Started |
@@ -472,7 +472,10 @@ At the end of every phase, the following must hold:
 | 0.2.1 | 2026-04-06 | pending | Settings link gated |
 | 0.2.2 | 2026-04-06 | pending | UnitSwitcher dropdown gated |
 | 0.2.3 | 2026-04-06 | pending | /create-unit page returns notFound() |
-| 0.2.4 | 2026-04-06 | pending | CLAUDE.md feature flag table updated |
+| 0.2.4 | 2026-04-06 | a25d697 | CLAUDE.md feature flag table updated |
+| 1.1.1 | 2026-04-06 | pending | cached getCurrentMembership extended, 6 tests |
+| 1.1.2 | 2026-04-06 | pending | lib/auth getCurrentMembership extended, 6 tests |
+| 1.1.3 | 2026-04-06 | pending | getRequestedUnitId helper added, 4 tests |
 
 ---
 

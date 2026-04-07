@@ -43,21 +43,30 @@ export const getCurrentProfile = cache(async () => {
 
 /**
  * Get the current user's active unit membership.
- * Returns unit_id, role, and profile_id.
+ *
+ * For multi-unit users, pass `requestedUnitId` (typically from the URL
+ * `?unit=` query param) to select the active unit. If omitted or no
+ * match is found, falls back to the first membership.
+ *
+ * Returns null when the user is not authenticated or has no memberships.
  */
-export const getCurrentMembership = cache(async () => {
+export const getCurrentMembership = cache(async (requestedUnitId?: string) => {
   const profile = await getCurrentProfile()
   if (!profile) return null
 
   const supabase = await createClient()
-  const { data: membership } = await supabase
+  const { data: memberships } = await supabase
     .from('unit_memberships')
     .select('unit_id, role')
     .eq('profile_id', profile.id)
     .eq('status', 'active')
-    .single()
 
-  if (!membership) return null
+  if (!memberships || memberships.length === 0) return null
+
+  const matched = requestedUnitId
+    ? memberships.find(m => m.unit_id === requestedUnitId)
+    : null
+  const membership = matched ?? memberships[0]
 
   return {
     profile_id: profile.id,
@@ -69,9 +78,11 @@ export const getCurrentMembership = cache(async () => {
 /**
  * Get the current user's unit with basic info.
  * Builds on getCurrentMembership for efficiency.
+ *
+ * For multi-unit users, pass `requestedUnitId` to select the active unit.
  */
-export const getCurrentUnit = cache(async () => {
-  const membership = await getCurrentMembership()
+export const getCurrentUnit = cache(async (requestedUnitId?: string) => {
+  const membership = await getCurrentMembership(requestedUnitId)
   if (!membership) return null
 
   const supabase = await createClient()
