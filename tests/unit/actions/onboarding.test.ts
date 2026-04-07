@@ -13,6 +13,11 @@ vi.mock('@/lib/import/bsa-roster-parser', () => ({
   getScoutPosition: vi.fn().mockReturnValue({ primary: null, secondary: null }),
 }))
 
+// Mock next/cache (revalidatePath requires Next.js request context)
+vi.mock('next/cache', () => ({
+  revalidatePath: vi.fn(),
+}))
+
 // Mock Supabase clients
 vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: vi.fn().mockReturnValue({

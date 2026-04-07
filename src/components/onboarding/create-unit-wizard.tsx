@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { Upload, FileText, X, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { TrailMarker } from '@/components/ui/trail-marker'
@@ -21,7 +20,6 @@ const STEPS_MANUAL = [
 ]
 
 export function CreateUnitWizard() {
-  const router = useRouter()
   const [currentStep, setCurrentStep] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -185,15 +183,17 @@ export function CreateUnitWizard() {
       setIsComplete(true)
       setIsLoading(false)
 
-      // Redirect to dashboard after short delay so user sees success
+      // Redirect to dashboard. Use full navigation (not router.push) so the
+      // dashboard layout re-runs with the new membership instead of using its
+      // cached server-render.
       setTimeout(() => {
-        router.push(`/scouts?unit=${result.unitId}`)
+        window.location.href = `/scouts?unit=${result.unitId}`
       }, 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
       setIsLoading(false)
     }
-  }, [unitMetadata, parsedRoster, signupPath, router])
+  }, [unitMetadata, parsedRoster, signupPath])
 
   // ============================================
   // Render: Success
@@ -340,7 +340,7 @@ export function CreateUnitWizard() {
         setIsComplete(true)
         setIsLoading(false)
         setTimeout(() => {
-          router.push(`/scouts?unit=${result.unitId}`)
+          window.location.href = `/scouts?unit=${result.unitId}`
         }, 2000)
       }).catch((err) => {
         setError(err instanceof Error ? err.message : 'An error occurred')

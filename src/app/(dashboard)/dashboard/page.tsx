@@ -61,7 +61,12 @@ interface JournalLine {
   } | null
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ unit?: string }>
+}) {
+  const params = await searchParams
   const supabase = await createClient()
 
   // Get current user
@@ -80,15 +85,20 @@ export default async function DashboardPage() {
 
   if (!profile) return null
 
-  // Get user's unit membership
-  const { data: membershipData } = await supabase
+  // Get all of user's unit memberships (a user may belong to multiple units)
+  const { data: allMemberships } = await supabase
     .from('unit_memberships')
     .select('unit_id, role')
     .eq('profile_id', profile.id)
     .eq('status', 'active')
-    .single()
 
-  const membership = membershipData as { unit_id: string; role: string } | null
+  // Pick the requested unit (from ?unit= query param) or fall back to first membership
+  const requestedUnitId = params.unit
+  const membership = (
+    requestedUnitId
+      ? allMemberships?.find(m => m.unit_id === requestedUnitId)
+      : allMemberships?.[0]
+  ) as { unit_id: string; role: string } | undefined
 
   if (!membership) {
     return (

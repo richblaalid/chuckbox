@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
 import crypto from 'crypto'
 import {
   parseRosterWithMetadata,
@@ -570,6 +571,9 @@ export async function provisionUnitAuthenticated(input: ProvisionAuthenticatedIn
         // Non-fatal — unit is still created
       }
     }
+
+    // Revalidate the dashboard layout so it picks up the new membership
+    revalidatePath('/', 'layout')
 
     return {
       success: true,
