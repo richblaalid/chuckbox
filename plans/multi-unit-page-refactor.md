@@ -1,6 +1,6 @@
 # Multi-Unit Page Refactor & Feature Flag
 
-> **Status:** Draft
+> **Status:** In Progress
 > **Created:** 2026-04-06
 > **Author:** Claude
 > **Depends on:** [graceful-existing-user-onboarding.md](./graceful-existing-user-onboarding.md) (Phase 2 must be flagged off until this is complete)
@@ -190,28 +190,28 @@ flowchart TD
 ### Phase 0: Feature Flag Foundation
 
 #### 0.1 Add the flag
-- [ ] **0.1.1** Add `MULTI_UNIT_CREATION` to `FeatureFlag` enum
+- [x] **0.1.1** Add `MULTI_UNIT_CREATION` to `FeatureFlag` enum
   - Files: `src/lib/feature-flags.ts`
   - Details: New enum value, env var `NEXT_PUBLIC_FEATURE_MULTI_UNIT_CREATION`, default `false`. Add to `featureFlagConfig`.
   - Test: `isFeatureEnabled(FeatureFlag.MULTI_UNIT_CREATION)` returns false by default
 
 #### 0.2 Gate Phase 2 UI
-- [ ] **0.2.1** Hide Settings "Create another unit" link when flag OFF
+- [x] **0.2.1** Hide Settings "Create another unit" link when flag OFF
   - Files: `src/app/(dashboard)/settings/page.tsx`
   - Details: Wrap the link in `{isFeatureEnabled(FeatureFlag.MULTI_UNIT_CREATION) && (...)}`
   - Test: Manual — visit /settings as admin, link absent when flag off
 
-- [ ] **0.2.2** Hide `UnitSwitcher` dropdown when flag OFF
+- [x] **0.2.2** Hide `UnitSwitcher` dropdown when flag OFF
   - Files: `src/components/dashboard/unit-switcher.tsx`
   - Details: At the top of the component, if flag is off, always render the static `<UnitLogo>` branch. Use `useFeatureFlag(FeatureFlag.MULTI_UNIT_CREATION)`.
   - Test: Multi-unit user with flag off sees static logo, no dropdown
 
-- [ ] **0.2.3** 404 the `/create-unit` page when flag OFF
+- [x] **0.2.3** 404 the `/create-unit` page when flag OFF
   - Files: `src/app/(dashboard)/create-unit/page.tsx`
   - Details: Server-side check at top of page; call `notFound()` from `next/navigation` if flag off.
   - Test: Visit /create-unit with flag off → 404 page
 
-- [ ] **0.2.4** Set `.env.local` to enable flag in dev
+- [x] **0.2.4** Set `.env.local` to enable flag in dev
   - Files: `.env.local` (not committed)
   - Details: Document in CLAUDE.md or README that `NEXT_PUBLIC_FEATURE_MULTI_UNIT_CREATION=true` is needed for dev work on this feature
   - Test: Manual — feature works in dev with flag on
@@ -450,7 +450,7 @@ At the end of every phase, the following must hold:
 
 | Phase | Total | Complete | Status |
 |-------|-------|----------|--------|
-| Phase 0: Feature flag | 4 | 0 | Not Started |
+| Phase 0: Feature flag | 4 | 4 | Complete |
 | Phase 1: Helper | 3 | 0 | Not Started |
 | Phase 2: Finances pages | 6 | 0 | Not Started |
 | Phase 3: Other pages | 11 | 0 | Not Started |
@@ -468,7 +468,11 @@ At the end of every phase, the following must hold:
 
 | Task | Date | Commit | Notes |
 |------|------|--------|-------|
-| | | | |
+| 0.1.1 | 2026-04-06 | pending | MULTI_UNIT_CREATION flag added |
+| 0.2.1 | 2026-04-06 | pending | Settings link gated |
+| 0.2.2 | 2026-04-06 | pending | UnitSwitcher dropdown gated |
+| 0.2.3 | 2026-04-06 | pending | /create-unit page returns notFound() |
+| 0.2.4 | 2026-04-06 | pending | CLAUDE.md feature flag table updated |
 
 ---
 

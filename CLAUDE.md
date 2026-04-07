@@ -227,6 +227,7 @@ Feature flags control feature availability via environment variables. See `src/l
 | `SCOUTBOOK_SYNC` | `NEXT_PUBLIC_FEATURE_SCOUTBOOK_SYNC` | `true` | Browser extension sync |
 | `CLI_AUTOMATION` | `NEXT_PUBLIC_FEATURE_CLI_AUTOMATION` | `false` | Dev-only CLI tools |
 | `BANK_INTEGRATION` | `NEXT_PUBLIC_FEATURE_BANK_INTEGRATION` | `false` | Plaid bank connection |
+| `MULTI_UNIT_CREATION` | `NEXT_PUBLIC_FEATURE_MULTI_UNIT_CREATION` | `false` | In-app unit creation + unit switcher (gated until [multi-unit page refactor](plans/multi-unit-page-refactor.md) is complete) |
 
 Usage:
 ```typescript

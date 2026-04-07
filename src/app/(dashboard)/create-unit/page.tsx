@@ -1,8 +1,14 @@
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import { CreateUnitWizard } from '@/components/onboarding/create-unit-wizard'
+import { isFeatureEnabled, FeatureFlag } from '@/lib/feature-flags'
 
 export default function CreateUnitPage() {
+  if (!isFeatureEnabled(FeatureFlag.MULTI_UNIT_CREATION)) {
+    notFound()
+  }
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       <Link

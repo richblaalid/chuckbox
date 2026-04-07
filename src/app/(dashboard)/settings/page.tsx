@@ -567,7 +567,7 @@ export default async function SettingsPage({
         integrationsTabContent={integrationsTabContent}
       />
 
-      {isAdmin && (
+      {isAdmin && isFeatureEnabled(FeatureFlag.MULTI_UNIT_CREATION) && (
         <div className="pt-4 border-t border-stone-200 dark:border-stone-700">
           <Link
             href="/create-unit"

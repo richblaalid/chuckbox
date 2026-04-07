@@ -5,10 +5,12 @@ import Link from 'next/link'
 import { ChevronDown, Plus, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUnit } from '@/components/providers/unit-context'
+import { useFeatureFlag, FeatureFlag } from '@/lib/feature-flags'
 import { UnitLogo } from './unit-logo'
 
 export function UnitSwitcher() {
   const { currentUnit, units, switchUnit } = useUnit()
+  const isMultiUnitEnabled = useFeatureFlag(FeatureFlag.MULTI_UNIT_CREATION)
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -25,8 +27,8 @@ export function UnitSwitcher() {
     }
   }, [isOpen])
 
-  // Single unit — show static logo, no dropdown
-  if (units.length <= 1) {
+  // Single unit OR feature flag off — show static logo, no dropdown
+  if (units.length <= 1 || !isMultiUnitEnabled) {
     return (
       <div className="flex flex-col items-center gap-3">
         <UnitLogo size="md" />

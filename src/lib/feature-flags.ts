@@ -39,6 +39,14 @@ export enum FeatureFlag {
    * balances and transactions. View-only, no payment processing.
    */
   BANK_INTEGRATION = 'BANK_INTEGRATION',
+
+  /**
+   * Multi-Unit Creation
+   * Enables in-app creation of additional units and the unit
+   * switcher UI. Hidden by default until the multi-unit page
+   * refactor is complete (see plans/multi-unit-page-refactor.md).
+   */
+  MULTI_UNIT_CREATION = 'MULTI_UNIT_CREATION',
 }
 
 /**
@@ -61,6 +69,10 @@ const featureFlagConfig: Record<FeatureFlag, { envVar: string; defaultValue: boo
   [FeatureFlag.BANK_INTEGRATION]: {
     envVar: 'NEXT_PUBLIC_FEATURE_BANK_INTEGRATION',
     defaultValue: false, // Disabled by default, enable per environment
+  },
+  [FeatureFlag.MULTI_UNIT_CREATION]: {
+    envVar: 'NEXT_PUBLIC_FEATURE_MULTI_UNIT_CREATION',
+    defaultValue: false, // Disabled until page refactor is complete
   },
 }
 
