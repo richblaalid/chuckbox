@@ -51,8 +51,11 @@ export async function updateSession(request: NextRequest) {
   }
 
   // If user is authenticated and trying to access login page, redirect to dashboard
+  // (or honor ?next= param if present, e.g. from ExistingUserNotice)
   if (user && pathname === '/login') {
-    const dashboardUrl = new URL('/scouts', request.url)
+    const next = request.nextUrl.searchParams.get('next')
+    const target = next && next.startsWith('/') ? next : '/scouts'
+    const dashboardUrl = new URL(target, request.url)
     return NextResponse.redirect(dashboardUrl)
   }
 
