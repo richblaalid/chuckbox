@@ -129,7 +129,8 @@ export function UnitProvider({
   const linkedGroup = null
   const linkedUnits = currentUnit ? [currentUnit] : []
 
-  // Persist unit selection and clean up invalid stored values
+  // Persist unit selection (localStorage for client-side, cookie for server-side)
+  // and clean up invalid stored values
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('chuckbox_current_unit')
@@ -140,6 +141,10 @@ export function UnitProvider({
       // Save current valid unit ID
       if (currentUnitId) {
         localStorage.setItem('chuckbox_current_unit', currentUnitId)
+        // Cookie is read by server-side getCurrentMembership() helper as a
+        // fallback when no ?unit= query param is in the URL. This preserves
+        // the selected unit across navigation between dashboard pages.
+        document.cookie = `chuckbox_current_unit=${currentUnitId}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`
       }
     }
   }, [currentUnitId, allUnits])

@@ -13,9 +13,20 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
 }))
 
+// Hoisted so vi.mock factory can reference it. Default returns no cookie.
+const { cookieGetMock } = vi.hoisted(() => ({
+  cookieGetMock: vi.fn().mockReturnValue(undefined),
+}))
+vi.mock('next/headers', () => ({
+  cookies: vi.fn().mockResolvedValue({
+    get: cookieGetMock,
+  }),
+}))
+
 describe('getCurrentMembership (cached, multi-unit)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    cookieGetMock.mockReturnValue(undefined)
   })
 
   function setupSupabaseMock(opts: {
@@ -142,6 +153,76 @@ describe('getCurrentMembership (cached, multi-unit)', () => {
         user: { id: 'user-1' },
         profile: { id: 'profile-1' },
         memberships: [{ unit_id: 'unit-A', role: 'admin' }],
+      }) as never
+    )
+
+    const result = await getCurrentMembership()
+    expect(result).toEqual({
+      profile_id: 'profile-1',
+      unit_id: 'unit-A',
+      role: 'admin',
+    })
+  })
+
+  it('falls back to cookie when no requestedUnitId is provided', async () => {
+    cookieGetMock.mockReturnValue({ value: 'unit-B' })
+
+    const { createClient } = await import('@/lib/supabase/server')
+    vi.mocked(createClient).mockResolvedValue(
+      setupSupabaseMock({
+        user: { id: 'user-1' },
+        profile: { id: 'profile-1' },
+        memberships: [
+          { unit_id: 'unit-A', role: 'admin' },
+          { unit_id: 'unit-B', role: 'parent' },
+        ],
+      }) as never
+    )
+
+    const result = await getCurrentMembership()
+    expect(result).toEqual({
+      profile_id: 'profile-1',
+      unit_id: 'unit-B',
+      role: 'parent',
+    })
+  })
+
+  it('requestedUnitId argument takes precedence over cookie', async () => {
+    cookieGetMock.mockReturnValue({ value: 'unit-B' })
+
+    const { createClient } = await import('@/lib/supabase/server')
+    vi.mocked(createClient).mockResolvedValue(
+      setupSupabaseMock({
+        user: { id: 'user-1' },
+        profile: { id: 'profile-1' },
+        memberships: [
+          { unit_id: 'unit-A', role: 'admin' },
+          { unit_id: 'unit-B', role: 'parent' },
+        ],
+      }) as never
+    )
+
+    // Explicit unit-A should win even though cookie says unit-B
+    const result = await getCurrentMembership('unit-A')
+    expect(result).toEqual({
+      profile_id: 'profile-1',
+      unit_id: 'unit-A',
+      role: 'admin',
+    })
+  })
+
+  it('falls back to first membership when cookie unit no longer exists', async () => {
+    cookieGetMock.mockReturnValue({ value: 'unit-stale' })
+
+    const { createClient } = await import('@/lib/supabase/server')
+    vi.mocked(createClient).mockResolvedValue(
+      setupSupabaseMock({
+        user: { id: 'user-1' },
+        profile: { id: 'profile-1' },
+        memberships: [
+          { unit_id: 'unit-A', role: 'admin' },
+          { unit_id: 'unit-B', role: 'parent' },
+        ],
       }) as never
     )
 

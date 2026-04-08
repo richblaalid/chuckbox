@@ -9,7 +9,14 @@
  * For Client Components, use React Query or SWR instead.
  */
 import { cache } from 'react'
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
+
+/**
+ * Cookie name used to persist the user's selected unit across navigation.
+ * Set client-side by UnitContext when the user picks a unit in the switcher.
+ */
+const CURRENT_UNIT_COOKIE = 'chuckbox_current_unit'
 
 /**
  * Get the current authenticated user.
@@ -44,9 +51,11 @@ export const getCurrentProfile = cache(async () => {
 /**
  * Get the current user's active unit membership.
  *
- * For multi-unit users, pass `requestedUnitId` (typically from the URL
- * `?unit=` query param) to select the active unit. If omitted or no
- * match is found, falls back to the first membership.
+ * Selection priority for multi-unit users:
+ *   1. `requestedUnitId` argument (typically from URL `?unit=` query param)
+ *   2. `chuckbox_current_unit` cookie (set client-side when user picks a unit
+ *      in the unit switcher — preserves selection across navigation)
+ *   3. First membership (fallback)
  *
  * Returns null when the user is not authenticated or has no memberships.
  */
@@ -63,8 +72,15 @@ export const getCurrentMembership = cache(async (requestedUnitId?: string) => {
 
   if (!memberships || memberships.length === 0) return null
 
-  const matched = requestedUnitId
-    ? memberships.find(m => m.unit_id === requestedUnitId)
+  // Resolve effective unit ID: explicit arg > cookie > first membership
+  let effectiveUnitId = requestedUnitId
+  if (!effectiveUnitId) {
+    const cookieStore = await cookies()
+    effectiveUnitId = cookieStore.get(CURRENT_UNIT_COOKIE)?.value
+  }
+
+  const matched = effectiveUnitId
+    ? memberships.find(m => m.unit_id === effectiveUnitId)
     : null
   const membership = matched ?? memberships[0]
 
