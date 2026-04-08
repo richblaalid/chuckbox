@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership, getCurrentUnit } from '@/lib/data/cached-queries'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AccessDenied } from '@/components/ui/access-denied'
 import { formatCurrency } from '@/lib/utils'
@@ -39,7 +40,12 @@ interface JournalEntry {
   }[]
 }
 
-export default async function ReportsPage() {
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ unit?: string }>
+}) {
+  const params = await searchParams
   const supabase = await createClient()
 
   const {
@@ -48,30 +54,7 @@ export default async function ReportsPage() {
 
   if (!user) return null
 
-  // Get user's profile (profile_id is now separate from auth user id)
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) return null
-
-  // Get user's unit membership
-  const { data: membershipData } = await supabase
-    .from('unit_memberships')
-    .select('unit_id, role, units:units!unit_memberships_unit_id_fkey(name, unit_number)')
-    .eq('profile_id', profile.id)
-    .eq('status', 'active')
-    .single()
-
-  interface Membership {
-    unit_id: string
-    role: string
-    units: { name: string; unit_number: string } | null
-  }
-
-  const membership = membershipData as Membership | null
+  const membership = await getCurrentMembership(params.unit)
 
   if (!membership) {
     return (
@@ -83,6 +66,8 @@ export default async function ReportsPage() {
       </div>
     )
   }
+
+  const currentUnit = await getCurrentUnit(params.unit)
 
   // Check role-based access
   if (!canAccessPage(membership.role, 'reports')) {
@@ -279,7 +264,7 @@ export default async function ReportsPage() {
       <div>
         <h1 className="text-3xl font-bold text-stone-900">Reports</h1>
         <p className="mt-1 text-stone-600">
-          Financial reports for {membership.units?.name || 'your unit'}
+          Financial reports for {currentUnit?.name || 'your unit'}
         </p>
       </div>
 
@@ -325,16 +310,16 @@ export default async function ReportsPage() {
       </div>
 
       {/* Balance Sheet */}
-      <BalanceSheetReport unitName={membership.units?.name || 'Your Unit'} />
+      <BalanceSheetReport unitName={currentUnit?.name || 'Your Unit'} />
 
       {/* Income & Expense Statement */}
-      <IncomeExpenseReport unitName={membership.units?.name || 'Your Unit'} />
+      <IncomeExpenseReport unitName={currentUnit?.name || 'Your Unit'} />
 
       {/* Aging Report */}
       <AgingReport charges={agingCharges} />
 
       {/* Dues by Patrol */}
-      <DuesByPatrolReport unitName={membership.units?.name || 'Your Unit'} />
+      <DuesByPatrolReport unitName={currentUnit?.name || 'Your Unit'} />
 
       {/* Collection & Cash Flow */}
       <CollectionSummary payments={paymentsForReport} billingRecords={billingForReport} />

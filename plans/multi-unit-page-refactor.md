@@ -265,7 +265,7 @@ flowchart TD
   - Files: `src/app/(dashboard)/finances/payments/page.tsx`
   - Test: Manual
 
-- [ ] **2.1.6** `/finances/reports` page
+- [x] **2.1.6** `/finances/reports` page
   - Files: `src/app/(dashboard)/finances/reports/page.tsx`
   - Test: Manual
 
@@ -452,7 +452,7 @@ At the end of every phase, the following must hold:
 |-------|-------|----------|--------|
 | Phase 0: Feature flag | 4 | 4 | Complete |
 | Phase 1: Helper | 3 | 3 | Complete |
-| Phase 2: Finances pages | 6 | 5 | In Progress (2.1.6 pending) |
+| Phase 2: Finances pages | 6 | 6 | Complete |
 | Phase 3: Other pages | 11 | 0 | Not Started |
 | Phase 4: API routes | 13 | 0 | Not Started |
 | Phase 5: Lint rule | 1 | 0 | Not Started |
@@ -480,7 +480,8 @@ At the end of every phase, the following must hold:
 | 2.1.2 | 2026-04-06 | pending | /finances/accounts migrated |
 | 2.1.3 | 2026-04-06 | pending | /finances/accounts/[id] — preserves null-membership fallback for guardians |
 | 2.1.4 | 2026-04-06 | pending | /finances/billing migrated |
-| 2.1.5 | 2026-04-06 | pending | /finances/payments migrated |
+| 2.1.5 | 2026-04-06 | ff612f2 | /finances/payments migrated |
+| 2.1.6 | 2026-04-08 | pending | /finances/reports migrated — closes Wave A |
 
 ---
 
