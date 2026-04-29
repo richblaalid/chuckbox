@@ -1,8 +1,14 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership } from '@/lib/data/cached-queries'
 import { SetupWizard } from '@/components/onboarding/setup-wizard'
 
-export default async function SetupPage() {
+export default async function SetupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ unit?: string }>
+}) {
+  const { unit: requestedUnitId } = await searchParams
   const supabase = await createClient()
 
   // Get current user
@@ -11,57 +17,32 @@ export default async function SetupPage() {
     redirect('/login')
   }
 
-  // Get user's profile
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
+  // Setup requires admin role on the selected unit
+  const membership = await getCurrentMembership(requestedUnitId)
+  if (!membership || membership.role !== 'admin') {
     redirect('/dashboard')
   }
 
-  // Get user's admin membership and unit info
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select(`
-      unit_id,
-      role,
-      units:units!unit_memberships_unit_id_fkey (
-        id,
-        name,
-        unit_number,
-        unit_type,
-        council
-      )
-    `)
-    .eq('profile_id', profile.id)
-    .eq('role', 'admin')
-    .eq('status', 'active')
-    .maybeSingle()
-
-  // If no admin membership, redirect to dashboard
-  if (!membership) {
-    redirect('/dashboard')
-  }
-
-  const unit = membership.units as {
-    id: string
-    name: string
-    unit_number: string
-    unit_type: string
-    council: string | null
-  }
-
-  // Fetch needs_setup separately (column may not be in generated types yet)
-  const { data: unitData } = await supabase
+  // Fetch unit info + needs_setup flag in one query
+  const { data: unitRow } = await supabase
     .from('units')
-    .select('needs_setup')
-    .eq('id', unit.id)
-    .single()
+    .select('id, name, unit_number, unit_type, council, needs_setup')
+    .eq('id', membership.unit_id)
+    .single<{
+      id: string
+      name: string
+      unit_number: string
+      unit_type: string
+      council: string | null
+      needs_setup?: boolean | null
+    }>()
 
-  const needsSetup = (unitData as { needs_setup?: boolean | null } | null)?.needs_setup ?? false
+  if (!unitRow) {
+    redirect('/dashboard')
+  }
+
+  const unit = unitRow
+  const needsSetup = unitRow.needs_setup ?? false
 
   // Check if setup is already complete by querying with service role
   // Note: setup_completed_at column will be added by migration 20260118000000_unit_provisioning.sql
