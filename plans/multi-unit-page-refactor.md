@@ -307,7 +307,7 @@ Same pattern: read `?unit=` from `request.nextUrl.searchParams`, pass to helper.
   - Files: `src/app/api/square/{payments,transactions,sync,disconnect}/route.ts`, `src/app/api/square/oauth/{authorize,callback}/route.ts`
   - Note: Mutation routes (payments POST, oauth POST) — verify they get unit from request body / row, not URL. (See "API route mutation safety" in section 2.1.)
 
-- [ ] **4.1.2** Reports: balance-sheet, income-expense, dues-by-patrol
+- [x] **4.1.2** Reports: balance-sheet, income-expense, dues-by-patrol
   - Files: `src/app/api/reports/{balance-sheet,income-expense,dues-by-patrol}/route.ts`
 
 - [ ] **4.1.3** Plaid: accounts, transactions, create-link-token, exchange-token, disconnect
@@ -454,7 +454,7 @@ At the end of every phase, the following must hold:
 | Phase 1: Helper | 3 | 3 | Complete |
 | Phase 2: Finances pages | 6 | 6 | Complete |
 | Phase 3: Other pages | 11 | 11 | Complete |
-| Phase 4: API routes | 13 | 0 | Not Started |
+| Phase 4: API routes | 13 | 1 | In Progress (Reports done; read-only GET handlers shipped across Square/Plaid/Scoutbook/Imports — mutations pending in Wave F) |
 | Phase 5: Lint rule | 1 | 0 | Not Started |
 | Phase 6: Unflag | 3 | 0 | Not Started |
 
@@ -493,6 +493,11 @@ At the end of every phase, the following must hold:
 | 3.3.2 | 2026-04-28 | pending | /advancement/bulk-entry migrated to getCurrentMembership |
 | 3.3.3 | 2026-04-28 | pending | /settings/import/charges migrated to getCurrentMembership |
 | 3.3.4 | 2026-04-28 | pending | /settings/import/balances migrated — closes Wave D, Phase 3 complete |
+| 4.1.2 | 2026-04-28 | pending | All 3 reports routes migrated — closes 4.1.2 |
+| 4.1.1-partial | 2026-04-28 | pending | Square: transactions GET + sync GET migrated; payments POST, sync POST, oauth, disconnect remain for Wave F |
+| 4.1.3-partial | 2026-04-28 | pending | Plaid: transactions GET + accounts GET migrated; create-link-token, exchange-token, disconnect, accounts POST remain for Wave F |
+| 4.1.4-partial | 2026-04-28 | pending | Scoutbook: sync/history + sync/pending migrated; sync POST, cancel, confirm, resolution, extension-sync, extension-auth remain for Wave F (sync/status uses sessionId-based RLS, no migration needed) |
+| 4.2.1-partial | 2026-04-28 | pending | Imports: charges/template GET migrated; balances POST/undo, charges POST/notify/void, roster POST remain for Wave F |
 
 ---
 
