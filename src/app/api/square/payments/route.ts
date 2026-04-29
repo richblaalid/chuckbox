@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership, getRequestedUnitId } from '@/lib/auth'
 import { getSquareClientForUnit, getDefaultLocationId } from '@/lib/square/client'
 import { createHash } from 'crypto'
 import { z } from 'zod'
@@ -88,14 +89,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
     }
 
-    // Get user's active membership
-    const { data: membership } = await supabase
-      .from('unit_memberships')
-      .select('unit_id, role')
-      .eq('profile_id', profile.id)
-      .eq('status', 'active')
-      .single()
-
+    // Membership lookup via the multi-unit helper. All downstream unit-scoped
+    // queries (scout_account validation, journal entry, payment record, etc.)
+    // continue to use membership.unit_id, never trusting body fields for auth.
+    const membership = await getCurrentMembership(supabase, getRequestedUnitId(request))
     if (!membership) {
       return NextResponse.json({ error: 'No active membership found' }, { status: 403 })
     }

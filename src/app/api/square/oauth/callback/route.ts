@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership } from '@/lib/auth'
 import { exchangeCodeForTokens, saveSquareCredentials } from '@/lib/square/client'
 
 export async function GET(request: NextRequest) {
@@ -62,28 +63,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(errorUrl)
     }
 
-    // Get user's profile (profile_id is separate from auth user id)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!profile) {
-      const errorUrl = new URL(settingsUrl)
-      errorUrl.searchParams.set('error', 'Profile not found')
-      return NextResponse.redirect(errorUrl)
-    }
-
-    const { data: membership } = await supabase
-      .from('unit_memberships')
-      .select('unit_id, role')
-      .eq('profile_id', profile.id)
-      .eq('unit_id', unitId)
-      .eq('status', 'active')
-      .single()
-
-    if (!membership || membership.role !== 'admin') {
+    // Authorize the user against the unit_id parsed from the state token.
+    // The helper's fallback-to-first-membership behavior is unsafe here, so we
+    // explicitly verify membership.unit_id === unitId after the lookup.
+    const membership = await getCurrentMembership(supabase, unitId)
+    if (!membership || membership.unit_id !== unitId || membership.role !== 'admin') {
       const errorUrl = new URL(settingsUrl)
       errorUrl.searchParams.set('error', 'You do not have permission to connect Square for this unit')
       return NextResponse.redirect(errorUrl)

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership, getRequestedUnitId } from '@/lib/auth'
 import { exchangePublicToken } from '@/lib/plaid/client'
 
 interface ExchangeTokenRequest {
@@ -30,31 +31,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's profile
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
-    }
-
-    // Get user's active membership and verify admin/treasurer role
-    const { data: membership } = await supabase
-      .from('unit_memberships')
-      .select('unit_id, role')
-      .eq('profile_id', profile.id)
-      .eq('status', 'active')
-      .single()
-
-    if (!membership) {
-      return NextResponse.json({ error: 'No active membership found' }, { status: 403 })
-    }
-
-    // Only admins and treasurers can connect bank accounts
-    if (!['admin', 'treasurer'].includes(membership.role)) {
+    const membership = await getCurrentMembership(supabase, getRequestedUnitId(request))
+    if (!membership || !['admin', 'treasurer'].includes(membership.role)) {
       return NextResponse.json(
         { error: 'Only admins and treasurers can connect bank accounts' },
         { status: 403 }
