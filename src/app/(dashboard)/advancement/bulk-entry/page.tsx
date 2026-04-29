@@ -1,9 +1,16 @@
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership } from '@/lib/data/cached-queries'
 import { redirect } from 'next/navigation'
 import { isFeatureEnabled, FeatureFlag } from '@/lib/feature-flags'
 import { BulkEntryInterfaceLazy } from '@/components/advancement/bulk-entry-interface-lazy'
 
-export default async function BulkEntryPage() {
+export default async function BulkEntryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ unit?: string }>
+}) {
+  const { unit: requestedUnitId } = await searchParams
+
   // Check feature flag
   if (!isFeatureEnabled(FeatureFlag.ADVANCEMENT_TRACKING)) {
     redirect('/dashboard')
@@ -17,25 +24,8 @@ export default async function BulkEntryPage() {
 
   if (!user) redirect('/login')
 
-  // Get user's profile and membership
-  const { data: profileData } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profileData) redirect('/setup')
-
-  const { data: membershipData } = await supabase
-    .from('unit_memberships')
-    .select('unit_id, role')
-    .eq('profile_id', profileData.id)
-    .eq('status', 'active')
-    .single()
-
-  if (!membershipData) redirect('/setup')
-
-  const membership = membershipData as { unit_id: string; role: string }
+  const membership = await getCurrentMembership(requestedUnitId)
+  if (!membership) redirect('/setup')
 
   // Only leaders can do bulk entry
   if (!['admin', 'treasurer', 'leader'].includes(membership.role)) {
