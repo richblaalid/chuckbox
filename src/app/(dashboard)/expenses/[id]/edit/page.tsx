@@ -1,36 +1,26 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership } from '@/lib/data/cached-queries'
 import { ExpenseReimbursementForm } from '@/components/expenses/expense-form'
 import type { ExpenseReimbursement } from '@/lib/expenses/types'
 
 interface EditExpensePageProps {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ unit?: string }>
 }
 
-export default async function EditExpensePage({ params }: EditExpensePageProps) {
-  const { id } = await params
+export default async function EditExpensePage({ params, searchParams }: EditExpensePageProps) {
+  const [{ id }, { unit: requestedUnitId }] = await Promise.all([params, searchParams])
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) redirect('/login')
-
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select('unit_id, role')
-    .eq('profile_id', profile.id)
-    .eq('status', 'active')
-    .single()
-
+  const membership = await getCurrentMembership(requestedUnitId)
   if (!membership) redirect('/login')
+
+  const profile = { id: membership.profile_id }
 
   // Fetch the expense
   const { data: expense } = await supabase

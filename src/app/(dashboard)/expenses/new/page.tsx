@@ -1,40 +1,21 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership, getCurrentUnit } from '@/lib/data/cached-queries'
 import { ExpenseReimbursementForm } from '@/components/expenses/expense-form'
 
-export default async function NewExpensePage() {
-  const supabase = await createClient()
+export default async function NewExpensePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ unit?: string }>
+}) {
+  const params = await searchParams
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    redirect('/login')
-  }
-
-  // Get user's profile
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
-    redirect('/login')
-  }
-
-  // Get user's active unit membership
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select('unit_id, role, units!unit_memberships_unit_id_fkey(name)')
-    .eq('profile_id', profile.id)
-    .eq('status', 'active')
-    .single()
-
+  const membership = await getCurrentMembership(params.unit)
   if (!membership) {
     redirect('/login')
   }
 
-  const unit = membership.units as { name: string } | null
+  const unit = await getCurrentUnit(params.unit)
 
   return (
     <div className="space-y-6">

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership, getCurrentUnit } from '@/lib/data/cached-queries'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ExpenseReimbursementList } from '@/components/expenses/expense-list'
@@ -9,7 +10,12 @@ import { isFinancialRole } from '@/lib/roles'
 import { Clock, CheckCircle, Banknote, XCircle, Plus } from 'lucide-react'
 import type { ExpenseReimbursementWithSubmitter } from '@/lib/expenses/types'
 
-export default async function ExpensesPage() {
+export default async function ExpensesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ unit?: string }>
+}) {
+  const params = await searchParams
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -17,30 +23,13 @@ export default async function ExpensesPage() {
     redirect('/login')
   }
 
-  // Get user's profile
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
-    redirect('/login')
-  }
-
-  // Get user's active unit membership
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select('unit_id, role, units!unit_memberships_unit_id_fkey(name)')
-    .eq('profile_id', profile.id)
-    .eq('status', 'active')
-    .single()
-
+  const membership = await getCurrentMembership(params.unit)
   if (!membership) {
     redirect('/login')
   }
 
-  const unit = membership.units as { name: string } | null
+  const profile = { id: membership.profile_id }
+  const unit = await getCurrentUnit(params.unit)
   const hasFinancialRole = isFinancialRole(membership.role)
 
   // Check if unit has an active payment processor connection (for subnav)
