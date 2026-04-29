@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership, getRequestedUnitId } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
   type ParsedAdult,
@@ -37,29 +38,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<ImportRes
     )
   }
 
-  // Get user's profile
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
-    return NextResponse.json(
-      { success: false, adultsImported: 0, adultsUpdated: 0, scoutsImported: 0, scoutsUpdated: 0, guardiansLinked: 0, trainingsImported: 0, patrolsCreated: 0, errors: ['Profile not found'] },
-      { status: 403 }
-    )
-  }
-
-  // Get user's unit and verify admin role
-  const { data: membership, error: membershipError } = await supabase
-    .from('unit_memberships')
-    .select('unit_id, role')
-    .eq('profile_id', profile.id)
-    .eq('status', 'active')
-    .single()
-
-  if (membershipError || !membership) {
+  const membership = await getCurrentMembership(supabase, getRequestedUnitId(request))
+  if (!membership) {
     return NextResponse.json(
       { success: false, adultsImported: 0, adultsUpdated: 0, scoutsImported: 0, scoutsUpdated: 0, guardiansLinked: 0, trainingsImported: 0, patrolsCreated: 0, errors: ['No active unit membership'] },
       { status: 403 }

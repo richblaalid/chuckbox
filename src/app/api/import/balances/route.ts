@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership, getRequestedUnitId } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 interface BalanceImportRow {
@@ -44,28 +45,7 @@ export async function POST(
     )
   }
 
-  // Get user's profile
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
-    return NextResponse.json(
-      { success: false, imported: 0, skipped: 0, errors: ['Profile not found'] },
-      { status: 403 }
-    )
-  }
-
-  // Get user's unit and verify admin/treasurer role
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select('unit_id, role')
-    .eq('profile_id', profile.id)
-    .eq('status', 'active')
-    .single()
-
+  const membership = await getCurrentMembership(supabase, getRequestedUnitId(request))
   if (!membership || !['admin', 'treasurer'].includes(membership.role)) {
     return NextResponse.json(
       {
@@ -78,6 +58,7 @@ export async function POST(
     )
   }
 
+  const profile = { id: membership.profile_id }
   const unitId = membership.unit_id
 
   // Parse request body
