@@ -1,12 +1,13 @@
 import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership } from '@/lib/data/cached-queries'
 import { redirect } from 'next/navigation'
 import { isFeatureEnabled, FeatureFlag } from '@/lib/feature-flags'
 import { AdvancementContentLoader } from '@/components/advancement/advancement-content-loader'
 import { AdvancementContentSkeleton } from '@/components/advancement/advancement-content-skeleton'
 
 interface AdvancementPageProps {
-  searchParams: Promise<{ tab?: string }>
+  searchParams: Promise<{ tab?: string; unit?: string }>
 }
 
 /**
@@ -20,7 +21,7 @@ interface AdvancementPageProps {
  * while data-dependent content loads in the background.
  */
 export default async function AdvancementPage({ searchParams }: AdvancementPageProps) {
-  const { tab } = await searchParams
+  const { tab, unit: requestedUnitId } = await searchParams
   const initialTab = (tab === 'summary' || tab === 'badges' || tab === 'ranks') ? tab : 'ranks'
 
   // Check feature flag
@@ -36,8 +37,8 @@ export default async function AdvancementPage({ searchParams }: AdvancementPageP
 
   if (!user) redirect('/login')
 
-  // Get user's profile and membership
-  // These queries are fast and needed for auth/routing decisions
+  // Profile name is still needed for currentUserName below; the helper
+  // covers membership but not display name.
   const { data: profileData } = await supabase
     .from('profiles')
     .select('id, first_name, last_name')
@@ -50,16 +51,9 @@ export default async function AdvancementPage({ searchParams }: AdvancementPageP
     ? `${profileData.first_name} ${profileData.last_name}`
     : 'Leader'
 
-  const { data: membershipData } = await supabase
-    .from('unit_memberships')
-    .select('unit_id, role')
-    .eq('profile_id', profileData.id)
-    .eq('status', 'active')
-    .single()
+  const membership = await getCurrentMembership(requestedUnitId)
+  if (!membership) redirect('/setup')
 
-  if (!membershipData) redirect('/setup')
-
-  const membership = membershipData as { unit_id: string; role: string }
   const canEdit = ['admin', 'treasurer', 'leader'].includes(membership.role)
 
   // ==========================================

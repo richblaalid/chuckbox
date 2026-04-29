@@ -287,10 +287,10 @@ flowchart TD
 - [x] **3.2.4** `/expenses/[id]/edit` page → `src/app/(dashboard)/expenses/[id]/edit/page.tsx`
 
 #### Wave D: Advancement / Settings imports
-- [ ] **3.3.1** `/advancement` page → `src/app/(dashboard)/advancement/page.tsx`
-- [ ] **3.3.2** `/advancement/bulk-entry` page → `src/app/(dashboard)/advancement/bulk-entry/page.tsx`
-- [ ] **3.3.3** `/settings/import/charges` page → `src/app/(dashboard)/settings/import/charges/page.tsx`
-- [ ] **3.3.4** `/settings/import/balances` page → `src/app/(dashboard)/settings/import/balances/page.tsx`
+- [x] **3.3.1** `/advancement` page → `src/app/(dashboard)/advancement/page.tsx`
+- [x] **3.3.2** `/advancement/bulk-entry` page → `src/app/(dashboard)/advancement/bulk-entry/page.tsx`
+- [x] **3.3.3** `/settings/import/charges` page → `src/app/(dashboard)/settings/import/charges/page.tsx`
+- [x] **3.3.4** `/settings/import/balances` page → `src/app/(dashboard)/settings/import/balances/page.tsx`
 
 > **Checkpoint:** Smoke-test every dashboard page with a multi-unit test user.
 
@@ -453,7 +453,7 @@ At the end of every phase, the following must hold:
 | Phase 0: Feature flag | 4 | 4 | Complete |
 | Phase 1: Helper | 3 | 3 | Complete |
 | Phase 2: Finances pages | 6 | 6 | Complete |
-| Phase 3: Other pages | 11 | 7 | In Progress (Waves B & C complete) |
+| Phase 3: Other pages | 11 | 11 | Complete |
 | Phase 4: API routes | 13 | 0 | Not Started |
 | Phase 5: Lint rule | 1 | 0 | Not Started |
 | Phase 6: Unflag | 3 | 0 | Not Started |
@@ -489,6 +489,10 @@ At the end of every phase, the following must hold:
 | 3.2.2 | 2026-04-28 | pending | /expenses/new migrated to getCurrentMembership + getCurrentUnit |
 | 3.2.3 | 2026-04-28 | pending | /expenses/[id] migrated to getCurrentMembership |
 | 3.2.4 | 2026-04-28 | pending | /expenses/[id]/edit migrated — closes Wave C |
+| 3.3.1 | 2026-04-28 | pending | /advancement migrated — kept inline profile lookup for display name |
+| 3.3.2 | 2026-04-28 | pending | /advancement/bulk-entry migrated to getCurrentMembership |
+| 3.3.3 | 2026-04-28 | pending | /settings/import/charges migrated to getCurrentMembership |
+| 3.3.4 | 2026-04-28 | pending | /settings/import/balances migrated — closes Wave D, Phase 3 complete |
 
 ---
 

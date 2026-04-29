@@ -1,13 +1,19 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership } from '@/lib/data/cached-queries'
 import { isFinancialRole } from '@/lib/roles'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChargeImportWizard } from '@/components/import/charge-import-wizard'
 import { ArrowLeft, Users } from 'lucide-react'
 
-export default async function ChargeImportPage() {
+export default async function ChargeImportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ unit?: string }>
+}) {
+  const { unit: requestedUnitId } = await searchParams
   const supabase = await createClient()
 
   const {
@@ -18,23 +24,7 @@ export default async function ChargeImportPage() {
     redirect('/login')
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
-    redirect('/login')
-  }
-
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select('unit_id, role')
-    .eq('profile_id', profile.id)
-    .eq('status', 'active')
-    .single()
-
+  const membership = await getCurrentMembership(requestedUnitId)
   if (!membership) {
     redirect('/login')
   }
