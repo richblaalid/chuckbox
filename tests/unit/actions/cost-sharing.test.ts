@@ -15,6 +15,11 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(() => Promise.resolve(mockSupabase)),
 }))
 
+vi.mock('@/lib/data/cached-queries', () => ({
+  getCurrentMembership: vi.fn(),
+  getCurrentProfile: vi.fn(),
+}))
+
 import {
   getScoutsWithGuardians,
   createCostShares,
@@ -23,6 +28,13 @@ import {
   markCostSharePaid,
   deleteCostShare,
 } from '@/app/actions/cost-sharing'
+import {
+  getCurrentMembership,
+  getCurrentProfile,
+} from '@/lib/data/cached-queries'
+
+const mockedGetCurrentMembership = vi.mocked(getCurrentMembership)
+const mockedGetCurrentProfile = vi.mocked(getCurrentProfile)
 
 function chainWith(data: unknown, error: unknown = null) {
   return {
@@ -41,29 +53,40 @@ function defaultChain() {
   return chainWith(null)
 }
 
-/** Set up getUserContext to succeed: auth → profile → membership */
-function setupUserContext(role = 'leader') {
-  mockSupabase.auth.getUser.mockResolvedValue({
-    data: { user: { id: 'user-123' } },
+/**
+ * Set up the unit-context auth path used by getScoutsWithGuardians,
+ * createCostShares, getOrganizedCostShares, getParticipantCostShares.
+ *
+ * The action calls getCurrentMembership(unitId), then queries profiles for
+ * venmo_username via the supabase client. Tests can still override
+ * mockSupabase.from for the profiles lookup if they want a different shape.
+ */
+function setupUnitContext(role = 'leader', unitId = 'unit-1') {
+  mockedGetCurrentMembership.mockResolvedValue({
+    profile_id: 'profile-123',
+    unit_id: unitId,
+    role,
   })
 
+  // Default profiles lookup returns a profile with a venmo username; tests that
+  // need different `from` behavior can override after calling this.
   mockSupabase.from.mockImplementation((table: string) => {
     if (table === 'profiles')
       return chainWith({ id: 'profile-123', venmo_username: '@test' })
-    if (table === 'unit_memberships') return chainWith({ role })
     return defaultChain()
   })
 }
 
-/** Set up getAuthenticatedProfile to succeed */
+/**
+ * Set up the profile-only auth path used by markCostSharePaid and
+ * deleteCostShare (via getAuthenticatedProfile → getCurrentProfile).
+ */
 function setupAuthProfile() {
-  mockSupabase.auth.getUser.mockResolvedValue({
-    data: { user: { id: 'user-123' } },
-  })
-
-  mockSupabase.from.mockImplementation((table: string) => {
-    if (table === 'profiles') return chainWith({ id: 'profile-123' })
-    return defaultChain()
+  mockedGetCurrentProfile.mockResolvedValue({
+    id: 'profile-123',
+    first_name: 'Test',
+    last_name: 'User',
+    email: 'test@example.com',
   })
 }
 
@@ -75,18 +98,29 @@ describe('Cost Sharing Actions', () => {
   // ─── getScoutsWithGuardians ──────────────────────────────────────
 
   describe('getScoutsWithGuardians', () => {
-    it('should return error when not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+    it('should return error when not a unit member', async () => {
+      mockedGetCurrentMembership.mockResolvedValue(null)
 
       const result = await getScoutsWithGuardians('unit-1')
       expect(result.success).toBe(false)
-      expect(result.error).toBe('Not authenticated')
+      expect(result.error).toBe('Not a member of this unit')
+    })
+
+    it('should return error when profile lookup fails', async () => {
+      setupUnitContext()
+      // Override profiles to return null so getUserContext fails on profile
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') return chainWith(null)
+        return defaultChain()
+      })
+
+      const result = await getScoutsWithGuardians('unit-1')
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Profile not found')
     })
 
     it('should return scouts with guardian data', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-      })
+      setupUnitContext()
 
       const mockScouts = [
         {
@@ -110,8 +144,6 @@ describe('Cost Sharing Actions', () => {
       mockSupabase.from.mockImplementation((table: string) => {
         if (table === 'profiles')
           return chainWith({ id: 'profile-123', venmo_username: '@test' })
-        if (table === 'unit_memberships')
-          return chainWith({ role: 'leader' })
         if (table === 'scouts') {
           return {
             select: vi.fn().mockReturnThis(),
@@ -139,8 +171,8 @@ describe('Cost Sharing Actions', () => {
   // ─── createCostShares ────────────────────────────────────────────
 
   describe('createCostShares', () => {
-    it('should return error when not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+    it('should return error when not a unit member', async () => {
+      mockedGetCurrentMembership.mockResolvedValue(null)
 
       const result = await createCostShares({
         unitId: 'unit-1',
@@ -149,11 +181,11 @@ describe('Cost Sharing Actions', () => {
         result: { shares: [], totalScouts: 0, perScoutAmount: 0 },
       })
       expect(result.success).toBe(false)
-      expect(result.error).toBe('Not authenticated')
+      expect(result.error).toBe('Not a member of this unit')
     })
 
     it('should return error when no shares provided', async () => {
-      setupUserContext()
+      setupUnitContext()
 
       const result = await createCostShares({
         unitId: 'unit-1',
@@ -166,15 +198,11 @@ describe('Cost Sharing Actions', () => {
     })
 
     it('should create cost share records', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-      })
+      setupUnitContext()
 
       mockSupabase.from.mockImplementation((table: string) => {
         if (table === 'profiles')
           return chainWith({ id: 'profile-123', venmo_username: '@test' })
-        if (table === 'unit_memberships')
-          return chainWith({ role: 'leader' })
         if (table === 'expense_cost_shares') {
           return {
             insert: vi.fn().mockResolvedValue({ error: null }),
@@ -206,26 +234,22 @@ describe('Cost Sharing Actions', () => {
   // ─── getOrganizedCostShares ──────────────────────────────────────
 
   describe('getOrganizedCostShares', () => {
-    it('should return error when not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+    it('should return error when not a unit member', async () => {
+      mockedGetCurrentMembership.mockResolvedValue(null)
 
       const result = await getOrganizedCostShares('unit-1')
       expect(result.success).toBe(false)
-      expect(result.error).toBe('Not authenticated')
+      expect(result.error).toBe('Not a member of this unit')
     })
 
     it('should return organized cost shares', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-      })
+      setupUnitContext()
 
       const mockShares = [{ id: 'cs1', description: 'Food' }]
 
       mockSupabase.from.mockImplementation((table: string) => {
         if (table === 'profiles')
           return chainWith({ id: 'profile-123', venmo_username: '@test' })
-        if (table === 'unit_memberships')
-          return chainWith({ role: 'leader' })
         if (table === 'expense_cost_shares') {
           return {
             select: vi.fn().mockReturnThis(),
@@ -248,26 +272,22 @@ describe('Cost Sharing Actions', () => {
   // ─── getParticipantCostShares ────────────────────────────────────
 
   describe('getParticipantCostShares', () => {
-    it('should return error when not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+    it('should return error when not a unit member', async () => {
+      mockedGetCurrentMembership.mockResolvedValue(null)
 
       const result = await getParticipantCostShares('unit-1')
       expect(result.success).toBe(false)
-      expect(result.error).toBe('Not authenticated')
+      expect(result.error).toBe('Not a member of this unit')
     })
 
     it('should return participant cost shares', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({
-        data: { user: { id: 'user-123' } },
-      })
+      setupUnitContext('parent')
 
       const mockShares = [{ id: 'cs2', description: 'Gas' }]
 
       mockSupabase.from.mockImplementation((table: string) => {
         if (table === 'profiles')
           return chainWith({ id: 'profile-123', venmo_username: '@test' })
-        if (table === 'unit_memberships')
-          return chainWith({ role: 'parent' })
         if (table === 'expense_cost_shares') {
           return {
             select: vi.fn().mockReturnThis(),
@@ -291,7 +311,7 @@ describe('Cost Sharing Actions', () => {
 
   describe('markCostSharePaid', () => {
     it('should return error when not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+      mockedGetCurrentProfile.mockResolvedValue(null)
 
       const result = await markCostSharePaid('share-1')
       expect(result.success).toBe(false)
@@ -302,9 +322,7 @@ describe('Cost Sharing Actions', () => {
       setupAuthProfile()
 
       let costShareCalls = 0
-      const originalFrom = mockSupabase.from.getMockImplementation()
       mockSupabase.from.mockImplementation((table: string) => {
-        if (table === 'profiles') return chainWith({ id: 'profile-123' })
         if (table === 'expense_cost_shares') {
           costShareCalls++
           if (costShareCalls === 1) {
@@ -330,7 +348,6 @@ describe('Cost Sharing Actions', () => {
 
       let costShareCalls = 0
       mockSupabase.from.mockImplementation((table: string) => {
-        if (table === 'profiles') return chainWith({ id: 'profile-123' })
         if (table === 'expense_cost_shares') {
           costShareCalls++
           if (costShareCalls === 1) {
@@ -357,7 +374,7 @@ describe('Cost Sharing Actions', () => {
 
   describe('deleteCostShare', () => {
     it('should return error when not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+      mockedGetCurrentProfile.mockResolvedValue(null)
 
       const result = await deleteCostShare('share-1')
       expect(result.success).toBe(false)
@@ -368,7 +385,6 @@ describe('Cost Sharing Actions', () => {
       setupAuthProfile()
 
       mockSupabase.from.mockImplementation((table: string) => {
-        if (table === 'profiles') return chainWith({ id: 'profile-123' })
         if (table === 'expense_cost_shares') {
           return chainWith({
             id: 'share-1',
@@ -388,7 +404,6 @@ describe('Cost Sharing Actions', () => {
       setupAuthProfile()
 
       mockSupabase.from.mockImplementation((table: string) => {
-        if (table === 'profiles') return chainWith({ id: 'profile-123' })
         if (table === 'expense_cost_shares') {
           return chainWith({
             id: 'share-1',
@@ -409,7 +424,6 @@ describe('Cost Sharing Actions', () => {
 
       let costShareCalls = 0
       mockSupabase.from.mockImplementation((table: string) => {
-        if (table === 'profiles') return chainWith({ id: 'profile-123' })
         if (table === 'expense_cost_shares') {
           costShareCalls++
           if (costShareCalls === 1) {

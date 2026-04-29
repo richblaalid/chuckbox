@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership, getCurrentProfile } from '@/lib/data/cached-queries'
 import {
   expenseSubmissionSchema,
   expenseApprovalSchema,
@@ -40,42 +41,24 @@ interface GetExpensesResult extends ActionResult {
 }
 
 /**
- * Get the current user's profile and verify unit access
+ * Get the current user's profile and verify unit access.
+ *
+ * The unitId is supplied by the caller (a page that already authorized the
+ * unit). The helper's fallback-to-first-membership is unsafe for
+ * body/argument-driven auth, so we explicitly verify
+ * `membership.unit_id === unitId`.
  */
 async function getUserContext(unitId: string) {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { error: 'Not authenticated' }
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
-    return { error: 'Profile not found' }
-  }
-
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select('role')
-    .eq('profile_id', profile.id)
-    .eq('unit_id', unitId)
-    .eq('status', 'active')
-    .single()
-
-  if (!membership) {
+  const membership = await getCurrentMembership(unitId)
+  if (!membership || membership.unit_id !== unitId) {
     return { error: 'Not a member of this unit' }
   }
 
   return {
     supabase,
-    user,
-    profile,
+    profile: { id: membership.profile_id },
     membership,
   }
 }
@@ -159,19 +142,9 @@ export async function updateExpenseReimbursement(
   const validData = validationResult.data
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { success: false, error: 'Not authenticated' }
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
+  const profile = await getCurrentProfile()
   if (!profile) {
-    return { success: false, error: 'Profile not found' }
+    return { success: false, error: 'Not authenticated' }
   }
 
   // Fetch the expense to verify ownership and status
@@ -243,19 +216,9 @@ export async function submitExpenseReimbursement(
 ): Promise<ActionResult> {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { success: false, error: 'Not authenticated' }
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
+  const profile = await getCurrentProfile()
   if (!profile) {
-    return { success: false, error: 'Profile not found' }
+    return { success: false, error: 'Not authenticated' }
   }
 
   // Fetch the expense
@@ -305,22 +268,9 @@ export async function deleteExpenseReimbursement(
 ): Promise<ActionResult> {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { success: false, error: 'Not authenticated' }
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
-    return { success: false, error: 'Profile not found' }
-  }
-
-  // Fetch the expense
+  // Fetch the expense first to get its unit_id, then authorize against that
+  // unit (resource-scoped auth — the user must have membership in the unit
+  // the expense belongs to, not just any unit).
   const { data: expense, error: fetchError } = await supabase
     .from('expense_reimbursements')
     .select('id, submitter_id, status, receipt_url, unit_id')
@@ -331,17 +281,13 @@ export async function deleteExpenseReimbursement(
     return { success: false, error: 'Expense not found' }
   }
 
-  // Check if user is the submitter or an admin
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select('role')
-    .eq('profile_id', profile.id)
-    .eq('unit_id', expense.unit_id)
-    .eq('status', 'active')
-    .single()
+  const membership = await getCurrentMembership(expense.unit_id)
+  if (!membership || membership.unit_id !== expense.unit_id) {
+    return { success: false, error: 'Cannot delete this expense' }
+  }
 
-  const isAdmin = membership?.role === 'admin'
-  const isSubmitter = expense.submitter_id === profile.id
+  const isAdmin = membership.role === 'admin'
+  const isSubmitter = expense.submitter_id === membership.profile_id
 
   if (!isSubmitter && !isAdmin) {
     return { success: false, error: 'Cannot delete this expense' }
@@ -377,33 +323,12 @@ export async function getExpenseReimbursements(
 ): Promise<GetExpensesResult> {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { success: false, error: 'Not authenticated' }
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
-    return { success: false, error: 'Profile not found' }
-  }
-
-  // Check membership
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select('role')
-    .eq('profile_id', profile.id)
-    .eq('unit_id', unitId)
-    .eq('status', 'active')
-    .single()
-
-  if (!membership) {
+  // Body-validating: caller passes unitId; verify membership in that unit.
+  const membership = await getCurrentMembership(unitId)
+  if (!membership || membership.unit_id !== unitId) {
     return { success: false, error: 'Not a member of this unit' }
   }
+  const profile = { id: membership.profile_id }
 
   const isFinancialRole = ['admin', 'treasurer'].includes(membership.role)
   const page = options?.page ?? 1
@@ -478,21 +403,6 @@ export async function getExpenseReimbursement(
 ): Promise<ActionResult & { data?: ExpenseReimbursementWithSubmitter }> {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { success: false, error: 'Not authenticated' }
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
-    return { success: false, error: 'Profile not found' }
-  }
-
   // Fetch the expense with submitter
   const { data: expense, error } = await supabase
     .from('expense_reimbursements')
@@ -513,21 +423,14 @@ export async function getExpenseReimbursement(
     return { success: false, error: 'Expense not found' }
   }
 
-  // Check access
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select('role')
-    .eq('profile_id', profile.id)
-    .eq('unit_id', expense.unit_id)
-    .eq('status', 'active')
-    .single()
-
-  if (!membership) {
+  // Authorize against the expense's unit.
+  const membership = await getCurrentMembership(expense.unit_id)
+  if (!membership || membership.unit_id !== expense.unit_id) {
     return { success: false, error: 'Not authorized to view this expense' }
   }
 
   const isFinancialRole = ['admin', 'treasurer'].includes(membership.role)
-  const isSubmitter = expense.submitter_id === profile.id
+  const isSubmitter = expense.submitter_id === membership.profile_id
 
   if (!isFinancialRole && !isSubmitter) {
     return { success: false, error: 'Not authorized to view this expense' }
@@ -557,21 +460,6 @@ export async function approveExpenseReimbursement(
   const validData = validationResult.data
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { success: false, error: 'Not authenticated' }
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
-    return { success: false, error: 'Profile not found' }
-  }
-
   // Fetch the expense with submitter and unit info for email notification
   const { data: expense, error: fetchError } = await supabase
     .from('expense_reimbursements')
@@ -589,18 +477,12 @@ export async function approveExpenseReimbursement(
     return { success: false, error: 'Expense not found' }
   }
 
-  // Check user has financial role in the unit
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select('role')
-    .eq('profile_id', profile.id)
-    .eq('unit_id', expense.unit_id)
-    .eq('status', 'active')
-    .single()
-
-  if (!membership) {
+  // Authorize against the expense's unit.
+  const membership = await getCurrentMembership(expense.unit_id)
+  if (!membership || membership.unit_id !== expense.unit_id) {
     return { success: false, error: 'Not a member of this unit' }
   }
+  const profile = { id: membership.profile_id }
 
   const isFinancialRole = ['admin', 'treasurer'].includes(membership.role)
   if (!isFinancialRole) {
@@ -691,21 +573,6 @@ export async function rejectExpenseReimbursement(
   const validData = validationResult.data
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { success: false, error: 'Not authenticated' }
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
-    return { success: false, error: 'Profile not found' }
-  }
-
   // Fetch the expense with submitter and unit info for email notification
   const { data: expense, error: fetchError } = await supabase
     .from('expense_reimbursements')
@@ -723,18 +590,12 @@ export async function rejectExpenseReimbursement(
     return { success: false, error: 'Expense not found' }
   }
 
-  // Check user has financial role in the unit
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select('role')
-    .eq('profile_id', profile.id)
-    .eq('unit_id', expense.unit_id)
-    .eq('status', 'active')
-    .single()
-
-  if (!membership) {
+  // Authorize against the expense's unit.
+  const membership = await getCurrentMembership(expense.unit_id)
+  if (!membership || membership.unit_id !== expense.unit_id) {
     return { success: false, error: 'Not a member of this unit' }
   }
+  const profile = { id: membership.profile_id }
 
   const isFinancialRole = ['admin', 'treasurer'].includes(membership.role)
   if (!isFinancialRole) {
@@ -808,21 +669,6 @@ export async function markExpensePaid(
   const validData = validationResult.data
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { success: false, error: 'Not authenticated' }
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
-    return { success: false, error: 'Profile not found' }
-  }
-
   // Fetch the expense
   const { data: expense, error: fetchError } = await supabase
     .from('expense_reimbursements')
@@ -834,18 +680,12 @@ export async function markExpensePaid(
     return { success: false, error: 'Expense not found' }
   }
 
-  // Check user has financial role in the unit
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select('role')
-    .eq('profile_id', profile.id)
-    .eq('unit_id', expense.unit_id)
-    .eq('status', 'active')
-    .single()
-
-  if (!membership) {
+  // Authorize against the expense's unit.
+  const membership = await getCurrentMembership(expense.unit_id)
+  if (!membership || membership.unit_id !== expense.unit_id) {
     return { success: false, error: 'Not a member of this unit' }
   }
+  const profile = { id: membership.profile_id }
 
   const isFinancialRole = ['admin', 'treasurer'].includes(membership.role)
   if (!isFinancialRole) {
