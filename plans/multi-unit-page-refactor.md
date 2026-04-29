@@ -303,14 +303,15 @@ flowchart TD
 #### Wave E: Read-only API routes
 Same pattern: read `?unit=` from `request.nextUrl.searchParams`, pass to helper.
 
-- [ ] **4.1.1** Square: payments, transactions, sync, oauth/authorize, oauth/callback, disconnect
+- [x] **4.1.1** Square: payments, transactions, sync, oauth/authorize, oauth/callback, disconnect
   - Files: `src/app/api/square/{payments,transactions,sync,disconnect}/route.ts`, `src/app/api/square/oauth/{authorize,callback}/route.ts`
   - Note: Mutation routes (payments POST, oauth POST) — verify they get unit from request body / row, not URL. (See "API route mutation safety" in section 2.1.)
+  - Verified: payments POST uses membership.unit_id for journal entries / scout_account validation / Square client (not body unit). OAuth callback validates state-token unit_id with explicit `membership.unit_id === unitId` check post-helper. /api/square/webhooks remains untouched (no user auth, signature-based).
 
 - [x] **4.1.2** Reports: balance-sheet, income-expense, dues-by-patrol
   - Files: `src/app/api/reports/{balance-sheet,income-expense,dues-by-patrol}/route.ts`
 
-- [ ] **4.1.3** Plaid: accounts, transactions, create-link-token, exchange-token, disconnect
+- [x] **4.1.3** Plaid: accounts, transactions, create-link-token, exchange-token, disconnect
   - Files: `src/app/api/plaid/{accounts,transactions,create-link-token,exchange-token,disconnect}/route.ts`
 
 - [ ] **4.1.4** Scoutbook sync: route, history, pending, confirm, cancel, resolution, extension-sync, extension-auth
@@ -455,7 +456,7 @@ At the end of every phase, the following must hold:
 | Phase 1: Helper | 3 | 3 | Complete |
 | Phase 2: Finances pages | 6 | 6 | Complete |
 | Phase 3: Other pages | 11 | 11 | Complete |
-| Phase 4: API routes | 13 | 2 | In Progress (Reports + Imports done; read-only GETs across Square/Plaid/Scoutbook shipped; notifications partially migrated; mutations + body-validating routes still pending) |
+| Phase 4: API routes | 13 | 4 | In Progress (Reports + Imports + Square + Plaid done; read-only Scoutbook + partial notifications shipped; Scoutbook mutations + body-validating routes still pending) |
 | Phase 5: Lint rule | 1 | 0 | Not Started |
 | Phase 6: Unflag | 3 | 0 | Not Started |
 
@@ -502,6 +503,8 @@ At the end of every phase, the following must hold:
 | 4.2.1 | 2026-04-28 | pending | Imports: balances POST/undo, charges POST/notify/void, roster POST migrated — closes 4.2.1 |
 | 4.2.2-partial | 2026-04-28 | pending | Notifications: billing-charges/[id]/notify, billing-records/[id]/notify migrated; collection/send-reminders deferred (body-validating route, needs separate auth treatment) |
 | 4.2.3-partial | 2026-04-28 | pending | Settings: payment-links POST migrated; payment-fees, unit-logo, expenses receipt/extract remain |
+| 4.1.3 | 2026-04-28 | pending | Plaid: create-link-token, accounts POST, exchange-token, disconnect migrated — closes 4.1.3 |
+| 4.1.1 | 2026-04-28 | pending | Square: oauth/authorize, oauth/callback (with explicit unit verification), disconnect, sync POST, payments POST migrated — closes 4.1.1; webhooks intentionally untouched (signature-based, no user auth) |
 
 ---
 

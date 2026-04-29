@@ -16,31 +16,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's profile (profile_id is separate from auth user id)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
-    }
-
-    // Get user's active membership
-    const { data: membership } = await supabase
-      .from('unit_memberships')
-      .select('unit_id, role')
-      .eq('profile_id', profile.id)
-      .eq('status', 'active')
-      .single()
-
-    if (!membership) {
-      return NextResponse.json({ error: 'No active membership found' }, { status: 403 })
-    }
-
-    // Only admins and treasurers can sync
-    if (!['admin', 'treasurer'].includes(membership.role)) {
+    const membership = await getCurrentMembership(supabase, getRequestedUnitId(request))
+    if (!membership || !['admin', 'treasurer'].includes(membership.role)) {
       return NextResponse.json(
         { error: 'Only admins and treasurers can sync Square transactions' },
         { status: 403 }
