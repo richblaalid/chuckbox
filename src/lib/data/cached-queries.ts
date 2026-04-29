@@ -9,7 +9,14 @@
  * For Client Components, use React Query or SWR instead.
  */
 import { cache } from 'react'
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
+
+/**
+ * Cookie name used to persist the user's selected unit across navigation.
+ * Set client-side by UnitContext when the user picks a unit in the switcher.
+ */
+const CURRENT_UNIT_COOKIE = 'chuckbox_current_unit'
 
 /**
  * Get the current authenticated user.
@@ -43,21 +50,39 @@ export const getCurrentProfile = cache(async () => {
 
 /**
  * Get the current user's active unit membership.
- * Returns unit_id, role, and profile_id.
+ *
+ * Selection priority for multi-unit users:
+ *   1. `requestedUnitId` argument (typically from URL `?unit=` query param)
+ *   2. `chuckbox_current_unit` cookie (set client-side when user picks a unit
+ *      in the unit switcher — preserves selection across navigation)
+ *   3. First membership (fallback)
+ *
+ * Returns null when the user is not authenticated or has no memberships.
  */
-export const getCurrentMembership = cache(async () => {
+export const getCurrentMembership = cache(async (requestedUnitId?: string) => {
   const profile = await getCurrentProfile()
   if (!profile) return null
 
   const supabase = await createClient()
-  const { data: membership } = await supabase
+  const { data: memberships } = await supabase
     .from('unit_memberships')
     .select('unit_id, role')
     .eq('profile_id', profile.id)
     .eq('status', 'active')
-    .single()
 
-  if (!membership) return null
+  if (!memberships || memberships.length === 0) return null
+
+  // Resolve effective unit ID: explicit arg > cookie > first membership
+  let effectiveUnitId = requestedUnitId
+  if (!effectiveUnitId) {
+    const cookieStore = await cookies()
+    effectiveUnitId = cookieStore.get(CURRENT_UNIT_COOKIE)?.value
+  }
+
+  const matched = effectiveUnitId
+    ? memberships.find(m => m.unit_id === effectiveUnitId)
+    : null
+  const membership = matched ?? memberships[0]
 
   return {
     profile_id: profile.id,
@@ -69,9 +94,11 @@ export const getCurrentMembership = cache(async () => {
 /**
  * Get the current user's unit with basic info.
  * Builds on getCurrentMembership for efficiency.
+ *
+ * For multi-unit users, pass `requestedUnitId` to select the active unit.
  */
-export const getCurrentUnit = cache(async () => {
-  const membership = await getCurrentMembership()
+export const getCurrentUnit = cache(async (requestedUnitId?: string) => {
+  const membership = await getCurrentMembership(requestedUnitId)
   if (!membership) return null
 
   const supabase = await createClient()

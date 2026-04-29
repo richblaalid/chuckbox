@@ -16,6 +16,8 @@ import { isFinancialRole, isAdmin as checkIsAdmin } from '@/lib/roles'
 import { isFeatureEnabled, FeatureFlag } from '@/lib/feature-flags'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { SettingsTabs } from '@/components/settings/settings-tabs'
+import Link from 'next/link'
+import { Plus } from 'lucide-react'
 
 export default async function SettingsPage({
   searchParams,
@@ -564,6 +566,18 @@ export default async function SettingsPage({
         dataTabContent={dataTabContent}
         integrationsTabContent={integrationsTabContent}
       />
+
+      {isAdmin && isFeatureEnabled(FeatureFlag.MULTI_UNIT_CREATION) && (
+        <div className="pt-4 border-t border-stone-200 dark:border-stone-700">
+          <Link
+            href="/create-unit"
+            className="inline-flex items-center gap-2 text-sm text-stone-500 dark:text-stone-400 hover:text-forest-600 dark:hover:text-forest-400 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Create another unit
+          </Link>
+        </div>
+      )}
     </div>
   )
 }

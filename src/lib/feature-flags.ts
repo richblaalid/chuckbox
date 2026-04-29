@@ -39,6 +39,14 @@ export enum FeatureFlag {
    * balances and transactions. View-only, no payment processing.
    */
   BANK_INTEGRATION = 'BANK_INTEGRATION',
+
+  /**
+   * Multi-Unit Creation
+   * Enables in-app creation of additional units and the unit
+   * switcher UI. Hidden by default until the multi-unit page
+   * refactor is complete (see plans/multi-unit-page-refactor.md).
+   */
+  MULTI_UNIT_CREATION = 'MULTI_UNIT_CREATION',
 }
 
 /**
@@ -62,6 +70,33 @@ const featureFlagConfig: Record<FeatureFlag, { envVar: string; defaultValue: boo
     envVar: 'NEXT_PUBLIC_FEATURE_BANK_INTEGRATION',
     defaultValue: false, // Disabled by default, enable per environment
   },
+  [FeatureFlag.MULTI_UNIT_CREATION]: {
+    envVar: 'NEXT_PUBLIC_FEATURE_MULTI_UNIT_CREATION',
+    defaultValue: false, // Disabled until page refactor is complete
+  },
+}
+
+/**
+ * Read the env var for a flag using LITERAL access.
+ *
+ * IMPORTANT: Next.js statically replaces `process.env.NEXT_PUBLIC_*` references
+ * in client bundles, but ONLY when accessed with literal keys. Dynamic accesses
+ * like `process.env[someVariable]` are not replaced and return undefined on the
+ * client. Each branch below uses a literal key so the bundler can inline values.
+ */
+function readEnvValue(flag: FeatureFlag): string | undefined {
+  switch (flag) {
+    case FeatureFlag.ADVANCEMENT_TRACKING:
+      return process.env.NEXT_PUBLIC_FEATURE_ADVANCEMENT_TRACKING
+    case FeatureFlag.SCOUTBOOK_SYNC:
+      return process.env.NEXT_PUBLIC_FEATURE_SCOUTBOOK_SYNC
+    case FeatureFlag.CLI_AUTOMATION:
+      return process.env.NEXT_PUBLIC_FEATURE_CLI_AUTOMATION
+    case FeatureFlag.BANK_INTEGRATION:
+      return process.env.NEXT_PUBLIC_FEATURE_BANK_INTEGRATION
+    case FeatureFlag.MULTI_UNIT_CREATION:
+      return process.env.NEXT_PUBLIC_FEATURE_MULTI_UNIT_CREATION
+  }
 }
 
 /**
@@ -70,16 +105,13 @@ const featureFlagConfig: Record<FeatureFlag, { envVar: string; defaultValue: boo
  * @returns true if the feature is enabled
  */
 export function isFeatureEnabled(flag: FeatureFlag): boolean {
-  const config = featureFlagConfig[flag]
-
-  // Check environment variable
-  const envValue = process.env[config.envVar]
+  const envValue = readEnvValue(flag)
 
   if (envValue !== undefined) {
     return envValue === 'true' || envValue === '1'
   }
 
-  return config.defaultValue
+  return featureFlagConfig[flag].defaultValue
 }
 
 /**

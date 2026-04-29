@@ -7,6 +7,8 @@
 # Testing
 /coverage
 tests/e2e/.auth/
+/playwright-report/
+/test-results/
 
 # Next.js
 /.next/
@@ -39,8 +41,12 @@ next-env.d.ts
 # IDE
 .idea/
 .vscode/
+.cursor/
 *.swp
 *.swo
+
+# Tool caches
+.playwright-mcp/
 
 # Supabase
 supabase/.branches

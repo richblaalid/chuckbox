@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership, getCurrentUnit } from '@/lib/data/cached-queries'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
 import { canAccessPage, isFinancialRole } from '@/lib/roles'
@@ -33,7 +34,12 @@ interface RecentActivity {
   scoutAccountId: string
 }
 
-export default async function FinancesOverviewPage() {
+export default async function FinancesOverviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ unit?: string }>
+}) {
+  const params = await searchParams
   const supabase = await createClient()
 
   const {
@@ -44,33 +50,7 @@ export default async function FinancesOverviewPage() {
     redirect('/login')
   }
 
-  // Get user's profile
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
-    redirect('/login')
-  }
-
-  // Get user's unit membership
-  const { data: membershipData } = await supabase
-    .from('unit_memberships')
-    .select('unit_id, role, units:units!unit_memberships_unit_id_fkey(name, unit_number)')
-    .eq('profile_id', profile.id)
-    .eq('status', 'active')
-    .single()
-
-  interface Membership {
-    unit_id: string
-    role: string
-    units: { name: string; unit_number: string } | null
-  }
-
-  const membership = membershipData as Membership | null
-
+  const membership = await getCurrentMembership(params.unit)
   if (!membership) {
     redirect('/login')
   }
@@ -79,6 +59,8 @@ export default async function FinancesOverviewPage() {
   if (!canAccessPage(membership.role, 'finances')) {
     redirect('/roster')
   }
+
+  const currentUnit = await getCurrentUnit(params.unit)
 
   const canTakeActions = isFinancialRole(membership.role)
 
@@ -426,7 +408,7 @@ export default async function FinancesOverviewPage() {
       <div>
         <h1 className="text-3xl font-bold text-stone-900">Finances</h1>
         <p className="mt-1 text-stone-600">
-          Financial overview for {membership.units?.name || 'your unit'}
+          Financial overview for {currentUnit?.name || 'your unit'}
         </p>
       </div>
 
@@ -498,7 +480,7 @@ export default async function FinancesOverviewPage() {
       {canTakeActions && (
         <OverviewActions
           unitId={membership.unit_id}
-          unitName={membership.units?.name || 'your unit'}
+          unitName={currentUnit?.name || 'your unit'}
           scouts={scoutsForActions}
           scoutsOwing={scoutsOwingData}
         />

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership, getCurrentUnit } from '@/lib/data/cached-queries'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
 import { hasFilteredView, isFinancialRole } from '@/lib/roles'
@@ -24,7 +25,12 @@ interface ScoutAccount {
   } | null
 }
 
-export default async function AccountsPage() {
+export default async function AccountsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ unit?: string }>
+}) {
+  const params = await searchParams
   const supabase = await createClient()
 
   const {
@@ -33,24 +39,12 @@ export default async function AccountsPage() {
 
   if (!user) return null
 
-  // Get user's profile (profile_id is now separate from auth user id)
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
+  const membership = await getCurrentMembership(params.unit)
+  const profile = membership ? { id: membership.profile_id } : null
 
   if (!profile) return null
 
-  // Get user's unit membership
-  const { data: membershipData } = await supabase
-    .from('unit_memberships')
-    .select('unit_id, role, units:units!unit_memberships_unit_id_fkey(name)')
-    .eq('profile_id', profile.id)
-    .eq('status', 'active')
-    .single()
-
-  const membership = membershipData as { unit_id: string; role: string; units: { name: string } | null } | null
+  const currentUnit = await getCurrentUnit(params.unit)
 
   if (!membership) {
     return (
@@ -390,7 +384,7 @@ export default async function AccountsPage() {
       {/* Unified Accounts View with table, bulk actions, and action dialogs */}
       <UnifiedAccountsView
         unitId={membership.unit_id}
-        unitName={membership.units?.name}
+        unitName={currentUnit?.name ?? undefined}
         scouts={accounts}
         patrols={patrols}
         scoutsForBilling={scoutsForBilling}

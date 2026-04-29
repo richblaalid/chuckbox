@@ -42,7 +42,8 @@ function LoginForm() {
     const supabase = createClient()
 
     // Check for redirect parameter to pass through auth flow
-    const redirectTo = searchParams.get('redirect')
+    // Support both 'next' (new) and 'redirect' (legacy) for back-compat
+    const redirectTo = searchParams.get('next') || searchParams.get('redirect')
     const callbackUrl = new URL('/auth/callback', window.location.origin)
     if (redirectTo) {
       callbackUrl.searchParams.set('next', redirectTo)

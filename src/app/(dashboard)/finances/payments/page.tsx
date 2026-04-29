@@ -1,10 +1,16 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership, getCurrentUnit } from '@/lib/data/cached-queries'
 import { canAccessPage } from '@/lib/roles'
 import { FinanceSubnav } from '@/components/finances/finance-subnav'
 import { UnifiedPaymentsList } from '@/components/payments/unified-payments-list'
 
-export default async function PaymentsPage() {
+export default async function PaymentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ unit?: string }>
+}) {
+  const params = await searchParams
   const supabase = await createClient()
 
   const {
@@ -12,28 +18,11 @@ export default async function PaymentsPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-  if (!profile) redirect('/login')
-
-  const { data: membershipData } = await supabase
-    .from('unit_memberships')
-    .select('unit_id, role, units:units!unit_memberships_unit_id_fkey(name)')
-    .eq('profile_id', profile.id)
-    .eq('status', 'active')
-    .single()
-
-  const membership = membershipData as {
-    unit_id: string
-    role: string
-    units: { name: string } | null
-  } | null
-
+  const membership = await getCurrentMembership(params.unit)
   if (!membership) redirect('/login')
   if (!canAccessPage(membership.role, 'payments')) redirect('/roster')
+
+  const currentUnit = await getCurrentUnit(params.unit)
 
   // Fetch payments with related data
   const { data: payments } = await supabase
@@ -142,7 +131,7 @@ export default async function PaymentsPage() {
       <div>
         <h1 className="text-3xl font-bold text-stone-900">Finances</h1>
         <p className="mt-1 text-stone-600">
-          Financial overview for {membership.units?.name || 'your unit'}
+          Financial overview for {currentUnit?.name || 'your unit'}
         </p>
       </div>
 

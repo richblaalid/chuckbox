@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
 import crypto from 'crypto'
 import {
   parseRosterWithMetadata,
@@ -458,6 +459,7 @@ interface ProvisionAuthenticatedInput {
   parsedAdults: ParsedAdult[]
   parsedScouts: ParsedScout[]
   signupPath?: 'csv' | 'manual'
+  confirmDuplicateOverride?: boolean
 }
 
 export async function provisionUnitAuthenticated(input: ProvisionAuthenticatedInput): Promise<ProvisionResult> {
@@ -478,7 +480,7 @@ export async function provisionUnitAuthenticated(input: ProvisionAuthenticatedIn
 
   // 3. Check for duplicate unit
   const duplicateCheck = await checkDuplicateUnit(unitMetadata)
-  if (duplicateCheck.exists) {
+  if (duplicateCheck.exists && !input.confirmDuplicateOverride) {
     return {
       success: false,
       duplicateWarning: {
@@ -569,6 +571,9 @@ export async function provisionUnitAuthenticated(input: ProvisionAuthenticatedIn
         // Non-fatal — unit is still created
       }
     }
+
+    // Revalidate the dashboard layout so it picks up the new membership
+    revalidatePath('/', 'layout')
 
     return {
       success: true,
