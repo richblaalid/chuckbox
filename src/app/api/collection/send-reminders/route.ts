@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
 import { generatePaymentReminderEmail } from '@/lib/email/templates/payment-reminder'
 import { canPerformAction } from '@/lib/roles'
@@ -27,17 +28,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's profile
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
-    }
-
     // Parse request body
     const body: SendRemindersRequest = await request.json()
     const { unitId, accountIds } = body
@@ -49,28 +39,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verify user has permission for this unit
-    const { data: membership } = await supabase
-      .from('unit_memberships')
-      .select('role, units:units!unit_memberships_unit_id_fkey(name)')
-      .eq('profile_id', profile.id)
-      .eq('unit_id', unitId)
-      .eq('status', 'active')
-      .single()
-
-    if (!membership || !canPerformAction(membership.role, 'manage_billing')) {
+    // Authorize against the body's unitId. The helper's "fallback to first
+    // membership" is unsafe here, so we explicitly verify membership.unit_id
+    // matches the body's unitId — preserves the original `.eq('unit_id', unitId)`
+    // semantics.
+    const membership = await getCurrentMembership(supabase, unitId)
+    if (
+      !membership ||
+      membership.unit_id !== unitId ||
+      !canPerformAction(membership.role, 'manage_billing')
+    ) {
       return NextResponse.json(
         { error: 'You do not have permission to send reminders for this unit' },
         { status: 403 }
       )
     }
 
-    interface MembershipWithUnit {
-      role: string
-      units: { name: string } | null
-    }
-
-    const unitName = (membership as MembershipWithUnit).units?.name || 'Your Scout Unit'
+    // The helper doesn't return the unit name, so query separately for display.
+    const { data: unitRow } = await supabase
+      .from('units')
+      .select('name')
+      .eq('id', unitId)
+      .single()
+    const unitName = unitRow?.name || 'Your Scout Unit'
 
     // Get account details with scout and guardian info
     const { data: accountsData, error: accountsError } = await supabase

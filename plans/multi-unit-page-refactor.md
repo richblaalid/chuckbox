@@ -320,8 +320,9 @@ Same pattern: read `?unit=` from `request.nextUrl.searchParams`, pass to helper.
 - [x] **4.1.3** Plaid: accounts, transactions, create-link-token, exchange-token, disconnect
   - Files: `src/app/api/plaid/{accounts,transactions,create-link-token,exchange-token,disconnect}/route.ts`
 
-- [ ] **4.1.4** Scoutbook sync: route, history, pending, confirm, cancel, resolution, extension-sync, extension-auth
+- [x] **4.1.4** Scoutbook sync: route, history, pending, confirm, cancel, resolution, extension-sync, extension-auth
   - Files: `src/app/api/scoutbook/**/route.ts`
+  - Note on completion: extension-sync and extension-auth use dual session/Bearer auth; session paths use the helper, Bearer paths unchanged. cli-status / install-cli (dev-only) and sync/status (sessionId-based) intentionally untouched.
 
 #### Wave F: Mutation API routes
 - [x] **4.2.1** Imports: balances POST/undo, charges POST/template/notify/void, roster POST
@@ -329,12 +330,14 @@ Same pattern: read `?unit=` from `request.nextUrl.searchParams`, pass to helper.
   - **Critical:** These take `unit_id` from request body. Verify the helper is used to authorize that the caller has access to that unit, not to determine which unit is "active".
   - Note on completion: Verified that `unit_id` body field on `import/charges` is declared in the interface but unused — the actual unit comes from `membership.unit_id`. All other import routes also use `membership.unit_id` directly. No body-trust issues found.
 
-- [ ] **4.2.2** Notifications: billing-charges/[id]/notify, billing-records/[id]/notify, collection/send-reminders
+- [x] **4.2.2** Notifications: billing-charges/[id]/notify, billing-records/[id]/notify, collection/send-reminders
   - Files: `src/app/api/billing-charges/[id]/notify/route.ts`, `src/app/api/billing-records/[id]/notify/route.ts`, `src/app/api/collection/send-reminders/route.ts`
   - **Critical:** Resource-scoped — look up the resource's unit_id, then authorize.
+  - Note on completion: collection/send-reminders takes unit_id from request body and uses explicit `membership.unit_id === unitId` post-helper check; the other two derive unit_id from server-side membership.
 
-- [ ] **4.2.3** Settings: payment-fees, unit-logo, payment-links, expenses receipt/extract
+- [x] **4.2.3** Settings: payment-fees, unit-logo, payment-links, expenses receipt/extract
   - Files: `src/app/api/settings/{payment-fees,unit-logo}/route.ts`, `src/app/api/payment-links/route.ts`, `src/app/api/expenses/{receipt,extract}/route.ts`
+  - Note on completion: payment-fees, expenses/receipt, expenses/extract all body-validating — explicit `membership.unit_id === body.unitId` check. unit-logo route does not exist in the codebase (was speculative in the plan).
 
 #### Wave G: Server actions
 - [ ] **4.3.1** Server actions
@@ -462,7 +465,7 @@ At the end of every phase, the following must hold:
 | Phase 1: Helper | 3 | 3 | Complete |
 | Phase 2: Finances pages | 6 | 6 | Complete |
 | Phase 3: Other pages | 13 | 13 | Complete (Wave B + C + D + 2 missed-and-recovered: settings, setup) |
-| Phase 4: API routes | 13 | 4 | In Progress (Reports + Imports + Square + Plaid done; read-only Scoutbook + partial notifications shipped; Scoutbook mutations + body-validating routes still pending) |
+| Phase 4: API routes | 13 | 7 | In Progress (Reports, Imports, Square, Plaid, Scoutbook, Notifications, Settings done; only Wave G server actions remain) |
 | Phase 5: Lint rule | 1 | 0 | Not Started |
 | Phase 6: Unflag | 3 | 0 | Not Started |
 
@@ -513,6 +516,9 @@ At the end of every phase, the following must hold:
 | 3.4.2 | 2026-04-29 | pending | /setup page — hotfix for missed page; helper for membership + admin role check, units query for needs_setup flag |
 | 4.1.1 | 2026-04-28 | pending | Square: oauth/authorize, oauth/callback (with explicit unit verification), disconnect, sync POST, payments POST migrated — closes 4.1.1; webhooks intentionally untouched (signature-based, no user auth) |
 | 4.1.3 | 2026-04-28 | pending | Plaid: create-link-token, accounts POST, exchange-token, disconnect migrated — closes 4.1.3 |
+| 4.1.4 | 2026-04-29 | pending | Scoutbook: sync POST, sync/cancel, sync/confirm, sync/resolution, extension-sync (session path), extension-auth (GET/POST/DELETE) migrated — closes 4.1.4 |
+| 4.2.2 | 2026-04-29 | pending | Notifications: collection/send-reminders migrated with explicit `membership.unit_id === body.unitId` check — closes 4.2.2 |
+| 4.2.3 | 2026-04-29 | pending | Settings: payment-fees, expenses/receipt POST+DELETE, expenses/extract migrated as body-validating routes with explicit unit_id verification — closes 4.2.3 |
 
 ---
 

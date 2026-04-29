@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { Database } from '@/types/database'
+import { getCurrentMembership, getRequestedUnitId } from '@/lib/auth'
 import { validateExtensionToken } from '@/lib/auth/extension-auth'
 import { parseRosterHtmlWithAI, isValidRosterHtml } from '@/lib/sync/scoutbook/ai-parser'
 import { stageRosterMembers } from '@/lib/sync/scoutbook'
@@ -45,7 +46,7 @@ function getServiceClient() {
  * Authentication: Either session cookie or Bearer token
  * Body: { html: string }
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     let profileId: string
     let unitId: string
@@ -58,23 +59,7 @@ export async function POST(request: Request) {
 
     if (user) {
       // Session-based auth
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single()
-
-      if (!profile) {
-        return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
-      }
-
-      const { data: membership } = await supabase
-        .from('unit_memberships')
-        .select('unit_id, role')
-        .eq('profile_id', profile.id)
-        .eq('status', 'active')
-        .single()
-
+      const membership = await getCurrentMembership(supabase, getRequestedUnitId(request))
       if (!membership || !['admin', 'treasurer'].includes(membership.role)) {
         return NextResponse.json(
           { error: 'Only unit administrators can sync from Scoutbook' },
@@ -82,7 +67,7 @@ export async function POST(request: Request) {
         )
       }
 
-      profileId = profile.id
+      profileId = membership.profile_id
       unitId = membership.unit_id
     } else {
       // Try Bearer token auth

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { RECEIPT_UPLOAD } from '@/lib/expenses/constants'
 
@@ -22,29 +23,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing file or unit ID' }, { status: 400 })
     }
 
-    // Get user's profile
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
-    }
-
-    // Verify user has access to this unit (any active membership)
-    const { data: membership } = await supabase
-      .from('unit_memberships')
-      .select('id')
-      .eq('profile_id', profile.id)
-      .eq('unit_id', unitId)
-      .eq('status', 'active')
-      .single()
-
-    if (!membership) {
+    // Authorize against the body's unitId. The helper falls back to first
+    // membership when the requested unit doesn't match, so verify explicitly.
+    const membership = await getCurrentMembership(supabase, unitId)
+    if (!membership || membership.unit_id !== unitId) {
       return NextResponse.json({ error: 'Access denied to this unit' }, { status: 403 })
     }
+
+    const profile = { id: membership.profile_id }
 
     // Validate file type
     if (!RECEIPT_UPLOAD.acceptedTypes.includes(file.type)) {
@@ -121,31 +107,18 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Missing file path or unit ID' }, { status: 400 })
     }
 
-    // Get user's profile
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
+    // Authorize against the body's unitId.
+    const membership = await getCurrentMembership(supabase, unitId)
+    if (!membership || membership.unit_id !== unitId) {
+      return NextResponse.json({ error: 'Access denied to this unit' }, { status: 403 })
     }
 
-    // Verify the file path starts with the unit ID and belongs to this user
+    // Verify the file path starts with the unit ID and belongs to this user.
     // File path format: {unitId}/{profileId}_{timestamp}_{filename}
-    const expectedPrefix = `${unitId}/${profile.id}_`
+    const expectedPrefix = `${unitId}/${membership.profile_id}_`
     if (!filePath.startsWith(expectedPrefix)) {
-      // Check if user is admin/treasurer (they can delete any receipt in their unit)
-      const { data: membership } = await supabase
-        .from('unit_memberships')
-        .select('role')
-        .eq('profile_id', profile.id)
-        .eq('unit_id', unitId)
-        .eq('status', 'active')
-        .single()
-
-      if (!membership || !['admin', 'treasurer'].includes(membership.role)) {
+      // Not the file owner — only admin/treasurer can delete others' receipts.
+      if (!['admin', 'treasurer'].includes(membership.role)) {
         return NextResponse.json({ error: 'Cannot delete this receipt' }, { status: 403 })
       }
     }

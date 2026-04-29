@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { Database } from '@/types/database'
+import { getCurrentMembership, getCurrentProfile, getRequestedUnitId } from '@/lib/auth'
 import {
   createExtensionToken,
   revokeExtensionToken,
@@ -23,7 +24,7 @@ function getServiceClient() {
  * 1. With session cookie: Get active extension tokens for the current user
  * 2. With Bearer token: Validate token and return unit info (for extension status check)
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
     // Check for Bearer token first (extension calling to validate its token)
     const authHeader = request.headers.get('authorization')
@@ -60,23 +61,9 @@ export async function GET(request: Request) {
 
     // Session-based auth (Chuckbox UI calling to list tokens)
     const supabase = await createClient()
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
+    const profile = await getCurrentProfile(supabase)
     if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const tokens = await getActiveTokens(supabase, profile.id)
@@ -97,43 +84,13 @@ export async function GET(request: Request) {
  * Generate a new extension auth token
  * Only admins and treasurers can generate tokens
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
+    const membership = await getCurrentMembership(supabase, getRequestedUnitId(request))
+    if (!membership) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
-    }
-
-    // Get user's unit membership - only admin/treasurer can generate tokens
-    const { data: membership } = await supabase
-      .from('unit_memberships')
-      .select('unit_id, role')
-      .eq('profile_id', profile.id)
-      .eq('status', 'active')
-      .single()
-
-    if (!membership) {
-      return NextResponse.json(
-        { error: 'No active unit membership' },
-        { status: 403 }
-      )
-    }
-
     if (!['admin', 'treasurer'].includes(membership.role)) {
       return NextResponse.json(
         { error: 'Only unit administrators can generate extension tokens' },
@@ -143,7 +100,7 @@ export async function POST() {
 
     const { token, expiresAt } = await createExtensionToken(
       supabase,
-      profile.id,
+      membership.profile_id,
       membership.unit_id
     )
 
@@ -167,26 +124,12 @@ export async function POST() {
  *
  * Revoke an extension token
  */
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
     const supabase = await createClient()
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
+    const profile = await getCurrentProfile(supabase)
     if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
