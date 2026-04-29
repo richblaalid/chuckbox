@@ -276,9 +276,9 @@ flowchart TD
 ### Phase 3: Migrate Remaining Pages (Waves B, C, D)
 
 #### Wave B: Roster / Scouts / Adults
-- [ ] **3.1.1** `/roster` page → `src/app/(dashboard)/roster/page.tsx`
-- [ ] **3.1.2** `/scouts/[id]` page → `src/app/(dashboard)/scouts/[id]/page.tsx`
-- [ ] **3.1.3** `/adults/[id]` page → `src/app/(dashboard)/adults/[id]/page.tsx`
+- [x] **3.1.1** `/roster` page → `src/app/(dashboard)/roster/page.tsx`
+- [x] **3.1.2** `/scouts/[id]` page → `src/app/(dashboard)/scouts/[id]/page.tsx`
+- [x] **3.1.3** `/adults/[id]` page → `src/app/(dashboard)/adults/[id]/page.tsx`
 
 #### Wave C: Expenses
 - [x] **3.2.1** `/expenses` page → `src/app/(dashboard)/expenses/page.tsx`
@@ -453,7 +453,7 @@ At the end of every phase, the following must hold:
 | Phase 0: Feature flag | 4 | 4 | Complete |
 | Phase 1: Helper | 3 | 3 | Complete |
 | Phase 2: Finances pages | 6 | 6 | Complete |
-| Phase 3: Other pages | 11 | 0 | Not Started |
+| Phase 3: Other pages | 11 | 7 | In Progress (Waves B & C complete) |
 | Phase 4: API routes | 13 | 0 | Not Started |
 | Phase 5: Lint rule | 1 | 0 | Not Started |
 | Phase 6: Unflag | 3 | 0 | Not Started |
@@ -482,6 +482,9 @@ At the end of every phase, the following must hold:
 | 2.1.4 | 2026-04-06 | pending | /finances/billing migrated |
 | 2.1.5 | 2026-04-06 | ff612f2 | /finances/payments migrated |
 | 2.1.6 | 2026-04-08 | pending | /finances/reports migrated — closes Wave A |
+| 3.1.1 | 2026-04-28 | pending | /roster migrated to getCurrentMembership |
+| 3.1.2 | 2026-04-28 | pending | /scouts/[id] migrated, supports multi-membership lookup |
+| 3.1.3 | 2026-04-28 | pending | /adults/[id] migrated to getCurrentMembership |
 | 3.2.1 | 2026-04-28 | pending | /expenses migrated to getCurrentMembership |
 | 3.2.2 | 2026-04-28 | pending | /expenses/new migrated to getCurrentMembership + getCurrentUnit |
 | 3.2.3 | 2026-04-28 | pending | /expenses/[id] migrated to getCurrentMembership |

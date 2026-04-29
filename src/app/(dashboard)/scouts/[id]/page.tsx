@@ -20,10 +20,11 @@ const RANK_IMAGES: Record<string, string> = {
 
 interface ScoutPageProps {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ unit?: string }>
 }
 
-export default async function ScoutPage({ params }: ScoutPageProps) {
-  const { id } = await params
+export default async function ScoutPage({ params, searchParams }: ScoutPageProps) {
+  const [{ id }, { unit: requestedUnitId }] = await Promise.all([params, searchParams])
   const supabase = await createClient()
 
   const {
@@ -86,17 +87,22 @@ export default async function ScoutPage({ params }: ScoutPageProps) {
     notFound()
   }
 
-  // Get user's unit membership to check role (depends on profile)
-  const { data: membershipData } = profileData
+  // Get user's unit memberships to check role. A user may belong to multiple
+  // units; we pick the one matching ?unit= query param, or fall back to first.
+  const { data: membershipsData } = profileData
     ? await supabase
         .from('unit_memberships')
         .select('unit_id, role')
         .eq('profile_id', profileData.id)
         .eq('status', 'active')
-        .single()
     : { data: null }
 
-  const membership = membershipData as { unit_id: string; role: string } | null
+  const memberships = (membershipsData || []) as Array<{ unit_id: string; role: string }>
+  const membership = (
+    requestedUnitId
+      ? memberships.find(m => m.unit_id === requestedUnitId) ?? memberships[0]
+      : memberships[0]
+  ) ?? null
   const canEditScout = membership && ['admin', 'treasurer', 'leader'].includes(membership.role)
   const canEditGuardians = membership && ['admin', 'treasurer'].includes(membership.role)
 

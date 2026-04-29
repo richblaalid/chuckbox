@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { getCurrentMembership } from '@/lib/data/cached-queries'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AccessDenied } from '@/components/ui/access-denied'
 import { isAdmin, isTreasurer } from '@/lib/roles'
@@ -9,10 +10,11 @@ import { InviteAdultButton } from '@/components/roster/invite-adult-button'
 
 interface AdultDetailPageProps {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ unit?: string }>
 }
 
-export default async function AdultDetailPage({ params }: AdultDetailPageProps) {
-  const { id } = await params
+export default async function AdultDetailPage({ params, searchParams }: AdultDetailPageProps) {
+  const [{ id }, { unit: requestedUnitId }] = await Promise.all([params, searchParams])
   const supabase = await createClient()
 
   const {
@@ -23,25 +25,7 @@ export default async function AdultDetailPage({ params }: AdultDetailPageProps) 
     redirect('/login')
   }
 
-  // Get user's profile (profile_id is now separate from auth user id)
-  const { data: currentProfile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!currentProfile) {
-    redirect('/login')
-  }
-
-  // Get current user's membership
-  const { data: currentMembership } = await supabase
-    .from('unit_memberships')
-    .select('unit_id, role')
-    .eq('profile_id', currentProfile.id)
-    .eq('status', 'active')
-    .single()
-
+  const currentMembership = await getCurrentMembership(requestedUnitId)
   if (!currentMembership) {
     redirect('/login')
   }
