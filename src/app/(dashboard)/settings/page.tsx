@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership } from '@/lib/data/cached-queries'
 import { UnitInfoForm } from '@/components/settings/unit-info-form'
 import { PatrolList } from '@/components/settings/patrol-list'
 import { LogoUpload } from '@/components/settings/logo-upload'
@@ -22,7 +23,7 @@ import { Plus } from 'lucide-react'
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ success?: string; error?: string; tab?: string }>
+  searchParams: Promise<{ success?: string; error?: string; tab?: string; unit?: string }>
 }) {
   const params = await searchParams
   const supabase = await createClient()
@@ -35,40 +36,7 @@ export default async function SettingsPage({
     redirect('/login')
   }
 
-  // Get user's profile
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
-    redirect('/login')
-  }
-
-  // Get user's membership and unit info with fee settings
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select(
-      `unit_id, role, units:units!unit_memberships_unit_id_fkey(
-        id,
-        name,
-        unit_number,
-        unit_type,
-        council,
-        district,
-        chartered_org,
-        logo_url,
-        processing_fee_percent,
-        processing_fee_fixed,
-        pass_fees_to_payer,
-        collection_settings
-      )`
-    )
-    .eq('profile_id', profile.id)
-    .eq('status', 'active')
-    .single()
-
+  const membership = await getCurrentMembership(params.unit)
   if (!membership) {
     redirect('/login')
   }
@@ -78,26 +46,47 @@ export default async function SettingsPage({
     redirect('/profile')
   }
 
+  const profile = { id: membership.profile_id }
   const isAdmin = checkIsAdmin(membership.role)
-  const unit = membership.units as {
-    id: string
-    name: string
-    unit_number: string
-    unit_type: string
-    council: string | null
-    district: string | null
-    chartered_org: string | null
-    logo_url: string | null
-    processing_fee_percent: number | null
-    processing_fee_fixed: number | null
-    pass_fees_to_payer: boolean | null
-    collection_settings: {
-      overdue_threshold_days: number
-      overdue_threshold_amount_cents: number
-      reminder_email_subject: string
-      reminder_email_template: string
-    } | null
-  } | null
+
+  // Fetch the unit's extended fields (the helper's getCurrentUnit only returns
+  // basic fields; settings needs fee settings, collection settings, etc.)
+  const { data: unit } = await supabase
+    .from('units')
+    .select(
+      `id,
+      name,
+      unit_number,
+      unit_type,
+      council,
+      district,
+      chartered_org,
+      logo_url,
+      processing_fee_percent,
+      processing_fee_fixed,
+      pass_fees_to_payer,
+      collection_settings`
+    )
+    .eq('id', membership.unit_id)
+    .single<{
+      id: string
+      name: string
+      unit_number: string
+      unit_type: string
+      council: string | null
+      district: string | null
+      chartered_org: string | null
+      logo_url: string | null
+      processing_fee_percent: number | null
+      processing_fee_fixed: number | null
+      pass_fees_to_payer: boolean | null
+      collection_settings: {
+        overdue_threshold_days: number
+        overdue_threshold_amount_cents: number
+        reminder_email_subject: string
+        reminder_email_template: string
+      } | null
+    }>()
 
   if (!unit) {
     redirect('/profile')
