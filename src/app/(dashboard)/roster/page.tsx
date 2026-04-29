@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership } from '@/lib/data/cached-queries'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { AccessDenied } from '@/components/ui/access-denied'
@@ -7,7 +8,12 @@ import { RosterTabs } from '@/components/roster/roster-tabs'
 import Link from 'next/link'
 import { Receipt } from 'lucide-react'
 
-export default async function RosterPage() {
+export default async function RosterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ unit?: string }>
+}) {
+  const params = await searchParams
   const supabase = await createClient()
 
   const {
@@ -16,24 +22,10 @@ export default async function RosterPage() {
 
   if (!user) return null
 
-  // Get user's profile
-  const { data: profileData } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
+  const membership = await getCurrentMembership(params.unit)
 
-  // Get user's unit membership
-  const { data: membershipData } = profileData
-    ? await supabase
-        .from('unit_memberships')
-        .select('unit_id, role')
-        .eq('profile_id', profileData.id)
-        .eq('status', 'active')
-        .single()
-    : { data: null }
-
-  const membership = membershipData as { unit_id: string; role: string } | null
+  // Profile ID is needed for guardian lookups below
+  const profileData = membership ? { id: membership.profile_id } : null
 
   if (!membership) {
     return (
