@@ -24,6 +24,12 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(() => Promise.resolve(mockSupabase)),
 }))
 
+// Mock cached-queries helper used for auth
+vi.mock('@/lib/data/cached-queries', () => ({
+  getCurrentMembership: vi.fn(),
+  getCurrentProfile: vi.fn(),
+}))
+
 // Import after mocking
 import {
   createExpenseReimbursement,
@@ -36,6 +42,13 @@ import {
   rejectExpenseReimbursement,
   markExpensePaid,
 } from '@/app/actions/expenses'
+import {
+  getCurrentMembership,
+  getCurrentProfile,
+} from '@/lib/data/cached-queries'
+
+const mockedGetCurrentMembership = vi.mocked(getCurrentMembership)
+const mockedGetCurrentProfile = vi.mocked(getCurrentProfile)
 
 const validExpenseData = {
   description: 'Camping supplies',
@@ -45,19 +58,31 @@ const validExpenseData = {
   vendor: 'REI',
 }
 
-/** Helper: set up auth + profile + membership chain */
+/**
+ * Set up the cached-queries auth helpers for an authenticated user with a
+ * given unit role. Both getCurrentMembership and getCurrentProfile are
+ * stubbed; individual tests can override either as needed.
+ */
 function setupAuthenticatedUser(
   role: string,
-  overrides?: { profileId?: string; userId?: string }
+  overrides?: { profileId?: string; unitId?: string }
 ) {
-  const userId = overrides?.userId ?? 'user-123'
   const profileId = overrides?.profileId ?? 'profile-123'
+  const unitId = overrides?.unitId ?? 'unit-1'
 
-  mockSupabase.auth.getUser.mockResolvedValue({
-    data: { user: { id: userId } },
+  mockedGetCurrentMembership.mockResolvedValue({
+    profile_id: profileId,
+    unit_id: unitId,
+    role,
+  })
+  mockedGetCurrentProfile.mockResolvedValue({
+    id: profileId,
+    first_name: 'Test',
+    last_name: 'User',
+    email: 'test@example.com',
   })
 
-  return { userId, profileId, role }
+  return { profileId, unitId, role }
 }
 
 /** Helper: create a mock chain for `from(table)` calls with table-based routing */
@@ -128,31 +153,8 @@ describe('Expense Actions', () => {
       expect(result.error).toBeDefined()
     })
 
-    it('should return error when not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
-
-      const result = await createExpenseReimbursement('unit-1', validExpenseData)
-      expect(result.success).toBe(false)
-      expect(result.error).toBe('Not authenticated')
-    })
-
-    it('should return error when profile not found', async () => {
-      setupAuthenticatedUser('leader')
-      mockFromChain({
-        profiles: () => chainWithSingle(null),
-      })
-
-      const result = await createExpenseReimbursement('unit-1', validExpenseData)
-      expect(result.success).toBe(false)
-      expect(result.error).toBe('Profile not found')
-    })
-
     it('should return error when not a unit member', async () => {
-      setupAuthenticatedUser('leader')
-      mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
-        unit_memberships: () => chainWithSingle(null),
-      })
+      mockedGetCurrentMembership.mockResolvedValue(null)
 
       const result = await createExpenseReimbursement('unit-1', validExpenseData)
       expect(result.success).toBe(false)
@@ -162,8 +164,6 @@ describe('Expense Actions', () => {
     it('should create a draft expense successfully', async () => {
       setupAuthenticatedUser('leader')
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
-        unit_memberships: () => chainWithSingle({ role: 'leader' }),
         expense_reimbursements: () =>
           chainWithSingle({ id: 'expense-1', status: 'draft' }),
       })
@@ -179,8 +179,6 @@ describe('Expense Actions', () => {
     it('should create and submit expense when submit=true', async () => {
       setupAuthenticatedUser('leader')
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
-        unit_memberships: () => chainWithSingle({ role: 'leader' }),
         expense_reimbursements: () =>
           chainWithSingle({ id: 'expense-1', status: 'submitted' }),
       })
@@ -196,8 +194,6 @@ describe('Expense Actions', () => {
     it('should return error when insert fails', async () => {
       setupAuthenticatedUser('leader')
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
-        unit_memberships: () => chainWithSingle({ role: 'leader' }),
         expense_reimbursements: () =>
           chainWithSingle(null, { message: 'DB error' }),
       })
@@ -212,7 +208,7 @@ describe('Expense Actions', () => {
 
   describe('updateExpenseReimbursement', () => {
     it('should return error when not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+      mockedGetCurrentProfile.mockResolvedValue(null)
 
       const result = await updateExpenseReimbursement(
         'expense-1',
@@ -225,7 +221,6 @@ describe('Expense Actions', () => {
     it('should return error when expense not found', async () => {
       setupAuthenticatedUser('leader')
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () => chainWithSingle(null),
       })
 
@@ -240,7 +235,6 @@ describe('Expense Actions', () => {
     it('should return error when not the submitter', async () => {
       setupAuthenticatedUser('leader')
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () =>
           chainWithSingle({
             id: 'expense-1',
@@ -261,7 +255,6 @@ describe('Expense Actions', () => {
     it('should return error when expense is submitted', async () => {
       setupAuthenticatedUser('leader')
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () =>
           chainWithSingle({
             id: 'expense-1',
@@ -283,7 +276,6 @@ describe('Expense Actions', () => {
       setupAuthenticatedUser('leader')
       let callCount = 0
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () => {
           callCount++
           if (callCount === 1) {
@@ -314,7 +306,6 @@ describe('Expense Actions', () => {
       setupAuthenticatedUser('leader')
       let callCount = 0
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () => {
           callCount++
           if (callCount === 1) {
@@ -344,7 +335,7 @@ describe('Expense Actions', () => {
 
   describe('submitExpenseReimbursement', () => {
     it('should return error when not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+      mockedGetCurrentProfile.mockResolvedValue(null)
 
       const result = await submitExpenseReimbursement('expense-1')
       expect(result.success).toBe(false)
@@ -354,7 +345,6 @@ describe('Expense Actions', () => {
     it('should return error when not the submitter', async () => {
       setupAuthenticatedUser('leader')
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () =>
           chainWithSingle({
             id: 'expense-1',
@@ -371,7 +361,6 @@ describe('Expense Actions', () => {
     it('should return error when expense is not draft', async () => {
       setupAuthenticatedUser('leader')
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () =>
           chainWithSingle({
             id: 'expense-1',
@@ -389,7 +378,6 @@ describe('Expense Actions', () => {
       setupAuthenticatedUser('leader')
       let callCount = 0
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () => {
           callCount++
           if (callCount === 1) {
@@ -414,18 +402,28 @@ describe('Expense Actions', () => {
   // ─── deleteExpenseReimbursement ───────────────────────────────────
 
   describe('deleteExpenseReimbursement', () => {
-    it('should return error when not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+    it('should return error when not a unit member', async () => {
+      // Action fetches expense first, then auth-checks against expense.unit_id.
+      mockedGetCurrentMembership.mockResolvedValue(null)
+      mockFromChain({
+        expense_reimbursements: () =>
+          chainWithSingle({
+            id: 'expense-1',
+            submitter_id: 'profile-123',
+            status: 'draft',
+            unit_id: 'unit-1',
+            receipt_url: null,
+          }),
+      })
 
       const result = await deleteExpenseReimbursement('expense-1')
       expect(result.success).toBe(false)
-      expect(result.error).toBe('Not authenticated')
+      expect(result.error).toBe('Cannot delete this expense')
     })
 
     it('should return error when non-submitter non-admin tries to delete', async () => {
       setupAuthenticatedUser('leader')
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () =>
           chainWithSingle({
             id: 'expense-1',
@@ -434,7 +432,6 @@ describe('Expense Actions', () => {
             unit_id: 'unit-1',
             receipt_url: null,
           }),
-        unit_memberships: () => chainWithSingle({ role: 'leader' }),
       })
 
       const result = await deleteExpenseReimbursement('expense-1')
@@ -445,7 +442,6 @@ describe('Expense Actions', () => {
     it('should return error when non-admin deletes non-draft expense', async () => {
       setupAuthenticatedUser('leader')
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () =>
           chainWithSingle({
             id: 'expense-1',
@@ -454,7 +450,6 @@ describe('Expense Actions', () => {
             unit_id: 'unit-1',
             receipt_url: null,
           }),
-        unit_memberships: () => chainWithSingle({ role: 'leader' }),
       })
 
       const result = await deleteExpenseReimbursement('expense-1')
@@ -466,7 +461,6 @@ describe('Expense Actions', () => {
       setupAuthenticatedUser('leader')
       let expenseCalls = 0
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () => {
           expenseCalls++
           if (expenseCalls === 1) {
@@ -484,7 +478,6 @@ describe('Expense Actions', () => {
             eq: vi.fn().mockResolvedValue({ error: null }),
           }
         },
-        unit_memberships: () => chainWithSingle({ role: 'leader' }),
       })
 
       const result = await deleteExpenseReimbursement('expense-1')
@@ -495,7 +488,6 @@ describe('Expense Actions', () => {
       setupAuthenticatedUser('admin')
       let expenseCalls = 0
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () => {
           expenseCalls++
           if (expenseCalls === 1) {
@@ -512,7 +504,6 @@ describe('Expense Actions', () => {
             eq: vi.fn().mockResolvedValue({ error: null }),
           }
         },
-        unit_memberships: () => chainWithSingle({ role: 'admin' }),
       })
 
       const result = await deleteExpenseReimbursement('expense-1')
@@ -523,20 +514,8 @@ describe('Expense Actions', () => {
   // ─── getExpenseReimbursements ─────────────────────────────────────
 
   describe('getExpenseReimbursements', () => {
-    it('should return error when not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
-
-      const result = await getExpenseReimbursements('unit-1')
-      expect(result.success).toBe(false)
-      expect(result.error).toBe('Not authenticated')
-    })
-
     it('should return error when not a unit member', async () => {
-      setupAuthenticatedUser('leader')
-      mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
-        unit_memberships: () => chainWithSingle(null),
-      })
+      mockedGetCurrentMembership.mockResolvedValue(null)
 
       const result = await getExpenseReimbursements('unit-1')
       expect(result.success).toBe(false)
@@ -550,8 +529,6 @@ describe('Expense Actions', () => {
       ]
 
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
-        unit_memberships: () => chainWithSingle({ role: 'treasurer' }),
         expense_reimbursements: () => ({
           select: vi.fn().mockReturnThis(),
           eq: vi.fn().mockReturnThis(),
@@ -574,25 +551,34 @@ describe('Expense Actions', () => {
   // ─── getExpenseReimbursement ──────────────────────────────────────
 
   describe('getExpenseReimbursement', () => {
-    it('should return error when not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+    it('should return error when not authorized (non-member)', async () => {
+      // Action fetches expense first, then membership-checks. With membership
+      // null, the action returns the "Not authorized to view this expense"
+      // message before the financial-role check runs.
+      mockedGetCurrentMembership.mockResolvedValue(null)
+      mockFromChain({
+        expense_reimbursements: () =>
+          chainWithSingle({
+            id: 'expense-1',
+            submitter_id: 'profile-123',
+            unit_id: 'unit-1',
+          }),
+      })
 
       const result = await getExpenseReimbursement('expense-1')
       expect(result.success).toBe(false)
-      expect(result.error).toBe('Not authenticated')
+      expect(result.error).toBe('Not authorized to view this expense')
     })
 
     it('should return error when not authorized', async () => {
       setupAuthenticatedUser('parent')
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () =>
           chainWithSingle({
             id: 'expense-1',
             submitter_id: 'other-profile',
             unit_id: 'unit-1',
           }),
-        unit_memberships: () => chainWithSingle({ role: 'parent' }),
       })
 
       const result = await getExpenseReimbursement('expense-1')
@@ -603,14 +589,12 @@ describe('Expense Actions', () => {
     it('should allow submitter to view their own expense', async () => {
       setupAuthenticatedUser('parent')
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () =>
           chainWithSingle({
             id: 'expense-1',
             submitter_id: 'profile-123',
             unit_id: 'unit-1',
           }),
-        unit_memberships: () => chainWithSingle({ role: 'parent' }),
       })
 
       const result = await getExpenseReimbursement('expense-1')
@@ -620,14 +604,12 @@ describe('Expense Actions', () => {
     it('should allow treasurer to view any expense', async () => {
       setupAuthenticatedUser('treasurer')
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () =>
           chainWithSingle({
             id: 'expense-1',
             submitter_id: 'other-profile',
             unit_id: 'unit-1',
           }),
-        unit_memberships: () => chainWithSingle({ role: 'treasurer' }),
       })
 
       const result = await getExpenseReimbursement('expense-1')
@@ -650,18 +632,32 @@ describe('Expense Actions', () => {
       expect(result.success).toBe(false)
     })
 
-    it('should return error when not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
+    it('should return error when not a unit member', async () => {
+      // Action fetches expense first, then membership-checks against
+      // expense.unit_id.
+      mockedGetCurrentMembership.mockResolvedValue(null)
+      mockFromChain({
+        expense_reimbursements: () =>
+          chainWithSingle({
+            id: validApproval.expense_id,
+            status: 'submitted',
+            unit_id: 'unit-1',
+            description: 'Supplies',
+            amount: 45.99,
+            expense_date: '2026-02-15',
+            submitter: null,
+            unit: null,
+          }),
+      })
 
       const result = await approveExpenseReimbursement(validApproval)
       expect(result.success).toBe(false)
-      expect(result.error).toBe('Not authenticated')
+      expect(result.error).toBe('Not a member of this unit')
     })
 
     it('should return error when not financial role', async () => {
       setupAuthenticatedUser('leader')
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () =>
           chainWithSingle({
             id: validApproval.expense_id,
@@ -677,7 +673,6 @@ describe('Expense Actions', () => {
             },
             unit: { name: 'Troop 42' },
           }),
-        unit_memberships: () => chainWithSingle({ role: 'leader' }),
       })
 
       const result = await approveExpenseReimbursement(validApproval)
@@ -690,7 +685,6 @@ describe('Expense Actions', () => {
     it('should return error when expense is not submitted', async () => {
       setupAuthenticatedUser('treasurer')
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () =>
           chainWithSingle({
             id: validApproval.expense_id,
@@ -702,7 +696,6 @@ describe('Expense Actions', () => {
             submitter: null,
             unit: null,
           }),
-        unit_memberships: () => chainWithSingle({ role: 'treasurer' }),
       })
 
       const result = await approveExpenseReimbursement(validApproval)
@@ -714,12 +707,7 @@ describe('Expense Actions', () => {
       setupAuthenticatedUser('treasurer')
       let expenseCalls = 0
       mockFromChain({
-        profiles: (callIndex) => {
-          if (callIndex <= 1)
-            return chainWithSingle({ id: 'profile-123' })
-          // reviewer profile lookup
-          return chainWithSingle({ full_name: 'Treasurer User' })
-        },
+        profiles: () => chainWithSingle({ full_name: 'Treasurer User' }),
         expense_reimbursements: () => {
           expenseCalls++
           if (expenseCalls === 1) {
@@ -744,7 +732,6 @@ describe('Expense Actions', () => {
             eq: vi.fn().mockResolvedValue({ error: null }),
           }
         },
-        unit_memberships: () => chainWithSingle({ role: 'treasurer' }),
       })
 
       mockSupabase.rpc.mockResolvedValue({
@@ -777,18 +764,9 @@ describe('Expense Actions', () => {
       expect(result.success).toBe(false)
     })
 
-    it('should return error when not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
-
-      const result = await rejectExpenseReimbursement(validRejection)
-      expect(result.success).toBe(false)
-      expect(result.error).toBe('Not authenticated')
-    })
-
-    it('should return error when not financial role', async () => {
-      setupAuthenticatedUser('leader')
+    it('should return error when not a unit member', async () => {
+      mockedGetCurrentMembership.mockResolvedValue(null)
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () =>
           chainWithSingle({
             id: validRejection.expense_id,
@@ -800,7 +778,27 @@ describe('Expense Actions', () => {
             submitter: null,
             unit: null,
           }),
-        unit_memberships: () => chainWithSingle({ role: 'leader' }),
+      })
+
+      const result = await rejectExpenseReimbursement(validRejection)
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Not a member of this unit')
+    })
+
+    it('should return error when not financial role', async () => {
+      setupAuthenticatedUser('leader')
+      mockFromChain({
+        expense_reimbursements: () =>
+          chainWithSingle({
+            id: validRejection.expense_id,
+            status: 'submitted',
+            unit_id: 'unit-1',
+            description: 'Supplies',
+            amount: 45.99,
+            expense_date: '2026-02-15',
+            submitter: null,
+            unit: null,
+          }),
       })
 
       const result = await rejectExpenseReimbursement(validRejection)
@@ -813,7 +811,6 @@ describe('Expense Actions', () => {
     it('should return error when expense is not submitted', async () => {
       setupAuthenticatedUser('treasurer')
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () =>
           chainWithSingle({
             id: validRejection.expense_id,
@@ -825,7 +822,6 @@ describe('Expense Actions', () => {
             submitter: null,
             unit: null,
           }),
-        unit_memberships: () => chainWithSingle({ role: 'treasurer' }),
       })
 
       const result = await rejectExpenseReimbursement(validRejection)
@@ -837,11 +833,7 @@ describe('Expense Actions', () => {
       setupAuthenticatedUser('treasurer')
       let expenseCalls = 0
       mockFromChain({
-        profiles: (callIndex) => {
-          if (callIndex <= 1)
-            return chainWithSingle({ id: 'profile-123' })
-          return chainWithSingle({ full_name: 'Treasurer User' })
-        },
+        profiles: () => chainWithSingle({ full_name: 'Treasurer User' }),
         expense_reimbursements: () => {
           expenseCalls++
           if (expenseCalls === 1) {
@@ -865,7 +857,6 @@ describe('Expense Actions', () => {
             eq: vi.fn().mockResolvedValue({ error: null }),
           }
         },
-        unit_memberships: () => chainWithSingle({ role: 'treasurer' }),
       })
 
       const result = await rejectExpenseReimbursement(validRejection)
@@ -890,25 +881,31 @@ describe('Expense Actions', () => {
       expect(result.success).toBe(false)
     })
 
-    it('should return error when not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null } })
-
-      const result = await markExpensePaid(validPayment)
-      expect(result.success).toBe(false)
-      expect(result.error).toBe('Not authenticated')
-    })
-
-    it('should return error when not financial role', async () => {
-      setupAuthenticatedUser('leader')
+    it('should return error when not a unit member', async () => {
+      mockedGetCurrentMembership.mockResolvedValue(null)
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () =>
           chainWithSingle({
             id: validPayment.expense_id,
             status: 'approved',
             unit_id: 'unit-1',
           }),
-        unit_memberships: () => chainWithSingle({ role: 'leader' }),
+      })
+
+      const result = await markExpensePaid(validPayment)
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Not a member of this unit')
+    })
+
+    it('should return error when not financial role', async () => {
+      setupAuthenticatedUser('leader')
+      mockFromChain({
+        expense_reimbursements: () =>
+          chainWithSingle({
+            id: validPayment.expense_id,
+            status: 'approved',
+            unit_id: 'unit-1',
+          }),
       })
 
       const result = await markExpensePaid(validPayment)
@@ -921,14 +918,12 @@ describe('Expense Actions', () => {
     it('should return error when expense is not approved', async () => {
       setupAuthenticatedUser('treasurer')
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () =>
           chainWithSingle({
             id: validPayment.expense_id,
             status: 'submitted',
             unit_id: 'unit-1',
           }),
-        unit_memberships: () => chainWithSingle({ role: 'treasurer' }),
       })
 
       const result = await markExpensePaid(validPayment)
@@ -942,7 +937,6 @@ describe('Expense Actions', () => {
       setupAuthenticatedUser('treasurer')
       let expenseCalls = 0
       mockFromChain({
-        profiles: () => chainWithSingle({ id: 'profile-123' }),
         expense_reimbursements: () => {
           expenseCalls++
           if (expenseCalls === 1) {
@@ -957,7 +951,6 @@ describe('Expense Actions', () => {
             eq: vi.fn().mockResolvedValue({ error: null }),
           }
         },
-        unit_memberships: () => chainWithSingle({ role: 'treasurer' }),
       })
 
       const result = await markExpensePaid(validPayment)

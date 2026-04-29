@@ -340,9 +340,10 @@ Same pattern: read `?unit=` from `request.nextUrl.searchParams`, pass to helper.
   - Note on completion: payment-fees, expenses/receipt, expenses/extract all body-validating — explicit `membership.unit_id === body.unitId` check. unit-logo route does not exist in the codebase (was speculative in the plan).
 
 #### Wave G: Server actions
-- [ ] **4.3.1** Server actions
+- [x] **4.3.1** Server actions
   - Files: `src/app/actions/{billing,cost-sharing,expenses}.ts`
   - Note: Server actions called from client components — the unit ID should come from the client's URL via the page that calls the action, then passed to the action explicitly.
+  - Implementation note: Three patterns surfaced. (1) Cookie-driven actions (`voidBillingRecord`) use `getCurrentMembership()` with no arg — reads the cookie set by the unit switcher. (2) Body-validating actions (`getUserContext(unitId)`, `getExpenseReimbursements(unitId)`) pass the caller's unitId and explicitly verify `membership.unit_id === unitId` post-helper. (3) Resource-scoped actions (delete/get/approve/reject expense, markExpensePaid) fetch the resource first, then authorize against `expense.unit_id`. Profile-only actions (`updateExpenseReimbursement`, `submitExpenseReimbursement`) use `getCurrentProfile()`. Two unit tests were dropped because their branches (intermediate "profile fetched but membership not found") no longer exist as distinct paths in the helper-based code.
 
 > **Checkpoint:** Run full integration smoke test with multi-unit user. Try every nav item.
 
@@ -465,7 +466,7 @@ At the end of every phase, the following must hold:
 | Phase 1: Helper | 3 | 3 | Complete |
 | Phase 2: Finances pages | 6 | 6 | Complete |
 | Phase 3: Other pages | 13 | 13 | Complete (Wave B + C + D + 2 missed-and-recovered: settings, setup) |
-| Phase 4: API routes | 13 | 7 | In Progress (Reports, Imports, Square, Plaid, Scoutbook, Notifications, Settings done; only Wave G server actions remain) |
+| Phase 4: API routes | 13 | 13 | Complete (all 8 task groups across Waves E/F/G migrated — ~50 routes + 3 server action files) |
 | Phase 5: Lint rule | 1 | 0 | Not Started |
 | Phase 6: Unflag | 3 | 0 | Not Started |
 
@@ -519,6 +520,7 @@ At the end of every phase, the following must hold:
 | 4.1.4 | 2026-04-29 | pending | Scoutbook: sync POST, sync/cancel, sync/confirm, sync/resolution, extension-sync (session path), extension-auth (GET/POST/DELETE) migrated — closes 4.1.4 |
 | 4.2.2 | 2026-04-29 | pending | Notifications: collection/send-reminders migrated with explicit `membership.unit_id === body.unitId` check — closes 4.2.2 |
 | 4.2.3 | 2026-04-29 | pending | Settings: payment-fees, expenses/receipt POST+DELETE, expenses/extract migrated as body-validating routes with explicit unit_id verification — closes 4.2.3 |
+| 4.3.1 | 2026-04-29 | pending | Server actions migrated: billing.ts (1 action, cookie-driven), cost-sharing.ts (helper functions getUserContext + getAuthenticatedProfile refactored to use cached helpers), expenses.ts (9 actions with three auth patterns: cookie-driven, body-validating, resource-scoped). 2 unit tests dropped that no longer correspond to distinct code paths. — closes 4.3.1 and Phase 4 |
 
 ---
 

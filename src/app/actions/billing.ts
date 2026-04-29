@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership } from '@/lib/data/cached-queries'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 
@@ -16,28 +17,9 @@ interface ActionResult {
 export async function voidBillingRecord(billingRecordId: string): Promise<ActionResult> {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { success: false, error: 'Not authenticated' }
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
-    return { success: false, error: 'Profile not found' }
-  }
-
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select('unit_id, role')
-    .eq('profile_id', profile.id)
-    .eq('status', 'active')
-    .single()
-
+  // Server actions run with cookie access; the helper reads the current
+  // unit from the cookie set by the sidebar UnitSwitcher.
+  const membership = await getCurrentMembership()
   if (!membership || !['admin', 'treasurer'].includes(membership.role)) {
     return { success: false, error: 'Only admins and treasurers can void billing records' }
   }
@@ -67,7 +49,7 @@ export async function voidBillingRecord(billingRecordId: string): Promise<Action
     .update({
       is_void: true,
       void_reason: 'Record voided',
-      voided_by: profile.id,
+      voided_by: membership.profile_id,
       voided_at: now,
     })
     .eq('billing_record_id', billingRecordId)
@@ -78,7 +60,7 @@ export async function voidBillingRecord(billingRecordId: string): Promise<Action
     .update({
       is_void: true,
       void_reason: 'Voided by treasurer',
-      voided_by: profile.id,
+      voided_by: membership.profile_id,
       voided_at: now,
     })
     .eq('id', billingRecordId)
@@ -108,7 +90,7 @@ export async function voidBillingRecord(billingRecordId: string): Promise<Action
           entry_date: new Date().toISOString().split('T')[0],
           description: 'Void reversal',
           entry_type: 'adjustment',
-          created_by: profile.id,
+          created_by: membership.profile_id,
           is_posted: true,
           posted_at: now,
         })

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership, getCurrentProfile } from '@/lib/data/cached-queries'
 import type { CostShareResult } from '@/lib/expenses/cost-sharing'
 
 interface ActionResult {
@@ -12,38 +13,32 @@ interface ActionResult {
 
 /**
  * Get the current user's profile and verify unit access.
+ *
+ * The unitId comes from the caller (a page that already authorized the unit
+ * via its searchParams or cookie). Helper's fallback-to-first-membership is
+ * unsafe here, so we explicitly verify membership.unit_id === unitId.
  */
 async function getUserContext(unitId: string) {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { error: 'Not authenticated' }
+  const membership = await getCurrentMembership(unitId)
+  if (!membership || membership.unit_id !== unitId) {
+    return { error: 'Not a member of this unit' }
   }
 
+  // Need venmo_username for cost-share Venmo deep links, which the cached
+  // getCurrentProfile doesn't expose.
   const { data: profile } = await supabase
     .from('profiles')
     .select('id, venmo_username')
-    .eq('user_id', user.id)
+    .eq('id', membership.profile_id)
     .single()
 
   if (!profile) {
     return { error: 'Profile not found' }
   }
 
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select('role')
-    .eq('profile_id', profile.id)
-    .eq('unit_id', unitId)
-    .eq('status', 'active')
-    .single()
-
-  if (!membership) {
-    return { error: 'Not a member of this unit' }
-  }
-
-  return { supabase, user, profile, membership }
+  return { supabase, profile, membership }
 }
 
 /**
@@ -52,22 +47,10 @@ async function getUserContext(unitId: string) {
  */
 async function getAuthenticatedProfile() {
   const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  const profile = await getCurrentProfile()
+  if (!profile) {
     return { error: 'Not authenticated' }
   }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
-    return { error: 'Profile not found' }
-  }
-
   return { supabase, profile }
 }
 
