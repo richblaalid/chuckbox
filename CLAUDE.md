@@ -310,6 +310,37 @@ This project uses Claude Code plugins to enforce consistent workflows. **Skills 
 
 ---
 
+## Documentation Locations
+
+Planning and design artifacts follow a strict location convention.
+
+| Type | Location | Filename |
+|------|----------|----------|
+| **Design specs** (the WHAT/WHY) | `docs/superpowers/specs/` | `YYYY-MM-DD-<topic>-design.md` |
+| **Implementation plans** (the HOW) | `plans/` | `YYYY-MM-DD-<topic>.md` |
+| **Templates** | `plans/` | `*-TEMPLATE.md` |
+| **Archived (shipped)** | `plans/archive/` and `docs/superpowers/specs/archive/` | preserves filename |
+| **Deferred / parked** | `plans/deferred/` | preserves filename |
+
+**Required frontmatter for every new plan or spec:**
+
+```yaml
+---
+status: draft | approved | in-progress | shipped | deferred | abandoned
+last_verified: YYYY-MM-DD
+---
+```
+
+**Rules:**
+
+- New specs and plans use date-prefixed filenames. Legacy un-prefixed files keep their names.
+- When a plan ships, move it to `plans/archive/` (or its spec to `docs/superpowers/specs/archive/`).
+- The `docs/superpowers/plans/` directory is deprecated — implementation plans live in `plans/`.
+- Templates (`PLAN-TEMPLATE.md`, `BUG-TEMPLATE.md`, `TASKS-TEMPLATE.md`) stay at `plans/` root.
+- Update `last_verified` whenever you confirm the plan still matches reality (or when status changes).
+
+---
+
 ## Core Philosophy
 
 ### Verification Before Completion
