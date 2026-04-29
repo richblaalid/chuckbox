@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership, getRequestedUnitId } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
 import { generateChargeNotificationEmail } from '@/lib/email/templates/charge-notification'
 import { randomBytes } from 'crypto'
@@ -12,7 +13,7 @@ function generateSecureToken(): string {
   return randomBytes(32).toString('hex')
 }
 
-export async function POST(_request: NextRequest, { params }: RouteParams) {
+export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { batchId } = await params
     const supabase = await createClient()
@@ -25,23 +26,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
-    }
-
-    const { data: membership } = await supabase
-      .from('unit_memberships')
-      .select('unit_id, role')
-      .eq('profile_id', profile.id)
-      .eq('status', 'active')
-      .single()
-
+    const membership = await getCurrentMembership(supabase, getRequestedUnitId(request))
     if (!membership || !['admin', 'treasurer'].includes(membership.role)) {
       return NextResponse.json(
         { error: 'Only admins and treasurers can send notifications' },

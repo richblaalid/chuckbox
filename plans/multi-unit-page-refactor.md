@@ -317,9 +317,10 @@ Same pattern: read `?unit=` from `request.nextUrl.searchParams`, pass to helper.
   - Files: `src/app/api/scoutbook/**/route.ts`
 
 #### Wave F: Mutation API routes
-- [ ] **4.2.1** Imports: balances POST/undo, charges POST/template/notify/void, roster POST
+- [x] **4.2.1** Imports: balances POST/undo, charges POST/template/notify/void, roster POST
   - Files: `src/app/api/import/{balances,charges,roster}/**/route.ts`
   - **Critical:** These take `unit_id` from request body. Verify the helper is used to authorize that the caller has access to that unit, not to determine which unit is "active".
+  - Note on completion: Verified that `unit_id` body field on `import/charges` is declared in the interface but unused — the actual unit comes from `membership.unit_id`. All other import routes also use `membership.unit_id` directly. No body-trust issues found.
 
 - [ ] **4.2.2** Notifications: billing-charges/[id]/notify, billing-records/[id]/notify, collection/send-reminders
   - Files: `src/app/api/billing-charges/[id]/notify/route.ts`, `src/app/api/billing-records/[id]/notify/route.ts`, `src/app/api/collection/send-reminders/route.ts`
@@ -454,7 +455,7 @@ At the end of every phase, the following must hold:
 | Phase 1: Helper | 3 | 3 | Complete |
 | Phase 2: Finances pages | 6 | 6 | Complete |
 | Phase 3: Other pages | 11 | 11 | Complete |
-| Phase 4: API routes | 13 | 1 | In Progress (Reports done; read-only GET handlers shipped across Square/Plaid/Scoutbook/Imports — mutations pending in Wave F) |
+| Phase 4: API routes | 13 | 2 | In Progress (Reports + Imports done; read-only GETs across Square/Plaid/Scoutbook shipped; notifications partially migrated; mutations + body-validating routes still pending) |
 | Phase 5: Lint rule | 1 | 0 | Not Started |
 | Phase 6: Unflag | 3 | 0 | Not Started |
 
@@ -498,6 +499,9 @@ At the end of every phase, the following must hold:
 | 4.1.3-partial | 2026-04-28 | pending | Plaid: transactions GET + accounts GET migrated; create-link-token, exchange-token, disconnect, accounts POST remain for Wave F |
 | 4.1.4-partial | 2026-04-28 | pending | Scoutbook: sync/history + sync/pending migrated; sync POST, cancel, confirm, resolution, extension-sync, extension-auth remain for Wave F (sync/status uses sessionId-based RLS, no migration needed) |
 | 4.2.1-partial | 2026-04-28 | pending | Imports: charges/template GET migrated; balances POST/undo, charges POST/notify/void, roster POST remain for Wave F |
+| 4.2.1 | 2026-04-28 | pending | Imports: balances POST/undo, charges POST/notify/void, roster POST migrated — closes 4.2.1 |
+| 4.2.2-partial | 2026-04-28 | pending | Notifications: billing-charges/[id]/notify, billing-records/[id]/notify migrated; collection/send-reminders deferred (body-validating route, needs separate auth treatment) |
+| 4.2.3-partial | 2026-04-28 | pending | Settings: payment-links POST migrated; payment-fees, unit-logo, expenses receipt/extract remain |
 
 ---
 
