@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership, getRequestedUnitId } from '@/lib/auth'
 import { updateFieldResolution, ConflictResolution } from '@/lib/sync/scoutbook'
 
 /**
@@ -8,7 +9,7 @@ import { updateFieldResolution, ConflictResolution } from '@/lib/sync/scoutbook'
  * Update a field resolution for a staged member
  * Allows users to override "Chuckbox wins" default for specific fields
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
 
@@ -43,25 +44,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // Verify user has access to this session (via their unit membership)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
-    }
-
-    // Get user's unit membership
-    const { data: membership } = await supabase
-      .from('unit_memberships')
-      .select('unit_id, role')
-      .eq('profile_id', profile.id)
-      .eq('status', 'active')
-      .single()
-
+    const membership = await getCurrentMembership(supabase, getRequestedUnitId(request))
     if (!membership) {
       return NextResponse.json(
         { error: 'No active unit membership' },

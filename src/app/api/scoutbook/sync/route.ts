@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
 import { Database, Json } from '@/types/database'
+import { getCurrentMembership, getRequestedUnitId } from '@/lib/auth'
 import { syncFromScoutbook, stageRosterMembers } from '@/lib/sync/scoutbook'
 
 // Create a service client for background updates (not tied to request)
@@ -101,7 +102,7 @@ async function runSyncInBackground(
  * and only works when running locally (not in serverless deployments).
  * The browser automation opens a headed browser for user login.
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient()
 
@@ -114,37 +115,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get user's profile (profile_id is separate from auth user id)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!profile) {
-      return NextResponse.json(
-        { error: 'Profile not found' },
-        { status: 403 }
-      )
-    }
-
-    // Get user's unit membership
-    const { data: membership } = await supabase
-      .from('unit_memberships')
-      .select('unit_id, role')
-      .eq('profile_id', profile.id)
-      .eq('status', 'active')
-      .single()
-
-    if (!membership) {
-      return NextResponse.json(
-        { error: 'No active unit membership' },
-        { status: 403 }
-      )
-    }
-
-    // Only admins and treasurers can run sync
-    if (!['admin', 'treasurer'].includes(membership.role)) {
+    const membership = await getCurrentMembership(supabase, getRequestedUnitId(request))
+    if (!membership || !['admin', 'treasurer'].includes(membership.role)) {
       return NextResponse.json(
         { error: 'Only unit administrators can sync from Scoutbook' },
         { status: 403 }
@@ -179,7 +151,7 @@ export async function POST(request: Request) {
       .insert({
         unit_id: membership.unit_id,
         status: 'running',
-        created_by: profile.id,
+        created_by: membership.profile_id,
       })
       .select()
       .single()

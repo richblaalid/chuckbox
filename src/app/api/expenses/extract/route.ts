@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership } from '@/lib/auth'
 import { extractReceiptData } from '@/lib/expenses/receipt-ocr'
 
 export async function POST(request: NextRequest) {
@@ -24,27 +25,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing unit ID' }, { status: 400 })
     }
 
-    // Get user's profile
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
-    }
-
-    // Verify user has access to this unit
-    const { data: membership } = await supabase
-      .from('unit_memberships')
-      .select('id')
-      .eq('profile_id', profile.id)
-      .eq('unit_id', unitId)
-      .eq('status', 'active')
-      .single()
-
-    if (!membership) {
+    // Authorize against the body's unitId. Helper's fallback-to-first-membership
+    // is unsafe for body-driven auth, so verify membership.unit_id === unitId.
+    const membership = await getCurrentMembership(supabase, unitId)
+    if (!membership || membership.unit_id !== unitId) {
       return NextResponse.json({ error: 'Access denied to this unit' }, { status: 403 })
     }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership } from '@/lib/auth'
 import { z } from 'zod'
 
 // Zod schema for fee settings validation
@@ -37,27 +38,11 @@ export async function POST(request: NextRequest) {
 
     const { unitId, processingFeePercent, processingFeeFixed, passFeesToPayer } = parseResult.data
 
-    // Get user's profile (profile_id is separate from auth user id)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
-    }
-
-    // Check user has admin role for this unit
-    const { data: membership } = await supabase
-      .from('unit_memberships')
-      .select('role')
-      .eq('profile_id', profile.id)
-      .eq('unit_id', unitId)
-      .eq('status', 'active')
-      .single()
-
-    if (!membership || membership.role !== 'admin') {
+    // Authorize against the body's unitId. Explicit `membership.unit_id ===
+    // unitId` check preserves the original `.eq('unit_id', unitId)` semantics —
+    // the helper's fallback-to-first-membership is unsafe for body-driven auth.
+    const membership = await getCurrentMembership(supabase, unitId)
+    if (!membership || membership.unit_id !== unitId || membership.role !== 'admin') {
       return NextResponse.json(
         { error: 'Only unit administrators can update fee settings' },
         { status: 403 }
