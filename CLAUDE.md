@@ -41,6 +41,8 @@ npm run db:seed:all    # Run base + test seeds
 npm run db:fresh       # Reset + seed + fix + validate (fresh start)
 npm run db:fix         # Run BSA requirement fixes (hierarchy, naming)
 npm run db:validate    # Validate BSA requirement structure (report issues)
+npm run db:validate:strict  # Validate with stricter checks (fails on warnings)
+npm run db:normalize   # Normalize BSA canonical data (internal/dev only)
 npm run db:dump        # Export current database to JSON (supabase/seeds/)
 npm run db:dump -- name  # Export with custom name
 npm run db:restore -- supabase/seeds/file.json  # Restore from dump
@@ -107,7 +109,7 @@ All BSA reference data (ranks, merit badges, requirements) comes from ONE file: 
 - **Framework**: Next.js 16 (App Router, React 19)
 - **Database**: Supabase (PostgreSQL with Row Level Security)
 - **Styling**: Tailwind CSS 4, shadcn/ui components (Radix primitives)
-- **Forms**: react-hook-form + zod validation
+- **Forms**: React state + Server Actions, zod for validation, `useFormState` hook (`src/hooks/use-form-state.ts`) for loading/error/success state
 - **Testing**: Vitest 4 + React Testing Library
 
 ### Route Structure
@@ -227,7 +229,7 @@ Feature flags control feature availability via environment variables. See `src/l
 | `SCOUTBOOK_SYNC` | `NEXT_PUBLIC_FEATURE_SCOUTBOOK_SYNC` | `true` | Browser extension sync |
 | `CLI_AUTOMATION` | `NEXT_PUBLIC_FEATURE_CLI_AUTOMATION` | `false` | Dev-only CLI tools |
 | `BANK_INTEGRATION` | `NEXT_PUBLIC_FEATURE_BANK_INTEGRATION` | `false` | Plaid bank connection |
-| `MULTI_UNIT_CREATION` | `NEXT_PUBLIC_FEATURE_MULTI_UNIT_CREATION` | `false` | In-app unit creation + unit switcher (gated until [multi-unit page refactor](plans/multi-unit-page-refactor.md) is complete) |
+| `MULTI_UNIT_CREATION` | `NEXT_PUBLIC_FEATURE_MULTI_UNIT_CREATION` | `false` | In-app unit creation + unit switcher (gated until [multi-unit page refactor](plans/multi-unit-page-refactor.md) is complete — TODO: remove gating language when refactor ships and archive its plan) |
 
 Usage:
 ```typescript
@@ -249,7 +251,7 @@ if (isFeatureEnabled(FeatureFlag.BANK_INTEGRATION)) {
 - View-only bank account connection (no payment processing)
 - Uses Plaid Link for OAuth, access tokens encrypted in `plaid_connections`
 - Requires feature flag: `NEXT_PUBLIC_FEATURE_BANK_INTEGRATION=true`
-- Env vars: `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENVIRONMENT`, `ENCRYPTION_KEY`
+- Env vars: `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENVIRONMENT`, `TOKEN_ENCRYPTION_KEY` (64-char hex)
 - Sandbox credentials: Use `user_good` / `pass_good` for testing
 
 ---
@@ -270,10 +272,15 @@ This project uses Claude Code plugins to enforce consistent workflows. **Skills 
 
 | Skill | Purpose | Trigger |
 |-------|---------|---------|
-| `frontend-design` | High-quality UI development | **MANDATORY** for any UI work |
 | `mermaid-diagrams` | Generate architecture diagrams | When visualizations help |
 | `fix-mb-requirements` | Fix BSA data structure issues | BSA canonical data fixes |
 | `vercel-react-best-practices` | React/Next.js performance guide | Reference during implementation |
+
+### Plugin-Provided Skills (not in `.claude/skills/`)
+
+| Skill | Purpose | Trigger |
+|-------|---------|---------|
+| `frontend-design:frontend-design` | High-quality UI development | **MANDATORY** for any UI work |
 
 ### Superpowers Plugin (Workflow Enforcement)
 
@@ -470,7 +477,7 @@ Skip planning for:
   - `funds_balance`: Scout savings from fundraising/overpayments (always >= 0)
 - Avoid reading localStorage in initial state - defer to useEffect to prevent hydration mismatches
 - Nested interactive elements (button inside button) cause React hydration issues - use `<div role="button">` with keyboard handlers instead
-- Plaid access tokens are encrypted at rest using `ENCRYPTION_KEY` - see `src/lib/plaid/encryption.ts`
+- Plaid access tokens are encrypted at rest using `TOKEN_ENCRYPTION_KEY` - see `src/lib/encryption.ts`
 - Feature flags are checked at render time (not build time) - changes require page refresh, not rebuild
 - PostgREST `.in()` queries with 200+ UUIDs can exceed URL length limits and return "Bad Request" - batch in chunks of 100 (see "PostgREST Query Limitations" section)
 
