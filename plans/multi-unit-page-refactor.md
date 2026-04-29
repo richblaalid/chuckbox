@@ -281,10 +281,10 @@ flowchart TD
 - [ ] **3.1.3** `/adults/[id]` page → `src/app/(dashboard)/adults/[id]/page.tsx`
 
 #### Wave C: Expenses
-- [ ] **3.2.1** `/expenses` page → `src/app/(dashboard)/expenses/page.tsx`
-- [ ] **3.2.2** `/expenses/new` page → `src/app/(dashboard)/expenses/new/page.tsx`
-- [ ] **3.2.3** `/expenses/[id]` page → `src/app/(dashboard)/expenses/[id]/page.tsx`
-- [ ] **3.2.4** `/expenses/[id]/edit` page → `src/app/(dashboard)/expenses/[id]/edit/page.tsx`
+- [x] **3.2.1** `/expenses` page → `src/app/(dashboard)/expenses/page.tsx`
+- [x] **3.2.2** `/expenses/new` page → `src/app/(dashboard)/expenses/new/page.tsx`
+- [x] **3.2.3** `/expenses/[id]` page → `src/app/(dashboard)/expenses/[id]/page.tsx`
+- [x] **3.2.4** `/expenses/[id]/edit` page → `src/app/(dashboard)/expenses/[id]/edit/page.tsx`
 
 #### Wave D: Advancement / Settings imports
 - [ ] **3.3.1** `/advancement` page → `src/app/(dashboard)/advancement/page.tsx`
@@ -482,6 +482,10 @@ At the end of every phase, the following must hold:
 | 2.1.4 | 2026-04-06 | pending | /finances/billing migrated |
 | 2.1.5 | 2026-04-06 | ff612f2 | /finances/payments migrated |
 | 2.1.6 | 2026-04-08 | pending | /finances/reports migrated — closes Wave A |
+| 3.2.1 | 2026-04-28 | pending | /expenses migrated to getCurrentMembership |
+| 3.2.2 | 2026-04-28 | pending | /expenses/new migrated to getCurrentMembership + getCurrentUnit |
+| 3.2.3 | 2026-04-28 | pending | /expenses/[id] migrated to getCurrentMembership |
+| 3.2.4 | 2026-04-28 | pending | /expenses/[id]/edit migrated — closes Wave C |
 
 ---
 
