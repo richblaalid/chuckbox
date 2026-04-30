@@ -229,7 +229,7 @@ Feature flags control feature availability via environment variables. See `src/l
 | `SCOUTBOOK_SYNC` | `NEXT_PUBLIC_FEATURE_SCOUTBOOK_SYNC` | `true` | Browser extension sync |
 | `CLI_AUTOMATION` | `NEXT_PUBLIC_FEATURE_CLI_AUTOMATION` | `false` | Dev-only CLI tools |
 | `BANK_INTEGRATION` | `NEXT_PUBLIC_FEATURE_BANK_INTEGRATION` | `false` | Plaid bank connection |
-| `MULTI_UNIT_CREATION` | `NEXT_PUBLIC_FEATURE_MULTI_UNIT_CREATION` | `false` | In-app unit creation + unit switcher (gated until [multi-unit page refactor](plans/multi-unit-page-refactor.md) is complete — TODO: remove gating language when refactor ships and archive its plan) |
+| `MULTI_UNIT_CREATION` | `NEXT_PUBLIC_FEATURE_MULTI_UNIT_CREATION` | `false` | UI gate for in-app unit creation + unit switcher dropdown. The data layer is fully multi-unit-aware (see [multi-unit architecture](#multi-unit-architecture) below); this flag controls *exposure* of the multi-unit UI in production. Flip when launching multi-unit. |
 
 Usage:
 ```typescript
@@ -253,6 +253,31 @@ if (isFeatureEnabled(FeatureFlag.BANK_INTEGRATION)) {
 - Requires feature flag: `NEXT_PUBLIC_FEATURE_BANK_INTEGRATION=true`
 - Env vars: `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENVIRONMENT`, `TOKEN_ENCRYPTION_KEY` (64-char hex)
 - Sandbox credentials: Use `user_good` / `pass_good` for testing
+
+### Multi-Unit Architecture
+
+A user can belong to multiple Scout units (the `unit_memberships` table is many-to-many). The data layer is fully multi-unit-aware as of 2026-04. The `MULTI_UNIT_CREATION` feature flag controls *UI exposure*, not data correctness — single-unit users see no behavioral difference whether the flag is on or off.
+
+**Helpers:**
+
+| Helper | Where | Use in |
+|--------|-------|--------|
+| `getCurrentMembership(unitId?)` | `@/lib/data/cached-queries` | Pages, server actions |
+| `getCurrentMembership(supabase, unitId?)` | `@/lib/auth` | API routes |
+| `getRequestedUnitId(request)` | `@/lib/auth` | API routes (reads `?unit=` query param) |
+| `getCurrentProfile()` / `getCurrentProfile(supabase)` | Both | Profile-only auth (no unit context needed) |
+
+Both helpers return `{ profile_id, unit_id, role } | null`. The `unitId` argument is optional. If not provided, the helper falls back to the `currentUnit` cookie (set by the sidebar `UnitSwitcher`) and then to the user's first active membership.
+
+**Three auth patterns** appear across the codebase:
+
+1. **Cookie-driven** (no `unitId` arg) — page-level data fetching, server actions called from the current page. The helper picks up the user's selected unit from cookie automatically.
+2. **Body-validating** (`unitId` from request body) — API routes / server actions where the caller explicitly names a unit. Pass the body's `unitId` to the helper AND verify `membership.unit_id === unitId` post-call. The helper's fallback semantics are unsafe for body-driven authorization without that explicit check.
+3. **Resource-scoped** (`unitId` from a row) — actions that operate on a specific resource (an expense, a billing record). Fetch the resource first, read its `unit_id`, then call the helper with that value and verify `membership.unit_id === resource.unit_id`.
+
+**Regression guard:** the custom ESLint rule `custom/no-single-on-unit-memberships` (in `eslint.config.mjs`) fails the build if new code uses `.single()` on a chain that includes `.from('unit_memberships')`. Use the helper instead.
+
+**Enabling multi-unit in dev:** set `NEXT_PUBLIC_FEATURE_MULTI_UNIT_CREATION=true` in `.env.local`. The unit switcher dropdown becomes visible, the `/create-unit` page becomes reachable, and you can exercise multi-membership flows. Smoke-test runbook: [docs/runbooks/multi-unit-smoke-test.md](docs/runbooks/multi-unit-smoke-test.md).
 
 ---
 
