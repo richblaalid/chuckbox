@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership } from '@/lib/auth'
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024 // 2MB
 const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp']
@@ -23,27 +24,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing file or unit ID' }, { status: 400 })
     }
 
-    // Get user's profile (profile_id is separate from auth user id)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
-    }
-
-    // Verify user is admin of this unit
-    const { data: membership } = await supabase
-      .from('unit_memberships')
-      .select('role')
-      .eq('profile_id', profile.id)
-      .eq('unit_id', unitId)
-      .eq('status', 'active')
-      .single()
-
-    if (!membership || membership.role !== 'admin') {
+    // Body-validating: caller passes unitId; verify admin membership in
+    // that specific unit. Helper's fallback-to-first-membership is unsafe
+    // here, so check `membership.unit_id === unitId` explicitly.
+    const membership = await getCurrentMembership(supabase, unitId)
+    if (!membership || membership.unit_id !== unitId || membership.role !== 'admin') {
       return NextResponse.json({ error: 'Only admins can upload logos' }, { status: 403 })
     }
 
@@ -119,27 +104,9 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Missing unit ID' }, { status: 400 })
     }
 
-    // Get user's profile (profile_id is separate from auth user id)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 403 })
-    }
-
-    // Verify user is admin of this unit
-    const { data: membership } = await supabase
-      .from('unit_memberships')
-      .select('role')
-      .eq('profile_id', profile.id)
-      .eq('unit_id', unitId)
-      .eq('status', 'active')
-      .single()
-
-    if (!membership || membership.role !== 'admin') {
+    // Body-validating: caller passes unitId; verify admin membership.
+    const membership = await getCurrentMembership(supabase, unitId)
+    if (!membership || membership.unit_id !== unitId || membership.role !== 'admin') {
       return NextResponse.json({ error: 'Only admins can delete logos' }, { status: 403 })
     }
 

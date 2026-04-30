@@ -351,10 +351,12 @@ Same pattern: read `?unit=` from `request.nextUrl.searchParams`, pass to helper.
 
 ### Phase 5: Lint Rule
 
-- [ ] **5.1.1** Add ESLint rule banning `.single()` on `unit_memberships` queries
-  - Files: `eslint.config.js` (or wherever the flat config lives)
-  - Details: Custom no-restricted-syntax rule with a selector that matches a `.single()` call on a chain that includes `.from('unit_memberships')`. Document escape hatch: `// eslint-disable-next-line` for the legitimate cases (e.g., the helpers themselves where we KNOW we want one row).
-  - Test: Add a fixture file with the bad pattern, run lint, verify it fails
+- [x] **5.1.1** Add ESLint rule banning `.single()` on `unit_memberships` queries
+  - Files: `eslint.config.mjs` (custom inline plugin)
+  - Implementation: Custom `custom/no-single-on-unit-memberships` rule that walks down the call-chain object from any `.single()` call, looking for `.from('unit_memberships')`. Reports an error with a message pointing to the helper.
+  - Test fixtures: `tests/fixtures/lint/bad-single-on-unit-memberships.ts` (in lint-ignored dir).
+  - Test: `tests/unit/lint/no-single-on-unit-memberships.test.ts` uses ESLint API to verify the rule fires on bad patterns and skips good ones (3 tests).
+  - Bonus: Rule surfaced 3 files that earlier waves missed — `src/app/api/settings/unit-logo/route.ts` (POST + DELETE), `src/app/actions/onboarding.ts` (`completeSetupWizard`). All migrated in this PR.
 
 ---
 
@@ -467,7 +469,7 @@ At the end of every phase, the following must hold:
 | Phase 2: Finances pages | 6 | 6 | Complete |
 | Phase 3: Other pages | 13 | 13 | Complete (Wave B + C + D + 2 missed-and-recovered: settings, setup) |
 | Phase 4: API routes | 13 | 13 | Complete (all 8 task groups across Waves E/F/G migrated — ~50 routes + 3 server action files) |
-| Phase 5: Lint rule | 1 | 0 | Not Started |
+| Phase 5: Lint rule | 1 | 1 | Complete (custom/no-single-on-unit-memberships rule active; 3 missed files surfaced and migrated) |
 | Phase 6: Unflag | 3 | 0 | Not Started |
 
 **Total: 41 tasks across 7 phases**
@@ -521,6 +523,7 @@ At the end of every phase, the following must hold:
 | 4.2.2 | 2026-04-29 | pending | Notifications: collection/send-reminders migrated with explicit `membership.unit_id === body.unitId` check — closes 4.2.2 |
 | 4.2.3 | 2026-04-29 | pending | Settings: payment-fees, expenses/receipt POST+DELETE, expenses/extract migrated as body-validating routes with explicit unit_id verification — closes 4.2.3 |
 | 4.3.1 | 2026-04-29 | pending | Server actions migrated: billing.ts (1 action, cookie-driven), cost-sharing.ts (helper functions getUserContext + getAuthenticatedProfile refactored to use cached helpers), expenses.ts (9 actions with three auth patterns: cookie-driven, body-validating, resource-scoped). 2 unit tests dropped that no longer correspond to distinct code paths. — closes 4.3.1 and Phase 4 |
+| 5.1.1 | 2026-04-29 | pending | Custom ESLint rule `custom/no-single-on-unit-memberships` added in eslint.config.mjs, with vitest tests via ESLint API. Rule surfaced 3 missed files (settings/unit-logo POST+DELETE, onboarding.ts completeSetupWizard) — all migrated in same PR. Phase 5 complete. |
 
 ---
 
