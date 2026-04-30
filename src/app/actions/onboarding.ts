@@ -2,6 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentMembership } from '@/lib/data/cached-queries'
 import { revalidatePath } from 'next/cache'
 import crypto from 'crypto'
 import {
@@ -1102,34 +1103,10 @@ async function importRosterData(
 // ============================================
 
 export async function completeSetupWizard(): Promise<{ success: boolean; error?: string }> {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { success: false, error: 'Not authenticated' }
-  }
-
-  // Get user's profile and active unit
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('user_id', user.id)
-    .single()
-
-  if (!profile) {
-    return { success: false, error: 'Profile not found' }
-  }
-
-  // Get user's admin membership
-  const { data: membership } = await supabase
-    .from('unit_memberships')
-    .select('unit_id')
-    .eq('profile_id', profile.id)
-    .eq('role', 'admin')
-    .eq('status', 'active')
-    .single()
-
-  if (!membership) {
+  // Use the cookie-driven helper — server action context, current unit
+  // comes from the unit switcher cookie. Verify user is admin in that unit.
+  const membership = await getCurrentMembership()
+  if (!membership || membership.role !== 'admin') {
     return { success: false, error: 'No admin membership found' }
   }
 
