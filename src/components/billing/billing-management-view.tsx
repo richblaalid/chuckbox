@@ -32,6 +32,7 @@ import { QuickPaymentForm } from '@/components/payments/quick-payment-form'
 interface ChargeDetail {
   id: string
   amount: number
+  paid_amount: number | null
   is_paid: boolean | null
   is_void: boolean | null
   scout_account_id: string
