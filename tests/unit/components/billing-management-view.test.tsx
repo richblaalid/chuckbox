@@ -103,7 +103,7 @@ describe('BillingManagementView — expanded per-charge rows', () => {
     fireEvent.click(expandButton!)
 
     // Jane Smith is the partial scout ($20 of $50 paid → $30 remaining)
-    const janeRow = screen.getByText('Jane Smith').closest('div')!.parentElement!
+    const janeRow = screen.getByTestId('charge-row-c2')
     expect(within(janeRow).getByText('Partial')).toBeInTheDocument()
     expect(within(janeRow).getByText('$30.00')).toBeInTheDocument()
     expect(within(janeRow).getByText(/of \$50\.00 billed/i)).toBeInTheDocument()
@@ -122,7 +122,7 @@ describe('BillingManagementView — expanded per-charge rows', () => {
     fireEvent.click(expandButton!)
 
     // Sam Lee is fully unpaid — badge should be neutral stone, not amber
-    const samRow = screen.getByText('Sam Lee').closest('div')!.parentElement!
+    const samRow = screen.getByTestId('charge-row-c3')
     const unpaidBadge = within(samRow).getByText('Unpaid')
     expect(unpaidBadge.className).toMatch(/stone-/)
     expect(unpaidBadge.className).not.toMatch(/amber-/)
@@ -140,7 +140,7 @@ describe('BillingManagementView — expanded per-charge rows', () => {
     const expandButton = screen.getAllByRole('button').find(b => b.querySelector('svg.lucide-chevron-right'))
     fireEvent.click(expandButton!)
 
-    const johnRow = screen.getByText('John Doe').closest('div')!.parentElement!
+    const johnRow = screen.getByTestId('charge-row-c1')
     expect(within(johnRow).getByText(/Paid/)).toBeInTheDocument()
   })
 })

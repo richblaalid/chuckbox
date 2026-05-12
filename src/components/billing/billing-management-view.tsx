@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency } from '@/lib/utils'
-import { chargeStatus, chargeRemaining, getRecordStatus, type ChargeStatus } from '@/components/billing/billing-charge-status'
+import { chargeStatus, chargeRemaining, getRecordStatus, hasCollectedPayments, type ChargeStatus } from '@/components/billing/billing-charge-status'
 import {
   ChevronDown,
   ChevronRight,
@@ -618,7 +618,7 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus, 
                           description={record.description}
                           totalAmount={record.total_amount}
                           isVoid={record.is_void ?? false}
-                          hasPaidCharges={record.charges.some((c) => c.is_paid && !c.is_void)}
+                          hasCollectedPayments={hasCollectedPayments(record)}
                           hasUnpaidCharges={hasUnpaid}
                           canEdit={true}
                           canVoid={true}
@@ -640,6 +640,7 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus, 
                               return (
                                 <div
                                   key={charge.id}
+                                  data-testid={`charge-row-${charge.id}`}
                                   className="flex items-center justify-between py-1.5 text-sm"
                                 >
                                   <div className="flex items-center gap-2">

@@ -32,3 +32,11 @@ export function getRecordStatus(record: RecordStatusInput): ChargeStatus {
   if (statuses.some(s => s === 'paid' || s === 'partial')) return 'partial'
   return 'unpaid'
 }
+
+export function hasCollectedPayments(record: RecordStatusInput): boolean {
+  return record.charges.some(c => {
+    if (c.is_void) return false
+    const s = chargeStatus(c)
+    return s === 'paid' || s === 'partial'
+  })
+}

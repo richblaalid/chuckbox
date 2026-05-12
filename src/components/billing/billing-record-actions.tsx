@@ -19,7 +19,7 @@ interface BillingRecordActionsProps {
   description: string
   totalAmount: number
   isVoid: boolean
-  hasPaidCharges: boolean
+  hasCollectedPayments: boolean
   hasUnpaidCharges?: boolean
   canEdit: boolean
   canVoid: boolean
@@ -30,7 +30,7 @@ export function BillingRecordActions({
   description,
   totalAmount,
   isVoid,
-  hasPaidCharges,
+  hasCollectedPayments,
   hasUnpaidCharges = false,
   canEdit,
   canVoid,
@@ -80,7 +80,7 @@ export function BillingRecordActions({
           {canVoid && (
             <>
               {canEdit && <DropdownMenuSeparator />}
-              {hasPaidCharges ? (
+              {hasCollectedPayments ? (
                 <DropdownMenuItem disabled className="text-stone-400">
                   <Ban className="mr-2 h-4 w-4" />
                   Cannot void (has payments)

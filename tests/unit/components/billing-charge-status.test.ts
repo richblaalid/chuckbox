@@ -3,6 +3,7 @@ import {
   chargeStatus,
   chargeRemaining,
   getRecordStatus,
+  hasCollectedPayments,
   type ChargeStatusInput,
 } from '@/components/billing/billing-charge-status'
 
@@ -102,5 +103,53 @@ describe('getRecordStatus', () => {
       is_void: false,
       charges: [charge(), charge(), charge()],
     })).toBe('unpaid')
+  })
+
+  it('returns paid when there are no charges at all (empty array)', () => {
+    expect(getRecordStatus({ is_void: false, charges: [] })).toBe('paid')
+  })
+
+  it('treats a voided charge with non-zero paid_amount as excluded from active classification', () => {
+    expect(getRecordStatus({
+      is_void: false,
+      charges: [charge({ is_void: true, paid_amount: 25 })],
+    })).toBe('paid')
+  })
+})
+
+describe('hasCollectedPayments', () => {
+  it('returns false when all active charges are unpaid', () => {
+    expect(hasCollectedPayments({
+      is_void: false,
+      charges: [charge(), charge(), charge()],
+    })).toBe(false)
+  })
+
+  it('returns false when the only non-voided charges are unpaid', () => {
+    expect(hasCollectedPayments({
+      is_void: false,
+      charges: [charge(), charge({ is_void: true })],
+    })).toBe(false)
+  })
+
+  it('returns true when at least one charge is fully paid', () => {
+    expect(hasCollectedPayments({
+      is_void: false,
+      charges: [charge({ is_paid: true, paid_amount: 50 }), charge()],
+    })).toBe(true)
+  })
+
+  it('returns true when at least one charge is partially paid', () => {
+    expect(hasCollectedPayments({
+      is_void: false,
+      charges: [charge({ paid_amount: 20 }), charge()],
+    })).toBe(true)
+  })
+
+  it('ignores voided charges even if their paid_amount is non-zero (historical edge case)', () => {
+    expect(hasCollectedPayments({
+      is_void: false,
+      charges: [charge({ is_void: true, paid_amount: 25 }), charge()],
+    })).toBe(false)
   })
 })
