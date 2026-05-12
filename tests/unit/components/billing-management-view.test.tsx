@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { fireEvent, within } from '@testing-library/react'
 import { BillingManagementView, type BillingRecordEntry } from '@/components/billing/billing-management-view'
 
 vi.mock('@/app/actions/billing', () => ({
@@ -83,5 +84,63 @@ describe('BillingManagementView — row amount column', () => {
     // $200.00 appears in the summary cards too — confirm at least one instance is present
     expect(screen.getAllByText('$200.00').length).toBeGreaterThan(0)
     expect(screen.queryByText(/of \$/i)).not.toBeInTheDocument()
+  })
+})
+
+describe('BillingManagementView — expanded per-charge rows', () => {
+  it('shows Partial badge + remaining amount + "of $X billed" subtext for partial charge', () => {
+    render(
+      <BillingManagementView
+        records={[recordWithMixed]}
+        scouts={[scout(1, 'John', 'Doe'), scout(2, 'Jane', 'Smith'), scout(3, 'Sam', 'Lee'), scout(4, 'Alex', 'Reed')]}
+        unitId="unit1"
+      />
+    )
+
+    // Click the expand chevron for the first record
+    const expandButton = screen.getAllByRole('button').find(b => b.querySelector('svg.lucide-chevron-right'))
+    expect(expandButton).toBeDefined()
+    fireEvent.click(expandButton!)
+
+    // Jane Smith is the partial scout ($20 of $50 paid → $30 remaining)
+    const janeRow = screen.getByText('Jane Smith').closest('div')!.parentElement!
+    expect(within(janeRow).getByText('Partial')).toBeInTheDocument()
+    expect(within(janeRow).getByText('$30.00')).toBeInTheDocument()
+    expect(within(janeRow).getByText(/of \$50\.00 billed/i)).toBeInTheDocument()
+  })
+
+  it('renders per-charge Unpaid badge with stone (neutral) classes, not amber', () => {
+    render(
+      <BillingManagementView
+        records={[recordWithMixed]}
+        scouts={[scout(1, 'John', 'Doe'), scout(2, 'Jane', 'Smith'), scout(3, 'Sam', 'Lee'), scout(4, 'Alex', 'Reed')]}
+        unitId="unit1"
+      />
+    )
+
+    const expandButton = screen.getAllByRole('button').find(b => b.querySelector('svg.lucide-chevron-right'))
+    fireEvent.click(expandButton!)
+
+    // Sam Lee is fully unpaid — badge should be neutral stone, not amber
+    const samRow = screen.getByText('Sam Lee').closest('div')!.parentElement!
+    const unpaidBadge = within(samRow).getByText('Unpaid')
+    expect(unpaidBadge.className).toMatch(/stone-/)
+    expect(unpaidBadge.className).not.toMatch(/amber-/)
+  })
+
+  it('renders Paid badge unchanged for fully-paid charge (regression guard)', () => {
+    render(
+      <BillingManagementView
+        records={[recordWithMixed]}
+        scouts={[scout(1, 'John', 'Doe'), scout(2, 'Jane', 'Smith'), scout(3, 'Sam', 'Lee'), scout(4, 'Alex', 'Reed')]}
+        unitId="unit1"
+      />
+    )
+
+    const expandButton = screen.getAllByRole('button').find(b => b.querySelector('svg.lucide-chevron-right'))
+    fireEvent.click(expandButton!)
+
+    const johnRow = screen.getByText('John Doe').closest('div')!.parentElement!
+    expect(within(johnRow).getByText(/Paid/)).toBeInTheDocument()
   })
 })

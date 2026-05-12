@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency } from '@/lib/utils'
-import { chargeRemaining, getRecordStatus, type ChargeStatus } from '@/components/billing/billing-charge-status'
+import { chargeStatus, chargeRemaining, getRecordStatus, type ChargeStatus } from '@/components/billing/billing-charge-status'
 import {
   ChevronDown,
   ChevronRight,
@@ -632,61 +632,78 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus, 
                         <div className="mt-2 space-y-1.5">
                           {record.charges
                             .sort((a, b) => `${a.scout_last_name} ${a.scout_first_name}`.localeCompare(`${b.scout_last_name} ${b.scout_first_name}`))
-                            .map((charge) => (
-                              <div
-                                key={charge.id}
-                                className="flex items-center justify-between py-1.5 text-sm"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <Link
-                                    href={`/finances/accounts/${charge.scout_account_id}`}
-                                    className="text-forest-600 hover:text-forest-800 hover:underline"
-                                  >
-                                    {charge.scout_first_name} {charge.scout_last_name}
-                                  </Link>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <span className={charge.is_paid ? 'text-stone-400 line-through' : 'text-stone-900'}>
-                                    {formatCurrency(charge.amount)}
-                                  </span>
-                                  {charge.is_void ? (
-                                    <Badge variant="outline" className="border-stone-200 text-stone-400 text-xs px-1.5 py-0">
-                                      Voided
-                                    </Badge>
-                                  ) : charge.is_paid ? (
-                                    <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 text-xs px-1.5 py-0">
-                                      Paid
-                                      {charge.payment_method && (
-                                        <span className="text-green-500 font-normal">
-                                          {' · '}{charge.payment_method === 'check' && charge.check_ref
-                                            ? `Check #${charge.check_ref}`
-                                            : charge.payment_method === 'check'
-                                              ? 'Check'
-                                              : charge.payment_method === 'card'
-                                                ? 'Card'
-                                                : charge.payment_method.charAt(0).toUpperCase() + charge.payment_method.slice(1)}
+                            .map((charge) => {
+                              const status = chargeStatus(charge)
+                              const remaining = chargeRemaining(charge)
+                              const isPartial = status === 'partial'
+
+                              return (
+                                <div
+                                  key={charge.id}
+                                  className="flex items-center justify-between py-1.5 text-sm"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Link
+                                      href={`/finances/accounts/${charge.scout_account_id}`}
+                                      className="text-forest-600 hover:text-forest-800 hover:underline"
+                                    >
+                                      {charge.scout_first_name} {charge.scout_last_name}
+                                    </Link>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <div className="flex flex-col items-end">
+                                      <span className={charge.is_paid ? 'text-stone-400 line-through' : 'text-stone-900'}>
+                                        {formatCurrency(isPartial ? remaining : charge.amount)}
+                                      </span>
+                                      {isPartial && (
+                                        <span className="text-xs text-stone-500">
+                                          of {formatCurrency(charge.amount)} billed
                                         </span>
                                       )}
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 text-xs px-1.5 py-0">
-                                      Unpaid
-                                    </Badge>
-                                  )}
-                                  {!charge.is_void && !charge.is_paid && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="h-6 px-2 text-xs text-forest-600 hover:text-forest-800"
-                                      onClick={() => handleRecordPaymentForCharge(charge, record.description)}
-                                    >
-                                      <DollarSign className="h-3 w-3 mr-1" />
-                                      Record Payment
-                                    </Button>
-                                  )}
+                                    </div>
+                                    {charge.is_void ? (
+                                      <Badge variant="outline" className="border-stone-200 text-stone-400 text-xs px-1.5 py-0">
+                                        Voided
+                                      </Badge>
+                                    ) : charge.is_paid ? (
+                                      <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 text-xs px-1.5 py-0">
+                                        Paid
+                                        {charge.payment_method && (
+                                          <span className="text-green-500 font-normal">
+                                            {' · '}{charge.payment_method === 'check' && charge.check_ref
+                                              ? `Check #${charge.check_ref}`
+                                              : charge.payment_method === 'check'
+                                                ? 'Check'
+                                                : charge.payment_method === 'card'
+                                                  ? 'Card'
+                                                  : charge.payment_method.charAt(0).toUpperCase() + charge.payment_method.slice(1)}
+                                          </span>
+                                        )}
+                                      </Badge>
+                                    ) : isPartial ? (
+                                      <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 text-xs px-1.5 py-0">
+                                        Partial
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="border-stone-200 bg-stone-50 text-stone-600 text-xs px-1.5 py-0">
+                                        Unpaid
+                                      </Badge>
+                                    )}
+                                    {!charge.is_void && !charge.is_paid && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 px-2 text-xs text-forest-600 hover:text-forest-800"
+                                        onClick={() => handleRecordPaymentForCharge(charge, record.description)}
+                                      >
+                                        <DollarSign className="h-3 w-3 mr-1" />
+                                        Record Payment
+                                      </Button>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              )
+                            })}
                         </div>
                       </div>
                     )}
