@@ -17,3 +17,18 @@ export function chargeStatus(c: ChargeStatusInput): ChargeStatus {
 export function chargeRemaining(c: ChargeStatusInput): number {
   return Math.max(0, c.amount - (c.paid_amount ?? 0))
 }
+
+export interface RecordStatusInput {
+  is_void: boolean | null
+  charges: ChargeStatusInput[]
+}
+
+export function getRecordStatus(record: RecordStatusInput): ChargeStatus {
+  if (record.is_void) return 'voided'
+  const activeCharges = record.charges.filter(c => !c.is_void)
+  if (activeCharges.length === 0) return 'paid'
+  const statuses = activeCharges.map(chargeStatus)
+  if (statuses.every(s => s === 'paid')) return 'paid'
+  if (statuses.some(s => s === 'paid' || s === 'partial')) return 'partial'
+  return 'unpaid'
+}

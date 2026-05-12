@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   chargeStatus,
   chargeRemaining,
+  getRecordStatus,
   type ChargeStatusInput,
 } from '@/components/billing/billing-charge-status'
 
@@ -51,5 +52,55 @@ describe('chargeRemaining', () => {
 
   it('clamps to zero on overpayment (never negative)', () => {
     expect(chargeRemaining(base({ amount: 50, paid_amount: 60 }))).toBe(0)
+  })
+})
+
+const charge = (over: Partial<ChargeStatusInput> = {}) => base(over)
+
+describe('getRecordStatus', () => {
+  it('returns voided when the record itself is voided', () => {
+    expect(getRecordStatus({ is_void: true, charges: [charge()] })).toBe('voided')
+  })
+
+  it('returns paid when all active charges are paid', () => {
+    expect(getRecordStatus({
+      is_void: false,
+      charges: [charge({ is_paid: true, paid_amount: 50 }), charge({ is_paid: true, paid_amount: 50 })],
+    })).toBe('paid')
+  })
+
+  it('returns paid when the only non-voided charges are paid (voided charges ignored)', () => {
+    expect(getRecordStatus({
+      is_void: false,
+      charges: [charge({ is_paid: true, paid_amount: 50 }), charge({ is_void: true })],
+    })).toBe('paid')
+  })
+
+  it('returns paid when there are no active charges (all voided)', () => {
+    expect(getRecordStatus({
+      is_void: false,
+      charges: [charge({ is_void: true }), charge({ is_void: true })],
+    })).toBe('paid')
+  })
+
+  it('returns partial when at least one charge is fully paid and another is unpaid', () => {
+    expect(getRecordStatus({
+      is_void: false,
+      charges: [charge({ is_paid: true, paid_amount: 50 }), charge()],
+    })).toBe('partial')
+  })
+
+  it('returns partial when at least one charge is partially paid (new behavior)', () => {
+    expect(getRecordStatus({
+      is_void: false,
+      charges: [charge({ paid_amount: 20 }), charge(), charge()],
+    })).toBe('partial')
+  })
+
+  it('returns unpaid when no charges have any collected payment', () => {
+    expect(getRecordStatus({
+      is_void: false,
+      charges: [charge(), charge(), charge()],
+    })).toBe('unpaid')
   })
 })

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency } from '@/lib/utils'
+import { getRecordStatus, type ChargeStatus } from '@/components/billing/billing-charge-status'
 import {
   ChevronDown,
   ChevronRight,
@@ -315,17 +316,7 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus, 
     ? scouts.find(s => s.scout_accounts?.id === paymentCharge.scoutAccountId)
     : null
 
-  const getRecordStatus = (record: BillingRecordEntry): 'voided' | 'paid' | 'partial' | 'unpaid' => {
-    if (record.is_void) return 'voided'
-    const activeCharges = record.charges.filter((c) => !c.is_void)
-    if (activeCharges.length === 0) return 'paid'
-    const paidCount = activeCharges.filter((c) => c.is_paid).length
-    if (paidCount === activeCharges.length) return 'paid'
-    if (paidCount > 0) return 'partial'
-    return 'unpaid'
-  }
-
-  const statusBadge = (status: ReturnType<typeof getRecordStatus>) => {
+  const statusBadge = (status: ChargeStatus) => {
     switch (status) {
       case 'paid':
         return <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">Paid</Badge>
