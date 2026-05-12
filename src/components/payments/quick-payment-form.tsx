@@ -107,27 +107,28 @@ export function QuickPaymentForm({
   const selectedScout = scouts.find((s) => s.id === selectedScoutId)
   const currentBalance = selectedScout?.scout_accounts?.billing_balance || 0
   const fundsBalance = selectedScout?.scout_accounts?.funds_balance || 0
+  // Amount = cash/check/card portion to collect (NOT total payment)
   const parsedAmount = parseFloat(amount) || 0
 
   // Check if scout has funds available to use
   const hasFunds = fundsBalance > 0 && currentBalance < 0
   const maxFromFunds = Math.min(fundsBalance, Math.abs(currentBalance))
 
-  // Remaining amount after funds are applied
-  const remainingAfterFunds = Math.max(0, parsedAmount - parsedFundsToApply)
+  // Total payment = funds applied + amount collected externally
+  const totalPayment = parsedAmount + parsedFundsToApply
 
   // Funds cover everything — no external payment method needed
-  const fundsCoverAll = parsedFundsToApply > 0 && remainingAfterFunds === 0 && parsedAmount > 0
+  const fundsCoverAll = parsedAmount === 0 && parsedFundsToApply > 0
 
-  // Calculate fees for card payments (only on remaining amount after funds)
+  // Card fees apply to the externally collected portion (parsedAmount)
   const isCardPayment = method === 'card'
-  const feeAmount = isCardPayment && remainingAfterFunds > 0
-    ? remainingAfterFunds * SQUARE_FEE_PERCENT + SQUARE_FEE_FIXED_DOLLARS
+  const feeAmount = isCardPayment && parsedAmount > 0
+    ? parsedAmount * SQUARE_FEE_PERCENT + SQUARE_FEE_FIXED_DOLLARS
     : 0
-  const netAmount = remainingAfterFunds - feeAmount
+  const netAmount = parsedAmount - feeAmount
 
-  // Calculate new balance after payment
-  const newBalance = currentBalance + parsedAmount
+  // Calculate new balance after total payment is applied
+  const newBalance = currentBalance + totalPayment
 
   // Fetch outstanding charges when scout changes
   useEffect(() => {
@@ -271,7 +272,8 @@ export function QuickPaymentForm({
 
   const handlePayFullBalance = () => {
     if (currentBalance < 0) {
-      setAmount(Math.abs(currentBalance).toFixed(2))
+      const cashNeeded = Math.max(0, Math.abs(currentBalance) - parsedFundsToApply)
+      setAmount(cashNeeded.toFixed(2))
     }
   }
 
@@ -411,8 +413,8 @@ export function QuickPaymentForm({
       setError('Please select a scout')
       return
     }
-    if (parsedAmount <= 0) {
-      setError('Please enter a valid amount')
+    if (totalPayment <= 0) {
+      setError('Please enter a payment amount')
       return
     }
     if (parsedFundsToApply > fundsBalance) {
@@ -423,7 +425,7 @@ export function QuickPaymentForm({
       setError(`Funds amount exceeds balance owed: ${formatCurrency(Math.abs(currentBalance))}`)
       return
     }
-    if (!fundsCoverAll && method === 'card' && remainingAfterFunds < 1) {
+    if (method === 'card' && parsedAmount > 0 && parsedAmount < 1) {
       setError('Minimum card payment is $1.00')
       return
     }
@@ -447,10 +449,10 @@ export function QuickPaymentForm({
           {
             p_unit_id: unitId,
             p_description: inlineBillingDescription.trim(),
-            p_total_amount: parsedAmount,
+            p_total_amount: totalPayment,
             p_billing_date: inlineBillingDate,
             p_billing_type: 'fixed',
-            p_per_scout_amount: parsedAmount,
+            p_per_scout_amount: totalPayment,
             p_scout_accounts: [{ scoutId: selectedScout.id, accountId: scoutAccountId, scoutName: `${selectedScout.first_name} ${selectedScout.last_name}` }],
           }
         )
@@ -472,7 +474,7 @@ export function QuickPaymentForm({
           .single()
 
         inlineAllocation = newCharge?.id
-          ? [{ chargeId: newCharge.id, amount: parsedAmount }]
+          ? [{ chargeId: newCharge.id, amount: totalPayment }]
           : []
       }
 
@@ -491,8 +493,8 @@ export function QuickPaymentForm({
         })
       }
 
-      // Step 2: Process remaining amount via external payment method
-      if (!fundsCoverAll && remainingAfterFunds > 0) {
+      // Step 2: Collect external payment (cash/check/card) if any
+      if (parsedAmount > 0) {
         if (method === 'card') {
           await handleCardPayment()
         } else {
@@ -515,7 +517,7 @@ export function QuickPaymentForm({
       <div className="rounded-lg border border-success/20 bg-success/5 p-4 text-center">
         <p className="font-medium text-success">Payment recorded successfully!</p>
         <p className="mt-1 text-sm text-stone-600">
-          {formatCurrency(parsedAmount)} from {selectedScout?.first_name} {selectedScout?.last_name}
+          {formatCurrency(totalPayment)} from {selectedScout?.first_name} {selectedScout?.last_name}
         </p>
       </div>
     )
@@ -593,9 +595,14 @@ export function QuickPaymentForm({
           <Label>Outstanding Charges</Label>
           <ChargeAllocationList
             charges={outstandingCharges}
-            paymentAmount={parsedAmount}
+            paymentAmount={totalPayment}
             onAllocationsChange={setAllocations}
-            onAmountChange={(newAmount) => setAmount(String(newAmount))}
+            onAmountChange={(newTotal) => {
+              // newTotal is the desired total payment based on selected charges.
+              // Amount field holds only the cash/check/card portion, so subtract funds.
+              const cashPortion = Math.max(0, newTotal - parsedFundsToApply)
+              setAmount(cashPortion.toFixed(2))
+            }}
           />
         </div>
       )}
@@ -661,9 +668,14 @@ export function QuickPaymentForm({
               Apply All
             </Button>
           </div>
-          {parsedFundsToApply > 0 && parsedAmount > 0 && (
+          {parsedFundsToApply > 0 && (
             <p className="text-sm text-stone-600">
-              Remaining after funds: {formatCurrency(remainingAfterFunds)}
+              Total payment: {formatCurrency(totalPayment)}
+              {parsedAmount > 0 && (
+                <span className="text-stone-500">
+                  {' '}({formatCurrency(parsedFundsToApply)} funds + {formatCurrency(parsedAmount)} {method})
+                </span>
+              )}
             </p>
           )}
         </div>
@@ -671,7 +683,9 @@ export function QuickPaymentForm({
 
       {/* Amount with Quick Buttons */}
       <div className="space-y-2">
-        <Label htmlFor="quick-amount">Amount</Label>
+        <Label htmlFor="quick-amount">
+          {parsedFundsToApply > 0 ? 'Cash / Check / Card Amount' : 'Amount to Collect'}
+        </Label>
         <div className="flex gap-2">
           {QUICK_AMOUNTS.map((qa) => (
             <Button
@@ -707,7 +721,7 @@ export function QuickPaymentForm({
       {/* Payment Method Toggle - hidden when funds cover full amount */}
       {!fundsCoverAll && (
         <div className="space-y-2">
-          <Label>{parsedFundsToApply > 0 ? 'Method for Remaining Amount' : 'Method'}</Label>
+          <Label>Method</Label>
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"
@@ -778,7 +792,7 @@ export function QuickPaymentForm({
               </div>
             )}
           </div>
-          {remainingAfterFunds > 0 && (
+          {parsedAmount > 0 && (
             <p className="text-xs text-stone-500">
               Fee: {formatCurrency(feeAmount)} | Net: {formatCurrency(netAmount)}
             </p>
@@ -800,7 +814,7 @@ export function QuickPaymentForm({
       </div>
 
       {/* New Balance Preview */}
-      {selectedScout && parsedAmount > 0 && currentBalance < 0 && (
+      {selectedScout && totalPayment > 0 && currentBalance < 0 && (
         <div className="rounded-lg border border-stone-200 bg-stone-50 p-3">
           <p className="text-sm font-medium text-stone-700">After payment:</p>
           <div className="mt-1 flex justify-between text-sm">
@@ -844,7 +858,7 @@ export function QuickPaymentForm({
             disabled={
               isSubmitting ||
               !selectedScoutId ||
-              parsedAmount <= 0 ||
+              totalPayment <= 0 ||
               (!fundsCoverAll && method === 'card' && !cardInitialized) ||
               (chargesLoaded && outstandingCharges.length === 0 && !inlineBillingDescription.trim())
             }
@@ -855,9 +869,9 @@ export function QuickPaymentForm({
                 Processing...
               </>
             ) : fundsCoverAll ? (
-              `Apply Funds (${formatCurrency(parsedAmount)})`
+              `Apply Funds (${formatCurrency(parsedFundsToApply)})`
             ) : parsedFundsToApply > 0 ? (
-              `Apply ${formatCurrency(parsedFundsToApply)} Funds + Record ${formatCurrency(remainingAfterFunds)}`
+              `Apply ${formatCurrency(parsedFundsToApply)} Funds + Record ${formatCurrency(parsedAmount)}`
             ) : (
               `Record ${formatCurrency(parsedAmount)}`
             )}
