@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency } from '@/lib/utils'
-import { getRecordStatus, type ChargeStatus } from '@/components/billing/billing-charge-status'
+import { chargeRemaining, getRecordStatus, type ChargeStatus } from '@/components/billing/billing-charge-status'
 import {
   ChevronDown,
   ChevronRight,
@@ -554,6 +554,9 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus, 
                 const activeCharges = record.charges.filter((c) => !c.is_void)
                 const paidCount = activeCharges.filter((c) => c.is_paid).length
                 const hasUnpaid = activeCharges.some((c) => !c.is_paid)
+                const billedTotal = activeCharges.reduce((s, c) => s + c.amount, 0)
+                const outstandingTotal = activeCharges.reduce((s, c) => s + chargeRemaining(c), 0)
+                const showBilledSubtext = outstandingTotal !== billedTotal
 
                 return (
                   <div key={record.id} className="rounded-lg border border-stone-200">
@@ -597,8 +600,15 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus, 
                         {paidCount}/{activeCharges.length}
                       </div>
 
-                      <div className={`w-24 text-right text-sm font-medium ${record.is_void ? 'text-stone-400' : 'text-stone-900'}`}>
-                        {formatCurrency(record.total_amount)}
+                      <div className={`w-24 text-right flex flex-col items-end ${record.is_void ? 'text-stone-400' : 'text-stone-900'}`}>
+                        <span className="text-sm font-medium">
+                          {formatCurrency(outstandingTotal)}
+                        </span>
+                        {showBilledSubtext && (
+                          <span className="text-xs text-stone-500">
+                            of {formatCurrency(billedTotal)} billed
+                          </span>
+                        )}
                       </div>
 
                       {/* Actions */}
