@@ -29,6 +29,14 @@ describe('chargeStatus', () => {
     expect(chargeStatus(base({ is_paid: true, paid_amount: 60 }))).toBe('paid')
   })
 
+  it('returns paid when paid_amount >= amount even if is_paid is false (defensive guard for inconsistent data)', () => {
+    expect(chargeStatus(base({ is_paid: false, paid_amount: 50, amount: 50 }))).toBe('paid')
+  })
+
+  it('returns paid when paid_amount > amount and is_paid is false (overpayment with reconcile trigger not yet fired)', () => {
+    expect(chargeStatus(base({ is_paid: false, paid_amount: 60, amount: 50 }))).toBe('paid')
+  })
+
   it('returns partial when paid_amount > 0 and is_paid is false', () => {
     expect(chargeStatus(base({ paid_amount: 20 }))).toBe('partial')
   })

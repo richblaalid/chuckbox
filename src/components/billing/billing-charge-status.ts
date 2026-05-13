@@ -10,6 +10,11 @@ export type ChargeStatus = 'voided' | 'paid' | 'partial' | 'unpaid'
 export function chargeStatus(c: ChargeStatusInput): ChargeStatus {
   if (c.is_void) return 'voided'
   if (c.is_paid) return 'paid'
+  // Defensive: paid_amount can reach/exceed amount before the reconcile trigger
+  // flips is_paid (e.g., when allocations report full owed but cash collected
+  // is less than the charge total, leaving billing_balance still negative).
+  // Treating that state as 'paid' avoids the "$0 of $25 + Partial" display.
+  if (c.amount > 0 && (c.paid_amount ?? 0) >= c.amount) return 'paid'
   if ((c.paid_amount ?? 0) > 0) return 'partial'
   return 'unpaid'
 }

@@ -50,6 +50,32 @@ In [src/components/payments/charge-allocation-list.tsx:53-61](../../src/componen
 
 Combined with the server logic at [src/app/actions/payments.ts:218-231](../../src/app/actions/payments.ts#L218-L231), this means `paid_amount` increments by the full owed amount of every checked charge, even when the cash payment is smaller. A $30 cash payment against checked charges A($30) + B($50) marks both charges fully paid in the per-charge state, while only $30 hits the journal. Accounting drifts silently.
 
+### Bug 5 — Scout-funds transfers don't update charge-level state at all
+
+Discovered May 12, 2026 during continued manual testing on `phase-6-smoke-runbook-and-cleanup`. Scenario: user creates a single-scout $25 billing record, applies $5 from the scout's funds balance, and expects the billing card to show partial state (e.g., "$20 of $25 billed, Partial"). Observed: row still shows "$25, Unpaid."
+
+Root cause: [`transfer_funds_to_billing` RPC](../../supabase/migrations/00000000000000_schema.sql#L1740-L1801) only writes journal lines (debit funds, credit AR). It does NOT touch `billing_charges.paid_amount` or `is_paid`. The closest mechanism — the [`reconcile_billing_charges` trigger](../../supabase/migrations/20260326000002_reconcile_billing_charges.sql) — only flips `is_paid = true` for charges **fully covered** by the balance improvement (greedy FIFO). A partial improvement ($5 against a $25 charge) walks the loop, sees the first charge ($25) exceeds the coverage ($5), and exits without marking anything.
+
+So funds transfers are entirely invisible at the charge level. The display correctly reflects what `billing_charges.paid_amount` says (= 0), so renders as Unpaid. This is a real data-attribution gap, not a display bug.
+
+Fix scope:
+- Either `transfer_funds_to_billing` (or a new wrapper around it) needs to accept a `billing_charge_id` and increment that charge's `paid_amount` alongside the journal entry, OR
+- The display layer needs a second source of truth (e.g., compute outstanding by joining `journal_lines` to billing accounts, not just reading `paid_amount`).
+
+The first approach is cleaner — same allocation model as cash payments — but inherits the same open questions about charge selection (FIFO? user-driven? locked to the modal's initial charge?). The second approach is independent of those questions but is a much larger refactor.
+
+---
+
+## Display-layer mitigation already applied (May 12, 2026)
+
+Committed as part of the billing-card display branch to prevent the worst visible symptom of Bug 4 from leaking through:
+
+**`chargeStatus()` treats `paid_amount >= amount` as `'paid'` even when `is_paid = false`**, so an inconsistent-data scenario (cash payment of $5 with allocation set to $25 → `paid_amount = 25`, `is_paid = false` because billing_balance is still negative) displays as "Paid" instead of "Partial — $0 of $25 billed."
+
+This is purely a display-side defensive guard. It does NOT fix the underlying data inconsistency — `billing_charges.paid_amount` still over-counts what was actually collected, the scout's `billing_balance` still reflects the smaller cash amount, and Bug 5 (funds transfers writing nothing at the charge level) is still completely unaddressed. The mitigation buys us a less-confusing display while the data-layer fix is parked.
+
+When the data-layer work eventually lands and correctly writes `paid_amount = actual cash collected`, the mitigation becomes a no-op (its precondition `paid_amount >= amount` will only fire on truly paid charges, which `is_paid` will already have flipped on). Safe to leave in place as a defensive guard.
+
 ## Root cause (Bug 1 + Bug 3, mechanical)
 
 `QuickPaymentForm` already tries to honor `initialChargeId`:
@@ -94,7 +120,8 @@ useEffect(() => {
 3. **Fix Bug 4** by reporting allocation amount as the actual cash distributed to each charge, not the full owed. Probably means: if cash < sum(owed of checked charges), distribute proportionally OR cap at cash collected.
 
    This is the most consequential change — it shifts the per-charge state to match the actual cash recorded in the journal. Open question: how should the distribution work when the user explicitly checks multiple charges but pays less than their total?
-4. **Add tests** covering pre-selection, no-pre-fill, and distribution math.
+4. **Fix Bug 5** by giving the scout-funds transfer path the same charge-attribution semantics as cash. Either the RPC accepts a `billing_charge_id` (or array of them with allocations), or the application layer follows the funds transfer with an explicit `paid_amount` increment using a payment-allocations-like row. Either way, the funds-transfer flow needs charge-level awareness.
+5. **Add tests** covering pre-selection, no-pre-fill, distribution math (cash and funds), and the funds-transfer charge attribution.
 
 ## Open questions (for the next brainstorming session)
 
