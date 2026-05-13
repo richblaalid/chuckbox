@@ -265,7 +265,7 @@ describe('BillingManagementView — scout name subtext', () => {
     ],
   }
 
-  const recordRecordVoided: BillingRecordEntry = {
+  const recordVoided: BillingRecordEntry = {
     id: 'r-void',
     description: 'Cancelled Trip',
     billing_date: '2026-05-13',
@@ -325,7 +325,7 @@ describe('BillingManagementView — scout name subtext', () => {
   it('renders no scout subtext when record.is_void is true (even with active charges)', () => {
     render(
       <BillingManagementView
-        records={[recordRecordVoided]}
+        records={[recordVoided]}
         scouts={[scout(99, 'Alex', 'Reed')]}
         unitId="unit1"
       />

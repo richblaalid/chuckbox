@@ -557,7 +557,7 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus, 
                 const billedTotal = activeCharges.reduce((s, c) => s + c.amount, 0)
                 const outstandingTotal = activeCharges.reduce((s, c) => s + chargeRemaining(c), 0)
                 const showBilledSubtext = outstandingTotal !== billedTotal
-                const scoutDisplay =
+                const scoutSubtext =
                   record.is_void || activeCharges.length === 0
                     ? null
                     : activeCharges.length === 1
@@ -589,9 +589,9 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus, 
                         <p className={`text-sm font-medium truncate ${record.is_void ? 'text-stone-400 line-through' : 'text-stone-900'}`}>
                           {record.description}
                         </p>
-                        {scoutDisplay && (
+                        {scoutSubtext && (
                           <p className="text-xs text-stone-500 truncate">
-                            {scoutDisplay}
+                            {scoutSubtext}
                           </p>
                         )}
                         <p className="text-xs text-stone-500 sm:hidden">
