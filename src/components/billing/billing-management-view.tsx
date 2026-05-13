@@ -552,8 +552,8 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus, 
                 const isExpanded = expandedId === record.id
                 const status = getRecordStatus(record)
                 const activeCharges = record.charges.filter((c) => !c.is_void)
-                const paidCount = activeCharges.filter((c) => c.is_paid).length
-                const hasUnpaid = activeCharges.some((c) => !c.is_paid)
+                const paidCount = activeCharges.filter((c) => chargeStatus(c) === 'paid').length
+                const hasUnpaid = activeCharges.some((c) => chargeStatus(c) !== 'paid')
                 const billedTotal = activeCharges.reduce((s, c) => s + c.amount, 0)
                 const outstandingTotal = activeCharges.reduce((s, c) => s + chargeRemaining(c), 0)
                 const showBilledSubtext = outstandingTotal !== billedTotal
@@ -636,6 +636,8 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus, 
                               const status = chargeStatus(charge)
                               const remaining = chargeRemaining(charge)
                               const isPartial = status === 'partial'
+                              const isPaid = status === 'paid'
+                              const isVoided = status === 'voided'
 
                               return (
                                 <div
@@ -653,7 +655,7 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus, 
                                   </div>
                                   <div className="flex items-center gap-3">
                                     <div className="flex flex-col items-end">
-                                      <span className={charge.is_paid ? 'text-stone-400 line-through' : 'text-stone-900'}>
+                                      <span className={isPaid ? 'text-stone-400 line-through' : 'text-stone-900'}>
                                         {formatCurrency(isPartial ? remaining : charge.amount)}
                                       </span>
                                       {isPartial && (
@@ -662,11 +664,11 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus, 
                                         </span>
                                       )}
                                     </div>
-                                    {charge.is_void ? (
+                                    {isVoided ? (
                                       <Badge variant="outline" className="border-stone-200 text-stone-400 text-xs px-1.5 py-0">
                                         Voided
                                       </Badge>
-                                    ) : charge.is_paid ? (
+                                    ) : isPaid ? (
                                       <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 text-xs px-1.5 py-0">
                                         Paid
                                         {charge.payment_method && (
@@ -690,7 +692,7 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus, 
                                         Unpaid
                                       </Badge>
                                     )}
-                                    {!charge.is_void && !charge.is_paid && (
+                                    {!isVoided && !isPaid && (
                                       <Button
                                         variant="ghost"
                                         size="sm"

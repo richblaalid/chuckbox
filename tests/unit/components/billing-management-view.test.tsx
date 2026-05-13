@@ -162,4 +162,84 @@ describe('BillingManagementView — expanded per-charge rows', () => {
     const johnRow = screen.getByTestId('charge-row-c1')
     expect(within(johnRow).getByText(/Paid/)).toBeInTheDocument()
   })
+
+  it('renders Paid badge when paid_amount >= amount even if is_paid is false (defensive guard)', () => {
+    // Bug observed in dev: a charge with paid_amount inflated to amount (via the
+    // ChargeAllocationList full-owed allocation bug) but is_paid still false
+    // (because the reconcile trigger only flips is_paid when billing_balance is
+    // fully covered). The row-level helper says "Paid" via chargeStatus's
+    // defensive guard, so the per-charge row must agree.
+    const recordInconsistent: BillingRecordEntry = {
+      id: 'r-inc',
+      description: 'dddd',
+      billing_date: '2026-05-13',
+      created_at: '2026-05-13T00:00:00Z',
+      total_amount: 25,
+      is_void: false,
+      batch_id: null,
+      charges: [
+        charge({
+          id: 'c-inc',
+          amount: 25,
+          paid_amount: 25, // inflated via the allocation bug
+          is_paid: false,  // reconcile trigger hasn't fired
+          scout_first_name: 'Alex',
+          scout_last_name: 'A.',
+        }),
+      ],
+    }
+
+    render(
+      <BillingManagementView
+        records={[recordInconsistent]}
+        scouts={[scout(99, 'Alex', 'A.')]}
+        unitId="unit1"
+      />
+    )
+
+    const expandButton = screen.getAllByRole('button').find(b => b.querySelector('svg.lucide-chevron-right'))
+    fireEvent.click(expandButton!)
+
+    const alexRow = screen.getByTestId('charge-row-c-inc')
+    expect(within(alexRow).getByText(/Paid/)).toBeInTheDocument()
+    expect(within(alexRow).queryByText('Unpaid')).not.toBeInTheDocument()
+    expect(within(alexRow).queryByText('Partial')).not.toBeInTheDocument()
+    // No Record Payment button on a Paid (even-if-defensive) charge
+    expect(within(alexRow).queryByText('Record Payment')).not.toBeInTheDocument()
+  })
+
+  it('row paid count uses chargeStatus, not raw is_paid (defensive-paid charges count as paid)', () => {
+    const recordInconsistent: BillingRecordEntry = {
+      id: 'r-count',
+      description: 'count check',
+      billing_date: '2026-05-13',
+      created_at: '2026-05-13T00:00:00Z',
+      total_amount: 25,
+      is_void: false,
+      batch_id: null,
+      charges: [
+        charge({
+          id: 'c-count',
+          amount: 25,
+          paid_amount: 25,
+          is_paid: false,
+          scout_first_name: 'Alex',
+          scout_last_name: 'A.',
+        }),
+      ],
+    }
+
+    render(
+      <BillingManagementView
+        records={[recordInconsistent]}
+        scouts={[scout(99, 'Alex', 'A.')]}
+        unitId="unit1"
+      />
+    )
+
+    // Row paid-count display: should show 1/1 (one effectively-paid charge),
+    // not 0/1 (which would happen if it filtered by raw is_paid).
+    expect(screen.getByText('1/1')).toBeInTheDocument()
+    expect(screen.queryByText('0/1')).not.toBeInTheDocument()
+  })
 })
