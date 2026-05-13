@@ -68,7 +68,7 @@ describe('BillingManagementView — row amount column', () => {
       />
     )
 
-    expect(screen.getByText('$130.00')).toBeInTheDocument()
+    expect(screen.getAllByText('$130.00').length).toBeGreaterThan(0)
     expect(screen.getByText(/of \$200\.00 billed/i)).toBeInTheDocument()
   })
 
@@ -84,6 +84,25 @@ describe('BillingManagementView — row amount column', () => {
     // $200.00 appears in the summary cards too — confirm at least one instance is present
     expect(screen.getAllByText('$200.00').length).toBeGreaterThan(0)
     expect(screen.queryByText(/of \$/i)).not.toBeInTheDocument()
+  })
+
+  it('summary card Outstanding shows partial-aware total ($130, not $150) for mixed-status record', () => {
+    render(
+      <BillingManagementView
+        records={[recordWithMixed]}
+        scouts={[scout(1, 'John', 'Doe'), scout(2, 'Jane', 'Smith'), scout(3, 'Sam', 'Lee'), scout(4, 'Alex', 'Reed')]}
+        unitId="unit1"
+      />
+    )
+
+    // The summary stat card labeled "Outstanding" should display $130 (the
+    // partial-aware total), not $150 (which would double-count the partial
+    // charge by ignoring paid_amount). Find the card by its descriptor label
+    // and verify the title within.
+    const outstandingLabel = screen.getByText('Outstanding')
+    const card = outstandingLabel.closest('[class*="CardHeader"]') || outstandingLabel.parentElement!
+    expect(card.textContent).toContain('$130.00')
+    expect(card.textContent).not.toContain('$150.00')
   })
 })
 

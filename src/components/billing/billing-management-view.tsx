@@ -206,7 +206,7 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus, 
     return {
       totalBilled: allCharges.reduce((sum, c) => sum + c.amount, 0),
       totalCollected: paidCharges.reduce((sum, c) => sum + c.amount, 0),
-      totalOutstanding: unpaidCharges.reduce((sum, c) => sum + c.amount, 0),
+      totalOutstanding: unpaidCharges.reduce((sum, c) => sum + chargeRemaining(c), 0),
       totalVoided: records.filter((r) => r.is_void).flatMap((r) => r.charges).reduce((sum, c) => sum + c.amount, 0),
     }
   }, [records])
