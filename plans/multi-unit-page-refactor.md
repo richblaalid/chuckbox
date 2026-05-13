@@ -1,9 +1,10 @@
 # Multi-Unit Page Refactor & Feature Flag
 
-> **Status:** In Progress
+> **Status:** Refactor complete (data layer multi-unit-ready). Phase 6.1.2 (remove flag) deferred to product launch.
 > **Created:** 2026-04-06
+> **Refactor closed:** 2026-04-29
 > **Author:** Claude
-> **Depends on:** [graceful-existing-user-onboarding.md](./graceful-existing-user-onboarding.md) (Phase 2 must be flagged off until this is complete)
+> **Depends on:** [graceful-existing-user-onboarding.md](./graceful-existing-user-onboarding.md) (Phase 2 still gated; flag flip happens when product is ready)
 
 ---
 
@@ -360,20 +361,24 @@ Same pattern: read `?unit=` from `request.nextUrl.searchParams`, pass to helper.
 
 ---
 
-### Phase 6: Unflag
+### Phase 6: Verify and document (originally "Unflag")
 
-- [ ] **6.1.1** Verify all migrated pages with multi-unit test user
-  - Details: Manual smoke test. Walk every dashboard page, every nav link, both units in switcher. Document any failures and fix before unflagging.
-  - Test: All pages render correct unit data
+> **Reframed (2026-04-29):** Phase 6 originally bundled "smoke test" with "remove the feature flag" because the plan assumed the project wanted multi-unit live in prod immediately after the refactor. After review, the user decided to **leave the flag in place as a deployment gate** — the data layer is multi-unit-ready, but the *product decision* to launch multi-unit is separate from the refactor. The flag stays until product is ready.
+>
+> The refactor's mandatory work is therefore complete after 6.1.1 (smoke runbook authored, run when needed) and 6.1.3 (CLAUDE.md updated). Task 6.1.2 (remove the flag) is intentionally **deferred** until launch.
 
-- [ ] **6.1.2** Remove feature flag gates
+- [x] **6.1.1** Smoke-test runbook for multi-unit flows
+  - Files: `docs/runbooks/multi-unit-smoke-test.md`
+  - Details: Comprehensive checklist covering setup, Phase A–H of multi-unit verification (single-unit baseline, page-level, mutations, body-validating routes, third-party integrations, server actions, regression guard via lint).
+  - Status: Runbook authored. Running it is the user's call (and should happen any time multi-unit code is touched, plus pre-flag-flip).
+
+- [ ] **6.1.2** Remove feature flag gates — **DEFERRED**
   - Files: `src/lib/feature-flags.ts`, `src/app/(dashboard)/settings/page.tsx`, `src/components/dashboard/unit-switcher.tsx`, `src/app/(dashboard)/create-unit/page.tsx`
-  - Details: Remove `MULTI_UNIT_CREATION` enum value, all `isFeatureEnabled()` checks. Delete the env var from `.env.local` and any deployment configs.
-  - Test: Build passes; Phase 2 UI is visible by default
+  - Details: Remove `MULTI_UNIT_CREATION` enum value and all `isFeatureEnabled()` checks. The lint rule from Phase 5 prevents regression in either direction (flag-on or flag-off), so removing the flag is a product launch decision, not a refactor cleanup task. Deferred until product is ready to expose multi-unit unit creation in prod.
 
-- [ ] **6.1.3** Update CLAUDE.md to document multi-unit support
+- [x] **6.1.3** Update CLAUDE.md to document multi-unit support
   - Files: `CLAUDE.md`
-  - Details: Add a "Multi-Unit Support" section explaining the URL param convention and the helper.
+  - Details: Added "Multi-Unit Architecture" section to the Architecture block, documenting the helper signatures, the three auth patterns (cookie-driven, body-validating, resource-scoped), the lint regression guard, and how to enable multi-unit in dev. Reframed the `MULTI_UNIT_CREATION` flag entry from "TODO: remove" to "deployment gate; flip when launching."
 
 ---
 
@@ -470,7 +475,7 @@ At the end of every phase, the following must hold:
 | Phase 3: Other pages | 13 | 13 | Complete (Wave B + C + D + 2 missed-and-recovered: settings, setup) |
 | Phase 4: API routes | 13 | 13 | Complete (all 8 task groups across Waves E/F/G migrated — ~50 routes + 3 server action files) |
 | Phase 5: Lint rule | 1 | 1 | Complete (custom/no-single-on-unit-memberships rule active; 3 missed files surfaced and migrated) |
-| Phase 6: Unflag | 3 | 0 | Not Started |
+| Phase 6: Verify and document | 3 | 2 | Refactor complete (6.1.1 runbook authored, 6.1.3 CLAUDE.md updated; 6.1.2 unflag deferred to product launch — flag stays as deployment gate) |
 
 **Total: 41 tasks across 7 phases**
 
@@ -524,6 +529,9 @@ At the end of every phase, the following must hold:
 | 4.2.3 | 2026-04-29 | pending | Settings: payment-fees, expenses/receipt POST+DELETE, expenses/extract migrated as body-validating routes with explicit unit_id verification — closes 4.2.3 |
 | 4.3.1 | 2026-04-29 | pending | Server actions migrated: billing.ts (1 action, cookie-driven), cost-sharing.ts (helper functions getUserContext + getAuthenticatedProfile refactored to use cached helpers), expenses.ts (9 actions with three auth patterns: cookie-driven, body-validating, resource-scoped). 2 unit tests dropped that no longer correspond to distinct code paths. — closes 4.3.1 and Phase 4 |
 | 5.1.1 | 2026-04-29 | pending | Custom ESLint rule `custom/no-single-on-unit-memberships` added in eslint.config.mjs, with vitest tests via ESLint API. Rule surfaced 3 missed files (settings/unit-logo POST+DELETE, onboarding.ts completeSetupWizard) — all migrated in same PR. Phase 5 complete. |
+| 6.1.1 | 2026-04-29 | pending | Smoke-test runbook authored at docs/runbooks/multi-unit-smoke-test.md. Runs when needed (any time multi-unit code changes, before flag flip). |
+| 6.1.3 | 2026-04-29 | pending | CLAUDE.md updated: added "Multi-Unit Architecture" section documenting helper signatures, three auth patterns, lint regression guard, dev flag toggle. Reframed `MULTI_UNIT_CREATION` flag note from "TODO: remove" to "deployment gate". |
+| 6.1.2 | DEFERRED | — | Remove feature flag — held until product is ready to launch multi-unit in prod. Refactor is complete and production-safe with the flag in place. |
 
 ---
 

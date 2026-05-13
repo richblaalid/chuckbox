@@ -129,7 +129,7 @@ export function BillingRecordCard({
               description={description}
               totalAmount={totalAmount}
               isVoid={isVoid}
-              hasPaidCharges={hasPaidCharges}
+              hasCollectedPayments={hasPaidCharges}
               canEdit={canEdit}
               canVoid={canVoid}
             />

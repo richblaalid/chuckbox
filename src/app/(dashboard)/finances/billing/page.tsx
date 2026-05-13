@@ -60,6 +60,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       billing_charges (
         id,
         amount,
+        paid_amount,
         is_paid,
         is_void,
         scout_account_id,
@@ -91,6 +92,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
     billing_charges: Array<{
       id: string
       amount: number
+      paid_amount: number | null
       is_paid: boolean | null
       is_void: boolean | null
       scout_account_id: string
@@ -135,6 +137,7 @@ export default async function BillingPage({ searchParams }: BillingPageProps) {
       return {
         id: charge.id,
         amount: charge.amount,
+        paid_amount: charge.paid_amount,
         is_paid: charge.is_paid,
         is_void: charge.is_void,
         scout_account_id: charge.scout_account_id,
