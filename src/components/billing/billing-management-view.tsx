@@ -557,6 +557,12 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus, 
                 const billedTotal = activeCharges.reduce((s, c) => s + c.amount, 0)
                 const outstandingTotal = activeCharges.reduce((s, c) => s + chargeRemaining(c), 0)
                 const showBilledSubtext = outstandingTotal !== billedTotal
+                const scoutDisplay =
+                  record.is_void || activeCharges.length === 0
+                    ? null
+                    : activeCharges.length === 1
+                      ? `${activeCharges[0].scout_first_name} ${activeCharges[0].scout_last_name}`.trim()
+                      : 'Multiple Scouts'
 
                 return (
                   <div key={record.id} className="rounded-lg border border-stone-200">
@@ -583,6 +589,11 @@ export function BillingManagementView({ records, scouts, unitId, initialStatus, 
                         <p className={`text-sm font-medium truncate ${record.is_void ? 'text-stone-400 line-through' : 'text-stone-900'}`}>
                           {record.description}
                         </p>
+                        {scoutDisplay && (
+                          <p className="text-xs text-stone-500 truncate">
+                            {scoutDisplay}
+                          </p>
+                        )}
                         <p className="text-xs text-stone-500 sm:hidden">
                           {new Date(record.billing_date + 'T00:00:00').toLocaleDateString()} · {paidCount}/{activeCharges.length} paid
                         </p>

@@ -243,3 +243,110 @@ describe('BillingManagementView — expanded per-charge rows', () => {
     expect(screen.queryByText('0/1')).not.toBeInTheDocument()
   })
 })
+
+describe('BillingManagementView — scout name subtext', () => {
+  const recordSingleScout: BillingRecordEntry = {
+    id: 'r-single',
+    description: 'Adventure Camp Deposit',
+    billing_date: '2026-05-13',
+    created_at: '2026-05-13T00:00:00Z',
+    total_amount: 50,
+    is_void: false,
+    batch_id: null,
+    charges: [
+      charge({
+        id: 'c-single',
+        amount: 50,
+        paid_amount: 0,
+        is_paid: false,
+        scout_first_name: 'Alex',
+        scout_last_name: 'Reed',
+      }),
+    ],
+  }
+
+  const recordRecordVoided: BillingRecordEntry = {
+    id: 'r-void',
+    description: 'Cancelled Trip',
+    billing_date: '2026-05-13',
+    created_at: '2026-05-13T00:00:00Z',
+    total_amount: 50,
+    is_void: true,
+    batch_id: null,
+    charges: [
+      charge({
+        id: 'c-active-anyway',
+        amount: 50,
+        paid_amount: 0,
+        is_paid: false,
+        is_void: false,
+        scout_first_name: 'Alex',
+        scout_last_name: 'Reed',
+      }),
+    ],
+  }
+
+  const recordAllChargesVoided: BillingRecordEntry = {
+    id: 'r-all-charges-voided',
+    description: 'Dropped Members',
+    billing_date: '2026-05-13',
+    created_at: '2026-05-13T00:00:00Z',
+    total_amount: 100,
+    is_void: false,
+    batch_id: null,
+    charges: [
+      charge({ id: 'c-v1', is_void: true, scout_first_name: 'Alex', scout_last_name: 'Reed' }),
+      charge({ id: 'c-v2', is_void: true, scout_first_name: 'Sam', scout_last_name: 'Lee' }),
+    ],
+  }
+
+  it('renders scout name as subtext for single-scout records', () => {
+    render(
+      <BillingManagementView
+        records={[recordSingleScout]}
+        scouts={[scout(99, 'Alex', 'Reed')]}
+        unitId="unit1"
+      />
+    )
+    expect(screen.getByText('Alex Reed')).toBeInTheDocument()
+  })
+
+  it('renders "Multiple Scouts" subtext for multi-scout records', () => {
+    render(
+      <BillingManagementView
+        records={[recordWithMixed]}
+        scouts={[scout(1, 'John', 'Doe'), scout(2, 'Jane', 'Smith'), scout(3, 'Sam', 'Lee'), scout(4, 'Alex', 'Reed')]}
+        unitId="unit1"
+      />
+    )
+    expect(screen.getByText('Multiple Scouts')).toBeInTheDocument()
+  })
+
+  it('renders no scout subtext when record.is_void is true (even with active charges)', () => {
+    render(
+      <BillingManagementView
+        records={[recordRecordVoided]}
+        scouts={[scout(99, 'Alex', 'Reed')]}
+        unitId="unit1"
+      />
+    )
+    // The row is collapsed by default, so the only place 'Alex Reed' could
+    // appear is in the new subtext. Asserting absence proves the subtext is
+    // suppressed by the record.is_void predicate.
+    expect(screen.queryByText('Alex Reed')).not.toBeInTheDocument()
+    expect(screen.queryByText('Multiple Scouts')).not.toBeInTheDocument()
+  })
+
+  it('renders no scout subtext when all charges are voided', () => {
+    render(
+      <BillingManagementView
+        records={[recordAllChargesVoided]}
+        scouts={[scout(99, 'Alex', 'Reed'), scout(98, 'Sam', 'Lee')]}
+        unitId="unit1"
+      />
+    )
+    expect(screen.queryByText('Alex Reed')).not.toBeInTheDocument()
+    expect(screen.queryByText('Sam Lee')).not.toBeInTheDocument()
+    expect(screen.queryByText('Multiple Scouts')).not.toBeInTheDocument()
+  })
+})
