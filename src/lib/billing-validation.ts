@@ -3,18 +3,23 @@ export interface LineItem {
   amount: number
 }
 
-export function validateLineItems(lineItems: LineItem[], totalAmount: number): string | null {
+export function validateLineItems(lineItems: LineItem[]): string | null {
   if (lineItems.length === 0) return null
-  const sum = lineItems.reduce((acc, item) => acc + item.amount, 0)
-  if (Math.abs(sum - totalAmount) > 0.01) {
-    return `Line items sum to $${sum.toFixed(2)} but total is $${totalAmount.toFixed(2)}`
+
+  for (let i = 0; i < lineItems.length; i++) {
+    if (lineItems[i].amount <= 0) {
+      return 'Each line item must have an amount greater than $0'
+    }
   }
-  if (lineItems.some((item) => !item.description.trim())) {
-    return 'All line items must have a description'
+
+  if (lineItems.length >= 2) {
+    for (let i = 0; i < lineItems.length; i++) {
+      if (!lineItems[i].description.trim()) {
+        return `Line item ${i + 1} needs a description`
+      }
+    }
   }
-  if (lineItems.some((item) => item.amount <= 0)) {
-    return 'All line item amounts must be positive'
-  }
+
   return null
 }
 

@@ -3,60 +3,68 @@ import { validateLineItems, validateDeposit } from '@/lib/billing-validation'
 
 describe('validateLineItems', () => {
   it('returns null when no line items', () => {
-    expect(validateLineItems([], 100)).toBeNull()
+    expect(validateLineItems([])).toBeNull()
   })
 
-  it('returns null when sum matches total', () => {
+  it('returns null for a single row with empty description (description is optional in single-row mode)', () => {
+    expect(validateLineItems([{ description: '', amount: 100 }])).toBeNull()
+  })
+
+  it('returns null for a single row with whitespace-only description', () => {
+    expect(validateLineItems([{ description: '   ', amount: 100 }])).toBeNull()
+  })
+
+  it('returns null for multiple rows that all have descriptions and positive amounts', () => {
     expect(
-      validateLineItems(
-        [
-          { description: 'Base fee', amount: 390 },
-          { description: 'MB fee', amount: 65 },
-        ],
-        455
-      )
+      validateLineItems([
+        { description: 'Base fee', amount: 390 },
+        { description: 'MB fee', amount: 65 },
+      ])
     ).toBeNull()
   })
 
-  it('returns null when sum is within tolerance', () => {
+  it('returns error when 2+ rows and the first row has an empty description', () => {
     expect(
-      validateLineItems(
-        [
-          { description: 'Fee A', amount: 33.33 },
-          { description: 'Fee B', amount: 33.33 },
-          { description: 'Fee C', amount: 33.34 },
-        ],
-        100
-      )
-    ).toBeNull()
+      validateLineItems([
+        { description: '', amount: 50 },
+        { description: 'Food', amount: 30 },
+      ])
+    ).toContain('Line item 1 needs a description')
   })
 
-  it('returns error when sum does not match', () => {
+  it('returns error when 2+ rows and a later row has an empty description', () => {
     expect(
-      validateLineItems(
-        [
-          { description: 'Base', amount: 390 },
-          { description: 'Extra', amount: 10 },
-        ],
-        455
-      )
-    ).toContain('sum to')
+      validateLineItems([
+        { description: 'Tent', amount: 50 },
+        { description: '', amount: 30 },
+      ])
+    ).toContain('Line item 2 needs a description')
   })
 
-  it('returns error for empty description', () => {
-    expect(validateLineItems([{ description: '', amount: 100 }], 100)).toContain('description')
+  it('returns error when 2+ rows and a row has a whitespace-only description', () => {
+    expect(
+      validateLineItems([
+        { description: 'Tent', amount: 50 },
+        { description: '   ', amount: 30 },
+      ])
+    ).toContain('Line item 2 needs a description')
   })
 
-  it('returns error for whitespace-only description', () => {
-    expect(validateLineItems([{ description: '   ', amount: 100 }], 100)).toContain('description')
+  it('returns error when any row has amount of zero', () => {
+    expect(validateLineItems([{ description: 'Fee', amount: 0 }])).toContain('greater than $0')
   })
 
-  it('returns error for zero amount', () => {
-    expect(validateLineItems([{ description: 'Fee', amount: 0 }], 0)).toContain('positive')
+  it('returns error when any row has a negative amount', () => {
+    expect(validateLineItems([{ description: 'Fee', amount: -5 }])).toContain('greater than $0')
   })
 
-  it('returns error for negative amount', () => {
-    expect(validateLineItems([{ description: 'Fee', amount: -5 }], -5)).toContain('positive')
+  it('returns error when 2+ rows and one has a zero amount (amount rule fires before description rule)', () => {
+    expect(
+      validateLineItems([
+        { description: 'Tent', amount: 50 },
+        { description: 'Food', amount: 0 },
+      ])
+    ).toContain('greater than $0')
   })
 })
 

@@ -126,7 +126,7 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
 
     // Validate line items if shown
     if (showLineItems && lineItems.length > 0) {
-      const lineItemError = validateLineItems(lineItems, parsedAmount)
+      const lineItemError = validateLineItems(lineItems)
       if (lineItemError) {
         setError(lineItemError)
         setIsLoading(false)
