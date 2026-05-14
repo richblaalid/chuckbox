@@ -11,6 +11,16 @@ afterEach(() => {
   cleanup()
 })
 
+// Polyfill ResizeObserver for jsdom (Radix components use it internally)
+global.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+// Polyfill scrollIntoView for jsdom (not implemented natively)
+Element.prototype.scrollIntoView = vi.fn()
+
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
   useRouter: () => ({

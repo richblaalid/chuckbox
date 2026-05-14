@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -36,22 +36,22 @@ interface BillingFormProps {
 }
 
 type BillingType = 'split' | 'fixed'
+type FormError = { message: string; rowIndex?: number }
 
 export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: BillingFormProps) {
   const router = useRouter()
   const { addToast } = useToast()
+  const topErrorRef = useRef<HTMLDivElement>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<FormError | null>(null)
   const [selectedScouts, setSelectedScouts] = useState<Set<string>>(
     () => new Set(preselectedScoutIds || [])
   )
-  const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
   const [billingType, setBillingType] = useState<BillingType>('fixed')
   const [sendNotifications, setSendNotifications] = useState(false)
   const [scoutSearch, setScoutSearch] = useState('')
-  const [lineItems, setLineItems] = useState<LineItem[]>([])
-  const [showLineItems, setShowLineItems] = useState(false)
+  const [lineItems, setLineItems] = useState<LineItem[]>([{ description: '', amount: 0 }])
   const [showDeposit, setShowDeposit] = useState(false)
   const [depositAmount, setDepositAmount] = useState('')
   const [depositDueDate, setDepositDueDate] = useState('')
@@ -70,14 +70,14 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
     localStorage.setItem(BILLING_TYPE_KEY, newType)
   }, [])
 
-  const parsedAmount = parseFloat(amount) || 0
+  const effectiveAmount = lineItems.reduce((sum, li) => sum + li.amount, 0)
 
   // Keyboard shortcut: Cmd/Ctrl+Enter to submit
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         // Only submit if form is valid
-        if (selectedScouts.size > 0 && parsedAmount > 0 && !isLoading) {
+        if (selectedScouts.size > 0 && effectiveAmount > 0 && !isLoading) {
           e.preventDefault()
           const form = document.querySelector('form') as HTMLFormElement | null
           form?.requestSubmit()
@@ -86,16 +86,29 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedScouts.size, parsedAmount, isLoading])
+  }, [selectedScouts.size, effectiveAmount, isLoading])
+
+  // Scroll the failing row (or the top error alert) into view when an error fires
+  useEffect(() => {
+    if (!error) return
+    if (error.rowIndex !== undefined) {
+      const rowEl = document.querySelector(`[data-line-item-row="${error.rowIndex}"]`)
+      if (rowEl) {
+        rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        return
+      }
+    }
+    topErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [error])
 
   // Calculate per-scout and total based on billing type
   const perScoutAmount = billingType === 'split'
-    ? (selectedScouts.size > 0 ? parsedAmount / selectedScouts.size : 0)
-    : parsedAmount
+    ? (selectedScouts.size > 0 ? effectiveAmount / selectedScouts.size : 0)
+    : effectiveAmount
 
   const totalAmount = billingType === 'split'
-    ? parsedAmount
-    : parsedAmount * selectedScouts.size
+    ? effectiveAmount
+    : effectiveAmount * selectedScouts.size
 
   const toggleScout = (scoutId: string) => {
     const newSelected = new Set(selectedScouts)
@@ -113,32 +126,30 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
     setError(null)
 
     if (selectedScouts.size === 0) {
-      setError('Please select at least one scout')
+      setError({ message: 'Please select at least one scout' })
       setIsLoading(false)
       return
     }
 
-    if (parsedAmount <= 0) {
-      setError('Please enter a valid amount')
+    if (effectiveAmount <= 0) {
+      setError({ message: 'Please enter a valid amount' })
       setIsLoading(false)
       return
     }
 
-    // Validate line items if shown
-    if (showLineItems && lineItems.length > 0) {
-      const lineItemError = validateLineItems(lineItems, parsedAmount)
-      if (lineItemError) {
-        setError(lineItemError)
-        setIsLoading(false)
-        return
-      }
+    // Validate line items
+    const lineItemError = validateLineItems(lineItems)
+    if (lineItemError) {
+      setError(lineItemError)
+      setIsLoading(false)
+      return
     }
 
     // Validate deposit if shown
     if (showDeposit) {
-      const depositError = validateDeposit(depositAmount, depositDueDate, parsedAmount)
+      const depositError = validateDeposit(depositAmount, depositDueDate, effectiveAmount)
       if (depositError) {
-        setError(depositError)
+        setError({ message: depositError })
         setIsLoading(false)
         return
       }
@@ -159,7 +170,7 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
       // Check all scouts have accounts
       const missingAccounts = selectedScoutAccounts.filter((s) => !s.accountId)
       if (missingAccounts.length > 0) {
-        setError(`Some scouts don't have accounts: ${missingAccounts.map((s) => s.scoutName).join(', ')}`)
+        setError({ message: `Some scouts don't have accounts: ${missingAccounts.map((s) => s.scoutName).join(', ')}` })
         setIsLoading(false)
         return
       }
@@ -186,14 +197,23 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
         throw new Error('Failed to create billing record')
       }
 
-      // Persist line items and deposit fields if provided
-      if ((showLineItems && lineItems.length > 0) || (showDeposit && depositAmount)) {
+      // Decide whether to persist line items based on row count and first-row description.
+      // - 1 row, blank description: bill is non-itemized; line_items stays null.
+      // - 1 row with description, or 2+ rows: persist as itemized.
+      const isItemized =
+        lineItems.length >= 2 ||
+        (lineItems.length === 1 && lineItems[0].description.trim().length > 0)
+
+      const persistedLineItems = isItemized
+        ? lineItems.map((li) => ({ description: li.description, amount: li.amount }))
+        : null
+
+      // Persist line items and deposit fields if either is non-default
+      if (isItemized || (showDeposit && depositAmount)) {
         const { error: updateError } = await supabase
           .from('billing_records')
           .update({
-            line_items: showLineItems && lineItems.length > 0
-              ? lineItems.map((li) => ({ description: li.description, amount: li.amount }))
-              : null,
+            line_items: persistedLineItems,
             deposit_amount: showDeposit && depositAmount ? parseFloat(depositAmount) : null,
             deposit_due_date: showDeposit && depositDueDate ? depositDueDate : null,
           })
@@ -232,12 +252,10 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
         title: 'Billing created',
         description: `${formatCurrency(totalAmount)} charged to ${selectedScouts.size} scout${selectedScouts.size !== 1 ? 's' : ''}`,
       })
-      setAmount('')
       setDescription('')
       setSelectedScouts(new Set())
       setSendNotifications(false)
-      setLineItems([])
-      setShowLineItems(false)
+      setLineItems([{ description: '', amount: 0 }])
       setShowDeposit(false)
       setDepositAmount('')
       setDepositDueDate('')
@@ -254,7 +272,7 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
         }, 1500)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError({ message: err instanceof Error ? err.message : 'An error occurred' })
     } finally {
       setIsLoading(false)
     }
@@ -310,6 +328,18 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
     <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
       {/* Scrollable form body */}
       <div className="flex-1 overflow-y-auto space-y-6 pr-1">
+
+      {/* Top-of-form error alert — always visible when scrolled to top */}
+      {error && (
+        <div
+          ref={topErrorRef}
+          className="rounded-lg bg-error-light p-3 text-sm font-medium text-error-dark"
+          role="alert"
+        >
+          {error.message}
+        </div>
+      )}
+
       {/* 1. Description */}
       <div className="space-y-2">
         <Label htmlFor="description">Description *</Label>
@@ -343,126 +373,107 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
         </p>
       </div>
 
-      {/* 3. Amount */}
-      <div className="w-40 space-y-2">
-        <Label htmlFor="amount">
-          {billingType === 'split' ? 'Total Amount' : 'Per Scout'} *
-        </Label>
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 dark:text-stone-400">
-            $
-          </span>
-          <Input
-            id="amount"
-            type="number"
-            step="0.01"
-            min="0"
-            required
-            className="pl-7 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-            placeholder="0.00"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            onWheel={(e) => e.currentTarget.blur()}
-          />
-        </div>
-      </div>
+      {/* 3. Items (line-item list with read-only auto-calculated total) */}
+      <div className="space-y-3 rounded-lg border border-stone-200 dark:border-stone-700 p-4">
+        <Label>Items</Label>
+        {lineItems.map((item, index) => {
+          const isErrorRow = error?.rowIndex === index
+          return (
+            <div key={index} data-line-item-row={index}>
+              <div
+                className={`flex items-center gap-2 ${
+                  isErrorRow ? 'rounded-md ring-2 ring-red-500 ring-offset-1 p-1' : ''
+                }`}
+              >
+                <Input
+                  placeholder={
+                    index === 0 && lineItems.length === 1
+                      ? 'Optional — describe what this bill covers'
+                      : 'Description'
+                  }
+                  value={item.description}
+                  onChange={(e) => {
+                    setError(null)
+                    const updated = [...lineItems]
+                    updated[index] = { ...updated[index], description: e.target.value }
+                    setLineItems(updated)
+                  }}
+                  className="flex-1"
+                />
+                <div className="relative w-28">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 dark:text-stone-400">
+                    $
+                  </span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={item.amount || ''}
+                    onChange={(e) => {
+                      setError(null)
+                      const updated = [...lineItems]
+                      updated[index] = {
+                        ...updated[index],
+                        amount: parseFloat(e.target.value) || 0,
+                      }
+                      setLineItems(updated)
+                    }}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    className="pl-7 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                </div>
+                {lineItems.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError(null)
+                      setLineItems(lineItems.filter((_, i) => i !== index))
+                    }}
+                    className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+                    aria-label="Remove line item"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {isErrorRow && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  {error.message}
+                </p>
+              )}
+            </div>
+          )
+        })}
 
-      {/* 3b. Line Items (optional) */}
-      {!showLineItems ? (
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={() => {
-            setShowLineItems(true)
-            setLineItems([{ description: '', amount: 0 }])
+            setError(null)
+            setLineItems([...lineItems, { description: '', amount: 0 }])
           }}
         >
           <Plus className="mr-1 h-4 w-4" />
-          Add itemized breakdown
+          Add another item
         </Button>
-      ) : (
-        <div className="space-y-3 rounded-lg border border-stone-200 dark:border-stone-700 p-4">
-          <div className="flex items-center justify-between">
-            <Label>Line Items</Label>
-            <button
-              type="button"
-              onClick={() => {
-                setShowLineItems(false)
-                setLineItems([])
-              }}
-              className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
-              aria-label="Close line items"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          {lineItems.map((item, index) => (
-            <div key={index} className="flex items-center gap-2">
-              <Input
-                placeholder="Description"
-                value={item.description}
-                onChange={(e) => {
-                  const updated = [...lineItems]
-                  updated[index] = { ...updated[index], description: e.target.value }
-                  setLineItems(updated)
-                }}
-                className="flex-1"
-              />
-              <div className="relative w-28">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 dark:text-stone-400">
-                  $
-                </span>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                  value={item.amount || ''}
-                  onChange={(e) => {
-                    const updated = [...lineItems]
-                    updated[index] = { ...updated[index], amount: parseFloat(e.target.value) || 0 }
-                    setLineItems(updated)
-                  }}
-                  onWheel={(e) => e.currentTarget.blur()}
-                  className="pl-7 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setLineItems(lineItems.filter((_, i) => i !== index))
-                }}
-                className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
-                aria-label="Remove line item"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setLineItems([...lineItems, { description: '', amount: 0 }])}
-          >
-            <Plus className="mr-1 h-4 w-4" />
-            Add line item
-          </Button>
-          {lineItems.length > 0 && (
-            <p
-              className={`text-sm ${
-                Math.abs(lineItems.reduce((sum, li) => sum + li.amount, 0) - parsedAmount) > 0.01
-                  ? 'text-red-600 dark:text-red-400'
-                  : 'text-stone-500 dark:text-stone-400'
-              }`}
-            >
-              Line items total: {formatCurrency(lineItems.reduce((sum, li) => sum + li.amount, 0))}
-              {parsedAmount > 0 && ` / ${formatCurrency(parsedAmount)}`}
-            </p>
-          )}
+
+        <div
+          className="mt-2 flex items-center justify-between rounded-md bg-stone-50 dark:bg-stone-800 px-3 py-2"
+          aria-label="Auto-calculated total"
+        >
+          <span className="text-sm font-medium text-stone-700 dark:text-stone-300">
+            Total
+          </span>
+          <span className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+            {formatCurrency(effectiveAmount)}
+            <span className="ml-2 text-xs font-normal text-stone-500 dark:text-stone-400">
+              auto-calculated
+            </span>
+          </span>
         </div>
-      )}
+      </div>
 
       {/* 3c. Deposit Requirement (optional) */}
       {!showDeposit ? (
@@ -606,34 +617,28 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
       </div>
 
       {/* 5. Cost Preview */}
-      {selectedScouts.size > 0 && parsedAmount > 0 && (
+      {selectedScouts.size > 0 && effectiveAmount > 0 && (
         <div className="rounded-md border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 p-3 text-sm">
           {billingType === 'fixed' ? (
             <span className="text-stone-700 dark:text-stone-200">
-              {selectedScouts.size} scout{selectedScouts.size !== 1 ? 's' : ''} selected &middot; {formatCurrency(parsedAmount)} each &middot;{' '}
-              <strong>Total: {formatCurrency(parsedAmount * selectedScouts.size)}</strong>
+              {selectedScouts.size} scout{selectedScouts.size !== 1 ? 's' : ''} selected &middot; {formatCurrency(effectiveAmount)} each &middot;{' '}
+              <strong>Total: {formatCurrency(effectiveAmount * selectedScouts.size)}</strong>
             </span>
           ) : (
             <span className="text-stone-700 dark:text-stone-200">
-              {selectedScouts.size} scout{selectedScouts.size !== 1 ? 's' : ''} selected &middot; {formatCurrency(parsedAmount)} &divide; {selectedScouts.size} ={' '}
-              <strong>{formatCurrency(parsedAmount / selectedScouts.size)}/scout</strong>
+              {selectedScouts.size} scout{selectedScouts.size !== 1 ? 's' : ''} selected &middot; {formatCurrency(effectiveAmount)} &divide; {selectedScouts.size} ={' '}
+              <strong>{formatCurrency(effectiveAmount / selectedScouts.size)}/scout</strong>
             </span>
           )}
         </div>
       )}
 
-      {/* Error Message */}
-      {error && (
-        <div className="rounded-lg bg-error-light p-3 text-sm font-medium text-error-dark">
-          {error}
-        </div>
-      )}
       </div>
 
       {/* Sticky footer — always visible */}
       <div className="shrink-0 border-t border-stone-200 dark:border-stone-700 pt-4 mt-4 space-y-3">
         {/* 6. Notification Option */}
-        {selectedScouts.size > 0 && parsedAmount > 0 && (
+        {selectedScouts.size > 0 && effectiveAmount > 0 && (
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
@@ -655,7 +660,7 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
           type="submit"
           loading={isLoading}
           loadingText="Creating..."
-          disabled={selectedScouts.size === 0 || parsedAmount <= 0}
+          disabled={selectedScouts.size === 0 || effectiveAmount <= 0 || !description.trim()}
           className="w-full"
         >
           Create Billing
