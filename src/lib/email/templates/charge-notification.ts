@@ -10,6 +10,8 @@ export interface ChargeNotificationEmailData {
   availableCredit: number // positive balance that can be applied
   paymentUrl: string
   customMessage?: string
+  lineItems?: Array<{ description: string; amount: number }> | null
+  totalScoutsOnRecord?: number
 }
 
 function formatCurrency(amount: number): string {
@@ -25,6 +27,76 @@ function formatDate(dateString: string): string {
     day: 'numeric',
     year: 'numeric',
   })
+}
+
+function renderBillIncludesSection(
+  lineItems: Array<{ description: string; amount: number }> | null | undefined,
+  totalScoutsOnRecord: number | undefined,
+  chargeAmount: number
+): { html: string; text: string } {
+  if (!lineItems || lineItems.length === 0) {
+    return { html: '', text: '' }
+  }
+
+  const total = lineItems.reduce((sum, item) => sum + item.amount, 0)
+  const scoutCount = totalScoutsOnRecord ?? 0
+  const showShareLine = scoutCount >= 2
+
+  const itemRowsHtml = lineItems
+    .map(
+      (item) => `
+                      <tr>
+                        <td style="padding: 4px 0; color: #4b5563;">${item.description}</td>
+                        <td style="padding: 4px 0; text-align: right; color: #4b5563;">${formatCurrency(item.amount)}</td>
+                      </tr>`
+    )
+    .join('')
+
+  const html = `
+              <!-- Bill Includes Box -->
+              <table role="presentation" style="width: 100%; margin-bottom: 24px; background-color: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <p style="margin: 0 0 8px; font-size: 14px; color: #374151; font-weight: 600;">Bill Includes</p>
+                    <table role="presentation" style="width: 100%;">
+                      ${itemRowsHtml}
+                      <tr style="border-top: 1px solid #e5e7eb;">
+                        <td style="padding: 8px 0 4px; font-weight: 700; color: #111827;">Total</td>
+                        <td style="padding: 8px 0 4px; text-align: right; font-weight: 700; color: #111827;">${formatCurrency(total)}</td>
+                      </tr>
+                    </table>
+                    ${
+                      showShareLine
+                        ? `
+                    <p style="margin: 16px 0 0; padding-top: 12px; border-top: 1px solid #e5e7eb; font-size: 13px; color: #6b7280;">
+                      Your scout's share: <strong>${formatCurrency(chargeAmount)}</strong><br>
+                      (1/${scoutCount} of the total)
+                    </p>`
+                        : ''
+                    }
+                  </td>
+                </tr>
+              </table>
+`
+
+  const itemRowsText = lineItems
+    .map((item) => `  ${item.description}: ${formatCurrency(item.amount)}`)
+    .join('\n')
+
+  const text = `
+Bill Includes:
+${itemRowsText}
+  ----------------------
+  Total: ${formatCurrency(total)}${
+    showShareLine
+      ? `
+
+  Your scout's share: ${formatCurrency(chargeAmount)} (1/${scoutCount} of the total)`
+      : ''
+  }
+`
+
+  return { html, text }
 }
 
 export function generateChargeNotificationEmail(data: ChargeNotificationEmailData): {
@@ -43,10 +115,13 @@ export function generateChargeNotificationEmail(data: ChargeNotificationEmailDat
     availableCredit,
     paymentUrl,
     customMessage,
+    lineItems,
+    totalScoutsOnRecord,
   } = data
 
   const owesAmount = currentBalance < 0 ? Math.abs(currentBalance) : 0
   const hasCredit = availableCredit > 0
+  const billIncludes = renderBillIncludesSection(lineItems, totalScoutsOnRecord, chargeAmount)
 
   const html = `
 <!DOCTYPE html>
@@ -103,7 +178,7 @@ export function generateChargeNotificationEmail(data: ChargeNotificationEmailDat
                   </td>
                 </tr>
               </table>
-
+              ${billIncludes.html}
               <!-- Credit Balance Notice -->
               ${hasCredit ? `
               <table role="presentation" style="width: 100%; margin-bottom: 24px; background-color: #ecfdf5; border-radius: 8px; border: 1px solid #6ee7b7;">
@@ -189,7 +264,7 @@ Charge Details:
   Description: ${chargeDescription}
   Date: ${formatDate(chargeDate)}
   Amount: ${formatCurrency(chargeAmount)}
-
+${billIncludes.text}
 ${hasCredit ? `Good news! ${scoutName} has ${formatCurrency(availableCredit)} in account credit that can be applied to this charge.\n\n` : ''}Current Account Balance: ${owesAmount > 0 ? formatCurrency(owesAmount) + ' owed' : formatCurrency(Math.abs(currentBalance)) + ' credit'}
 
 ${owesAmount > 0 ? `Pay now: ${paymentUrl}` : `Apply credit to charge: ${paymentUrl}`}
