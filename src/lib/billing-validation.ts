@@ -18,6 +18,19 @@ export function validateLineItems(lineItems: LineItem[], totalAmount: number): s
   return null
 }
 
+export function parseLineItems(
+  raw: unknown
+): Array<{ description: string; amount: number }> | null {
+  if (!Array.isArray(raw)) return null
+  for (const item of raw) {
+    if (typeof item !== 'object' || item === null) return null
+    const obj = item as Record<string, unknown>
+    if (typeof obj.description !== 'string') return null
+    if (typeof obj.amount !== 'number') return null
+  }
+  return raw as Array<{ description: string; amount: number }>
+}
+
 export function validateDeposit(
   depositAmount: string,
   depositDueDate: string,
