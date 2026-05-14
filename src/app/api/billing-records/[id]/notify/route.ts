@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getCurrentMembership, getRequestedUnitId } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
 import { generateChargeNotificationEmail } from '@/lib/email/templates/charge-notification'
+import { parseLineItems } from '@/lib/billing-validation'
 import { randomBytes } from 'crypto'
 import { z } from 'zod'
 
@@ -60,6 +61,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         billing_date,
         unit_id,
         is_void,
+        line_items,
+        total_amount,
         billing_charges (
           id,
           amount,
@@ -93,6 +96,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       billing_date: string
       unit_id: string
       is_void: boolean | null
+      line_items: unknown
+      total_amount: number
       billing_charges: Array<{
         id: string
         amount: number
@@ -226,6 +231,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           availableCredit,
           paymentUrl,
           customMessage,
+          lineItems: parseLineItems(billingRecord.line_items),
+          totalScoutsOnRecord: activeCharges.length,
         })
 
         await sendEmail({
