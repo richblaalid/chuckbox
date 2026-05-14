@@ -619,7 +619,7 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
           type="submit"
           loading={isLoading}
           loadingText="Creating..."
-          disabled={selectedScouts.size === 0 || effectiveAmount <= 0}
+          disabled={selectedScouts.size === 0 || effectiveAmount <= 0 || !description.trim()}
           className="w-full"
         >
           Create Billing
