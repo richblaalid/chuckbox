@@ -62,7 +62,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         unit_id,
         is_void,
         line_items,
-        total_amount,
         billing_charges (
           id,
           amount,
@@ -97,7 +96,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       unit_id: string
       is_void: boolean | null
       line_items: unknown
-      total_amount: number
       billing_charges: Array<{
         id: string
         amount: number
