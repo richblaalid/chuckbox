@@ -122,10 +122,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .eq('id', membership.unit_id)
       .single()
 
-    // Filter to unpaid, non-voided charges
-    const activeCharges = (billingRecord.billing_charges || []).filter(
-      (charge: { is_paid: boolean | null; is_void: boolean | null }) =>
-        !charge.is_paid && !charge.is_void
+    // Filter to non-voided charges (denominator for the email's "1/N" share line)
+    const nonVoidedCharges = (billingRecord.billing_charges || []).filter(
+      (charge: { is_void: boolean | null }) => !charge.is_void
+    )
+
+    // Filter to unpaid, non-voided charges (the actual notify targets)
+    const activeCharges = nonVoidedCharges.filter(
+      (charge: { is_paid: boolean | null }) => !charge.is_paid
     )
 
     if (activeCharges.length === 0) {
@@ -230,7 +234,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           paymentUrl,
           customMessage,
           lineItems: parseLineItems(billingRecord.line_items),
-          totalScoutsOnRecord: activeCharges.length,
+          totalScoutsOnRecord: nonVoidedCharges.length,
         })
 
         await sendEmail({
