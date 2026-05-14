@@ -24,47 +24,51 @@ describe('validateLineItems', () => {
   })
 
   it('returns error when 2+ rows and the first row has an empty description', () => {
-    expect(
-      validateLineItems([
-        { description: '', amount: 50 },
-        { description: 'Food', amount: 30 },
-      ])
-    ).toContain('Line item 1 needs a description')
+    const result = validateLineItems([
+      { description: '', amount: 50 },
+      { description: 'Food', amount: 30 },
+    ])
+    expect(result?.rowIndex).toBe(0)
+    expect(result?.message).toContain('Line item 1 needs a description')
   })
 
   it('returns error when 2+ rows and a later row has an empty description', () => {
-    expect(
-      validateLineItems([
-        { description: 'Tent', amount: 50 },
-        { description: '', amount: 30 },
-      ])
-    ).toContain('Line item 2 needs a description')
+    const result = validateLineItems([
+      { description: 'Tent', amount: 50 },
+      { description: '', amount: 30 },
+    ])
+    expect(result?.rowIndex).toBe(1)
+    expect(result?.message).toContain('Line item 2 needs a description')
   })
 
   it('returns error when 2+ rows and a row has a whitespace-only description', () => {
-    expect(
-      validateLineItems([
-        { description: 'Tent', amount: 50 },
-        { description: '   ', amount: 30 },
-      ])
-    ).toContain('Line item 2 needs a description')
+    const result = validateLineItems([
+      { description: 'Tent', amount: 50 },
+      { description: '   ', amount: 30 },
+    ])
+    expect(result?.rowIndex).toBe(1)
+    expect(result?.message).toContain('Line item 2 needs a description')
   })
 
   it('returns error when any row has amount of zero', () => {
-    expect(validateLineItems([{ description: 'Fee', amount: 0 }])).toContain('greater than $0')
+    const result = validateLineItems([{ description: 'Fee', amount: 0 }])
+    expect(result?.rowIndex).toBe(0)
+    expect(result?.message).toContain('greater than $0')
   })
 
   it('returns error when any row has a negative amount', () => {
-    expect(validateLineItems([{ description: 'Fee', amount: -5 }])).toContain('greater than $0')
+    const result = validateLineItems([{ description: 'Fee', amount: -5 }])
+    expect(result?.rowIndex).toBe(0)
+    expect(result?.message).toContain('greater than $0')
   })
 
   it('returns error when 2+ rows and one has a zero amount (amount rule fires before description rule)', () => {
-    expect(
-      validateLineItems([
-        { description: 'Tent', amount: 50 },
-        { description: 'Food', amount: 0 },
-      ])
-    ).toContain('greater than $0')
+    const result = validateLineItems([
+      { description: 'Tent', amount: 50 },
+      { description: 'Food', amount: 0 },
+    ])
+    expect(result?.rowIndex).toBe(1)
+    expect(result?.message).toContain('greater than $0')
   })
 })
 

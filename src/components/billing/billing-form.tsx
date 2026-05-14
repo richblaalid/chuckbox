@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -36,12 +36,14 @@ interface BillingFormProps {
 }
 
 type BillingType = 'split' | 'fixed'
+type FormError = { message: string; rowIndex?: number }
 
 export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: BillingFormProps) {
   const router = useRouter()
   const { addToast } = useToast()
+  const topErrorRef = useRef<HTMLDivElement>(null)
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<FormError | null>(null)
   const [selectedScouts, setSelectedScouts] = useState<Set<string>>(
     () => new Set(preselectedScoutIds || [])
   )
@@ -86,6 +88,19 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedScouts.size, effectiveAmount, isLoading])
 
+  // Scroll the failing row (or the top error alert) into view when an error fires
+  useEffect(() => {
+    if (!error) return
+    if (error.rowIndex !== undefined) {
+      const rowEl = document.querySelector(`[data-line-item-row="${error.rowIndex}"]`)
+      if (rowEl) {
+        rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        return
+      }
+    }
+    topErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [error])
+
   // Calculate per-scout and total based on billing type
   const perScoutAmount = billingType === 'split'
     ? (selectedScouts.size > 0 ? effectiveAmount / selectedScouts.size : 0)
@@ -111,13 +126,13 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
     setError(null)
 
     if (selectedScouts.size === 0) {
-      setError('Please select at least one scout')
+      setError({ message: 'Please select at least one scout' })
       setIsLoading(false)
       return
     }
 
     if (effectiveAmount <= 0) {
-      setError('Please enter a valid amount')
+      setError({ message: 'Please enter a valid amount' })
       setIsLoading(false)
       return
     }
@@ -134,7 +149,7 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
     if (showDeposit) {
       const depositError = validateDeposit(depositAmount, depositDueDate, effectiveAmount)
       if (depositError) {
-        setError(depositError)
+        setError({ message: depositError })
         setIsLoading(false)
         return
       }
@@ -155,7 +170,7 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
       // Check all scouts have accounts
       const missingAccounts = selectedScoutAccounts.filter((s) => !s.accountId)
       if (missingAccounts.length > 0) {
-        setError(`Some scouts don't have accounts: ${missingAccounts.map((s) => s.scoutName).join(', ')}`)
+        setError({ message: `Some scouts don't have accounts: ${missingAccounts.map((s) => s.scoutName).join(', ')}` })
         setIsLoading(false)
         return
       }
@@ -257,7 +272,7 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
         }, 1500)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+      setError({ message: err instanceof Error ? err.message : 'An error occurred' })
     } finally {
       setIsLoading(false)
     }
@@ -313,6 +328,18 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
     <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
       {/* Scrollable form body */}
       <div className="flex-1 overflow-y-auto space-y-6 pr-1">
+
+      {/* Top-of-form error alert — always visible when scrolled to top */}
+      {error && (
+        <div
+          ref={topErrorRef}
+          className="rounded-lg bg-error-light p-3 text-sm font-medium text-error-dark"
+          role="alert"
+        >
+          {error.message}
+        </div>
+      )}
+
       {/* 1. Description */}
       <div className="space-y-2">
         <Label htmlFor="description">Description *</Label>
@@ -349,64 +376,84 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
       {/* 3. Items (line-item list with read-only auto-calculated total) */}
       <div className="space-y-3 rounded-lg border border-stone-200 dark:border-stone-700 p-4">
         <Label>Items</Label>
-        {lineItems.map((item, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <Input
-              placeholder={
-                index === 0 && lineItems.length === 1
-                  ? 'Optional — describe what this bill covers'
-                  : 'Description'
-              }
-              value={item.description}
-              onChange={(e) => {
-                const updated = [...lineItems]
-                updated[index] = { ...updated[index], description: e.target.value }
-                setLineItems(updated)
-              }}
-              className="flex-1"
-            />
-            <div className="relative w-28">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 dark:text-stone-400">
-                $
-              </span>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="0.00"
-                value={item.amount || ''}
-                onChange={(e) => {
-                  const updated = [...lineItems]
-                  updated[index] = {
-                    ...updated[index],
-                    amount: parseFloat(e.target.value) || 0,
-                  }
-                  setLineItems(updated)
-                }}
-                onWheel={(e) => e.currentTarget.blur()}
-                className="pl-7 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              />
-            </div>
-            {lineItems.length > 1 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setLineItems(lineItems.filter((_, i) => i !== index))
-                }}
-                className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
-                aria-label="Remove line item"
+        {lineItems.map((item, index) => {
+          const isErrorRow = error?.rowIndex === index
+          return (
+            <div key={index} data-line-item-row={index}>
+              <div
+                className={`flex items-center gap-2 ${
+                  isErrorRow ? 'rounded-md ring-2 ring-red-500 ring-offset-1 p-1' : ''
+                }`}
               >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        ))}
+                <Input
+                  placeholder={
+                    index === 0 && lineItems.length === 1
+                      ? 'Optional — describe what this bill covers'
+                      : 'Description'
+                  }
+                  value={item.description}
+                  onChange={(e) => {
+                    setError(null)
+                    const updated = [...lineItems]
+                    updated[index] = { ...updated[index], description: e.target.value }
+                    setLineItems(updated)
+                  }}
+                  className="flex-1"
+                />
+                <div className="relative w-28">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500 dark:text-stone-400">
+                    $
+                  </span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={item.amount || ''}
+                    onChange={(e) => {
+                      setError(null)
+                      const updated = [...lineItems]
+                      updated[index] = {
+                        ...updated[index],
+                        amount: parseFloat(e.target.value) || 0,
+                      }
+                      setLineItems(updated)
+                    }}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    className="pl-7 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                </div>
+                {lineItems.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setError(null)
+                      setLineItems(lineItems.filter((_, i) => i !== index))
+                    }}
+                    className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+                    aria-label="Remove line item"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {isErrorRow && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  {error.message}
+                </p>
+              )}
+            </div>
+          )
+        })}
 
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => setLineItems([...lineItems, { description: '', amount: 0 }])}
+          onClick={() => {
+            setError(null)
+            setLineItems([...lineItems, { description: '', amount: 0 }])
+          }}
         >
           <Plus className="mr-1 h-4 w-4" />
           Add another item
@@ -586,12 +633,6 @@ export function BillingForm({ unitId, scouts, preselectedScoutIds, onSuccess }: 
         </div>
       )}
 
-      {/* Error Message */}
-      {error && (
-        <div className="rounded-lg bg-error-light p-3 text-sm font-medium text-error-dark">
-          {error}
-        </div>
-      )}
       </div>
 
       {/* Sticky footer — always visible */}

@@ -145,6 +145,53 @@ describe('BillingForm — line items as source of truth', () => {
     fireEvent.click(screen.getByRole('button', { name: /create billing/i }))
     await new Promise((r) => setTimeout(r, 50))
     expect(mockRpc).not.toHaveBeenCalled()
-    expect(screen.getByText(/Line item 1 needs a description/i)).toBeInTheDocument()
+    // Message appears in both the top alert and the inline row error — check at least one is present.
+    expect(screen.getAllByText(/Line item 1 needs a description/i).length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('shows a red ring on the row that fails validation', async () => {
+    render(<BillingForm {...baseProps} />)
+    fireEvent.change(screen.getByLabelText(/description/i), {
+      target: { value: 'Missing Desc Test' },
+    })
+    const amountInputs1 = screen.getAllByPlaceholderText('0.00')
+    fireEvent.change(amountInputs1[0], { target: { value: '50' } })
+    fireEvent.click(screen.getByRole('button', { name: /add another item/i }))
+    const amountInputs2 = screen.getAllByPlaceholderText('0.00')
+    fireEvent.change(amountInputs2[1], { target: { value: '30' } })
+    // Leave descriptions blank.
+    const scoutCheckbox = screen.getAllByRole('checkbox')[0]
+    fireEvent.click(scoutCheckbox)
+    fireEvent.click(screen.getByRole('button', { name: /create billing/i }))
+    // Wait for the error state to be set + rendered.
+    await new Promise((r) => setTimeout(r, 50))
+    // Row 0 (rowIndex 0) should have the red-ring class on its inner flex container.
+    const errorRow = document.querySelector('[data-line-item-row="0"]')
+    expect(errorRow).not.toBeNull()
+    // The visual ring is on the inner div within the row wrapper.
+    const innerFlex = errorRow!.querySelector('.flex')
+    expect(innerFlex?.className).toMatch(/ring-red-500/)
+  })
+
+  it('clears the error when the user starts editing a line-item input', async () => {
+    render(<BillingForm {...baseProps} />)
+    fireEvent.change(screen.getByLabelText(/description/i), {
+      target: { value: 'Clear Error Test' },
+    })
+    const amountInputs1 = screen.getAllByPlaceholderText('0.00')
+    fireEvent.change(amountInputs1[0], { target: { value: '50' } })
+    fireEvent.click(screen.getByRole('button', { name: /add another item/i }))
+    const amountInputs2 = screen.getAllByPlaceholderText('0.00')
+    fireEvent.change(amountInputs2[1], { target: { value: '30' } })
+    fireEvent.click(screen.getAllByRole('checkbox')[0])
+    fireEvent.click(screen.getByRole('button', { name: /create billing/i }))
+    await new Promise((r) => setTimeout(r, 50))
+    // Error appears in at least one place (top alert + inline row).
+    expect(screen.getAllByText(/Line item 1 needs a description/i).length).toBeGreaterThanOrEqual(1)
+    // Edit the first row's description.
+    const descInputs = screen.getAllByPlaceholderText(/describe what this bill covers|description/i)
+    fireEvent.change(descInputs[0], { target: { value: 'Tent rental' } })
+    // Error disappears from all locations.
+    expect(screen.queryAllByText(/Line item 1 needs a description/i)).toHaveLength(0)
   })
 })

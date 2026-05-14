@@ -3,19 +3,24 @@ export interface LineItem {
   amount: number
 }
 
-export function validateLineItems(lineItems: LineItem[]): string | null {
+export interface LineItemValidationError {
+  rowIndex: number
+  message: string
+}
+
+export function validateLineItems(lineItems: LineItem[]): LineItemValidationError | null {
   if (lineItems.length === 0) return null
 
   for (let i = 0; i < lineItems.length; i++) {
     if (lineItems[i].amount <= 0) {
-      return 'Each line item must have an amount greater than $0'
+      return { rowIndex: i, message: 'Each line item must have an amount greater than $0' }
     }
   }
 
   if (lineItems.length >= 2) {
     for (let i = 0; i < lineItems.length; i++) {
       if (!lineItems[i].description.trim()) {
-        return `Line item ${i + 1} needs a description`
+        return { rowIndex: i, message: `Line item ${i + 1} needs a description` }
       }
     }
   }

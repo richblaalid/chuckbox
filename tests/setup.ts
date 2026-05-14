@@ -18,6 +18,9 @@ global.ResizeObserver = class ResizeObserver {
   disconnect() {}
 }
 
+// Polyfill scrollIntoView for jsdom (not implemented natively)
+Element.prototype.scrollIntoView = vi.fn()
+
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
