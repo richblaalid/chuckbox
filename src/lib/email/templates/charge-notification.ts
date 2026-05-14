@@ -29,6 +29,15 @@ function formatDate(dateString: string): string {
   })
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 function renderBillIncludesSection(
   lineItems: Array<{ description: string; amount: number }> | null | undefined,
   totalScoutsOnRecord: number | undefined,
@@ -38,7 +47,9 @@ function renderBillIncludesSection(
     return { html: '', text: '' }
   }
 
-  const total = lineItems.reduce((sum, item) => sum + item.amount, 0)
+  const total = Math.round(
+    lineItems.reduce((sum, item) => sum + item.amount, 0) * 100
+  ) / 100
   const scoutCount = totalScoutsOnRecord ?? 0
   const showShareLine = scoutCount >= 2
 
@@ -46,7 +57,7 @@ function renderBillIncludesSection(
     .map(
       (item) => `
                       <tr>
-                        <td style="padding: 4px 0; color: #4b5563;">${item.description}</td>
+                        <td style="padding: 4px 0; color: #4b5563;">${escapeHtml(item.description)}</td>
                         <td style="padding: 4px 0; text-align: right; color: #4b5563;">${formatCurrency(item.amount)}</td>
                       </tr>`
     )

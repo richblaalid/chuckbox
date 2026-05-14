@@ -111,4 +111,15 @@ describe('generateChargeNotificationEmail — line items', () => {
     expect(text).toContain('Bill Includes')
     expect(text).not.toContain("Your scout's share")
   })
+
+  it('treats omitted totalScoutsOnRecord the same as 0 (no share line)', () => {
+    const { html, text } = generateChargeNotificationEmail({
+      ...baseData,
+      lineItems: [{ description: 'Activity fee', amount: 50 }],
+      // totalScoutsOnRecord intentionally omitted
+    })
+    expect(html).toContain('Bill Includes')
+    expect(html).not.toContain("Your scout's share")
+    expect(text).not.toContain("Your scout's share")
+  })
 })
