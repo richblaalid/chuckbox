@@ -11,6 +11,13 @@ afterEach(() => {
   cleanup()
 })
 
+// Polyfill ResizeObserver for jsdom (Radix components use it internally)
+global.ResizeObserver = class ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
   useRouter: () => ({

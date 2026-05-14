@@ -2,13 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { BillingForm } from '@/components/billing/billing-form'
 
-// jsdom does not implement ResizeObserver (used by Radix ToggleButtonGroup internals)
-global.ResizeObserver = class ResizeObserver {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-}
-
 // Track calls to supabase.from(...).update(...)
 const mockUpdate = vi.fn().mockResolvedValue({ error: null })
 const mockEq = vi.fn().mockReturnValue(mockUpdate)
@@ -114,15 +107,7 @@ describe('BillingForm — line items as source of truth', () => {
     await vi.waitFor(() => {
       expect(mockRpc).toHaveBeenCalled()
     })
-    // Single row with blank description: update should NOT be called (no itemized data to persist)
-    // OR update is called with line_items: null
-    if (mockUpdate.mock.calls.length > 0) {
-      const updateArg = mockUpdate.mock.calls[0][0]
-      expect(updateArg.line_items).toBeNull()
-    } else {
-      // update was not called at all — no itemized data and no deposit = correct non-itemized path
-      expect(mockUpdate).not.toHaveBeenCalled()
-    }
+    expect(mockUpdate).not.toHaveBeenCalled()
   })
 
   it('submits a single-row entry with a filled description as itemized with one item', async () => {
