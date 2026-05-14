@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getCurrentMembership, getRequestedUnitId } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
 import { generateChargeNotificationEmail } from '@/lib/email/templates/charge-notification'
+import { parseLineItems } from '@/lib/billing-validation'
 import { randomBytes } from 'crypto'
 import { z } from 'zod'
 
@@ -74,7 +75,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           description,
           billing_date,
           unit_id,
-          is_void
+          is_void,
+          line_items
         ),
         scout_accounts (
           id,
@@ -107,6 +109,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         billing_date: string
         unit_id: string
         is_void: boolean | null
+        line_items: unknown
       }
       scout_accounts: {
         id: string
@@ -122,6 +125,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       billing_date: string
       unit_id: string
       is_void: boolean | null
+      line_items: unknown
     }
 
     // Verify charge belongs to user's unit
@@ -150,6 +154,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const scout = scoutAccount.scouts
     const scoutName = `${scout.first_name} ${scout.last_name}`
+
+    // Count active sibling charges on the parent record (for the "1/N of the total" line)
+    const { count: activeSiblingCount } = await supabase
+      .from('billing_charges')
+      .select('id', { count: 'exact', head: true })
+      .eq('billing_record_id', billingRecord.id)
+      .or('is_void.is.null,is_void.eq.false')
 
     // Get guardian - specific one or primary
     let guardianQuery = supabase
@@ -245,6 +256,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       availableCredit,
       paymentUrl,
       customMessage,
+      lineItems: parseLineItems(billingRecord.line_items),
+      totalScoutsOnRecord: activeSiblingCount ?? 0,
     })
 
     try {

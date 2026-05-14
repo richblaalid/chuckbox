@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getCurrentMembership, getRequestedUnitId } from '@/lib/auth'
 import { sendEmail } from '@/lib/email/resend'
 import { generateChargeNotificationEmail } from '@/lib/email/templates/charge-notification'
+import { parseLineItems } from '@/lib/billing-validation'
 import { randomBytes } from 'crypto'
 import { z } from 'zod'
 
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         billing_date,
         unit_id,
         is_void,
+        line_items,
         billing_charges (
           id,
           amount,
@@ -93,6 +95,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       billing_date: string
       unit_id: string
       is_void: boolean | null
+      line_items: unknown
       billing_charges: Array<{
         id: string
         amount: number
@@ -119,10 +122,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .eq('id', membership.unit_id)
       .single()
 
-    // Filter to unpaid, non-voided charges
-    const activeCharges = (billingRecord.billing_charges || []).filter(
-      (charge: { is_paid: boolean | null; is_void: boolean | null }) =>
-        !charge.is_paid && !charge.is_void
+    // Filter to non-voided charges (denominator for the email's "1/N" share line)
+    const nonVoidedCharges = (billingRecord.billing_charges || []).filter(
+      (charge: { is_void: boolean | null }) => !charge.is_void
+    )
+
+    // Filter to unpaid, non-voided charges (the actual notify targets)
+    const activeCharges = nonVoidedCharges.filter(
+      (charge: { is_paid: boolean | null }) => !charge.is_paid
     )
 
     if (activeCharges.length === 0) {
@@ -226,6 +233,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           availableCredit,
           paymentUrl,
           customMessage,
+          lineItems: parseLineItems(billingRecord.line_items),
+          totalScoutsOnRecord: nonVoidedCharges.length,
         })
 
         await sendEmail({
