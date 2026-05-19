@@ -1,6 +1,6 @@
 ---
 status: approved
-last_verified: 2026-05-18
+last_verified: 2026-05-19
 ---
 
 # Payment Modal — Charge Allocation Fixes
@@ -48,16 +48,23 @@ Per user decision: Square fees are a pass-through cost. They do NOT increase sco
   - Keep the existing convention as-is and ensure no auto-sweep fires (the principle the user locked).
   - If the existing convention causes `billing_balance` to land slightly positive (gross convention), explicitly tolerate the small positive credit — do NOT call `auto_transfer_overpayment`, do NOT apply it to other charges, leave it as a balance credit available for the next billing record.
 
-### Bug 4 historical data (the "ghost balance" edge case)
+### Historical data: fix forward only, no backfill
 
-Pre-existing charges with `paid_amount >= amount AND is_paid = false` (Bug 4 victims that the reconcile trigger never resolved) will be **hidden from the modal's outstanding list** by the existing filter (`amount − paid_amount > 0`). They are not retroactively corrected by this work.
+Per explicit user decision (2026-05-19): historical Bug 4, Bug 5, and `auto_transfer_overpayment` artifacts will **not** be backfilled or corrected. The fix is forward-only — new transactions write correct data from the cutover; pre-existing rows stay as they are.
 
-In the rare case where a scout's `billing_balance` exceeds the sum of allocatable outstanding charges (because some real balance is "hidden" behind these ghost charges), the new validation will block the over-cap allocation, and the treasurer will need to either:
+The rationale:
+
+- The journal is authoritative for total balances. Scout `billing_balance` and `funds_balance` already reflect the actual cash flows, even when per-charge `paid_amount` attribution is wrong.
+- Bug 4 historical victims (`paid_amount >= amount AND is_paid = false`) display as "Paid" today via the May 12 display-layer mitigation, so treasurers don't see misleading information in the common case.
+- Bug 5 historical victims are rare (funds-only transfers are uncommon) and only affect per-charge display of charges that did receive funds; the scout's balance is still correct.
+- Backfill scripts would necessarily be lossy (they have to guess at attribution intent the original code didn't record). The complexity of a careful dry-run + approval workflow is not justified by the observed user impact.
+
+**Observable consequence — the "ghost balance" edge case:** In the rare scenario where a scout's `billing_balance` exceeds the sum of allocatable outstanding charges (because real balance is "hidden" behind Bug 4 ghost charges), the new validation will block over-cap allocation, and the treasurer will need to either:
 
 - Reduce cash to the visible outstanding total, or
 - Use the inline-billing-creation flow to record the remainder as a new billing item.
 
-Data correction tooling for these ghost charges is **out of scope** here. The follow-up work in [`project_void_delete_billing_ux.md`](../../.claude/projects/-Users-richblaalid-Projects-chuckbox/memory/project_void_delete_billing_ux.md) (spec `2026-05-12-void-delete-billing-ux-design.md`) is the natural home for treasurer-facing affordances to void/delete/correct damaged charges.
+This is acceptable. Treasurer-facing tooling to void or correct individual damaged charges is a separate concern, addressed in the parallel void/delete-billing UX work ([`project_void_delete_billing_ux.md`](../../.claude/projects/-Users-richblaalid-Projects-chuckbox/memory/project_void_delete_billing_ux.md)), but is **not a dependency** of this work and is not required to make this work valuable.
 
 ## Architecture
 
@@ -409,9 +416,17 @@ Smoke-test only for v1, via `npm run db:fresh` + the multi-unit smoke-test runbo
 
 ## Follow-up work
 
-- **Void/delete-billing + per-charge actions UX** ([`project_void_delete_billing_ux.md`](../../.claude/projects/-Users-richblaalid-Projects-chuckbox/memory/project_void_delete_billing_ux.md), spec `2026-05-12-void-delete-billing-ux-design.md`) — natural home for ghost-balance correction tooling. Bug 4 historical victims surface here.
-- Optional pg-test harness for SQL functions.
-- Optional audit-trail symmetry for funds-transfer attribution (new audit rows linking funds-transfers to charges).
+Explicitly **not** follow-ups to this work:
+
+- Backfill of Bug 4 historical `paid_amount` over-counts. Decision: fix forward only.
+- Backfill of Bug 5 historical funds-transfer attribution gaps. Decision: fix forward only.
+- Reversal of historical `auto_transfer_overpayment` artifacts in `funds_balance`. Decision: fix forward only.
+
+Independent improvements that may follow:
+
+- **Void/delete-billing + per-charge actions UX** ([`project_void_delete_billing_ux.md`](../../.claude/projects/-Users-richblaalid-Projects-chuckbox/memory/project_void_delete_billing_ux.md), spec `2026-05-12-void-delete-billing-ux-design.md`) — separate UX work for voiding/correcting individual damaged charges. Not a dependency of this work.
+- Optional pg-test harness for SQL functions (deferred; smoke-test is enough for v1).
+- Optional audit-trail symmetry for funds-transfer attribution (new audit rows linking funds-transfers to charges). Deferred — Bug 5's `paid_amount` fix is sufficient for the display layer.
 
 ## Original findings
 
