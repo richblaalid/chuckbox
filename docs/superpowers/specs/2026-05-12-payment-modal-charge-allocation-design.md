@@ -44,9 +44,7 @@ Per user decision: Square fees are a pass-through cost. They do NOT increase sco
 
 - Customer is charged the gross amount displayed in the Amount field; Square deducts the fee; the unit receives net.
 - Validation rule for card path: **net-of-fee applied to billing ≤ outstanding balance** (gross can exceed outstanding by the fee amount; net cannot).
-- **Open implementation detail:** whether `billing_balance` is reduced by gross (customer-pays-the-fee model) or by net (unit-eats-the-fee model) depends on what the existing `/api/square/payments` endpoint writes to the journal. The writing-plans step must read that route, confirm the convention, and either:
-  - Keep the existing convention as-is and ensure no auto-sweep fires (the principle the user locked).
-  - If the existing convention causes `billing_balance` to land slightly positive (gross convention), explicitly tolerate the small positive credit — do NOT call `auto_transfer_overpayment`, do NOT apply it to other charges, leave it as a balance credit available for the next billing record.
+- **Convention (verified 2026-05-19 in `src/app/api/square/payments/route.ts` lines 258-269):** `billing_balance` is reduced by **gross** (the full amount charged to the card). The journal credits the AR account (code '1200') by `amountDollars` (line 269) and debits the bank account by `netDollars` (line 258). With our card-fee net-of-fee validation rule, a successful card payment of $103.20 against a $100 balance will leave `billing_balance` at +$3.20 (a credit). This credit remains on `billing_balance` per user decision (no auto-sweep to `funds_balance`).
 
 ### Historical data: fix forward only, no backfill
 
