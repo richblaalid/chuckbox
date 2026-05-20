@@ -80,6 +80,35 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
     return { success: false, error: 'Scout does not belong to this unit' }
   }
 
+  // Validate allocations (if provided) against the scout account and amount
+  if (params.allocations && params.allocations.length > 0) {
+    const allocSum = params.allocations.reduce((s, a) => s + a.amount, 0)
+    if (Math.abs(allocSum - amountDollars) > 0.01) {
+      return {
+        success: false,
+        error: `Allocation total ($${allocSum.toFixed(2)}) does not match payment amount ($${amountDollars.toFixed(2)})`,
+      }
+    }
+
+    // Verify every chargeId belongs to this scout account and isn't voided
+    const chargeIds = params.allocations.map((a) => a.chargeId)
+    const { data: validCharges } = await supabase
+      .from('billing_charges')
+      .select('id, is_void')
+      .in('id', chargeIds)
+      .eq('scout_account_id', scoutAccountId)
+
+    const validIds = new Set((validCharges || []).filter((c) => !c.is_void).map((c) => c.id))
+    for (const id of chargeIds) {
+      if (!validIds.has(id)) {
+        return {
+          success: false,
+          error: `Charge ${id} is not owned by this scout account or is voided`,
+        }
+      }
+    }
+  }
+
   try {
     const paymentDate = params.entryDate || new Date().toISOString().split('T')[0]
 
