@@ -62,6 +62,26 @@ describe('chargeRemaining', () => {
   it('clamps to zero on overpayment (never negative)', () => {
     expect(chargeRemaining(base({ amount: 50, paid_amount: 60 }))).toBe(0)
   })
+
+  it('returns 0 when is_paid = true even if paid_amount = 0 (Bug 5 historical)', () => {
+    expect(chargeRemaining({ amount: 25, paid_amount: 0, is_paid: true, is_void: null })).toBe(0)
+  })
+
+  it('returns 0 when is_paid = true and paid_amount < amount', () => {
+    expect(chargeRemaining({ amount: 25, paid_amount: 10, is_paid: true, is_void: null })).toBe(0)
+  })
+
+  it('returns amount - paid_amount when is_paid = false and partial paid', () => {
+    expect(chargeRemaining({ amount: 25, paid_amount: 10, is_paid: false, is_void: null })).toBe(15)
+  })
+
+  it('returns full amount when is_paid = false and paid_amount = 0', () => {
+    expect(chargeRemaining({ amount: 25, paid_amount: 0, is_paid: false, is_void: null })).toBe(25)
+  })
+
+  it('returns 0 when is_paid = false but paid_amount >= amount (Bug 4 historical)', () => {
+    expect(chargeRemaining({ amount: 25, paid_amount: 50, is_paid: false, is_void: null })).toBe(0)
+  })
 })
 
 const charge = (over: Partial<ChargeStatusInput> = {}) => base(over)
