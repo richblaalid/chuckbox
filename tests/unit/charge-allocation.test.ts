@@ -196,3 +196,72 @@ describe('computeAllocations — manual override', () => {
     expect(result.issues).toContainEqual({ kind: 'sum_mismatch', expected: 20, actual: 50 })
   })
 })
+
+describe('computeAllocations — funds/cash drain split', () => {
+  it('drains funds across rows in date order before cash', () => {
+    // Scout owes A($30, older) and B($25, newer, pre-checked). Treasurer enters $5 funds + $30 cash.
+    const charges = [
+      makeCharge('A', 30, '2026-06-01'),
+      makeCharge('B', 25, '2026-06-15'),
+    ]
+    const result = computeAllocations(
+      makeInput(charges, {
+        cash: 30,
+        funds: 5,
+        rowOverrides: [{ chargeId: 'B', checked: true }],
+      })
+    )
+    expect(result.isValid).toBe(true)
+    // User-checked B fills first ($25). Auto-extended A gets $10. Total = $35.
+    expect(result.rowAmounts).toEqual({ B: 25, A: 10 })
+    expect(result.autoExtendedIds).toEqual(new Set(['A']))
+
+    // Split: walking rowAmounts in date order: A ($10) then B ($25).
+    // Funds=$5 takes from front (A): fundsAllocations=[{A:5}], A.remaining=$5.
+    // Cash=$30 takes rest: cashAllocations=[{A:5},{B:25}].
+    expect(result.fundsAllocations).toEqual([{ chargeId: 'A', amount: 5 }])
+    expect(result.cashAllocations).toEqual([
+      { chargeId: 'A', amount: 5 },
+      { chargeId: 'B', amount: 25 },
+    ])
+  })
+
+  it('funds-only payment (no cash) puts everything in fundsAllocations', () => {
+    const charges = [makeCharge('A', 25, '2026-06-01')]
+    const result = computeAllocations(
+      makeInput(charges, {
+        funds: 25,
+        rowOverrides: [{ chargeId: 'A', checked: true }],
+      })
+    )
+    expect(result.isValid).toBe(true)
+    expect(result.fundsAllocations).toEqual([{ chargeId: 'A', amount: 25 }])
+    expect(result.cashAllocations).toEqual([])
+  })
+
+  it('partial funds-only payment ($5 against $25 charge — Bug 5 scenario)', () => {
+    const charges = [makeCharge('A', 25, '2026-06-01')]
+    const result = computeAllocations(
+      makeInput(charges, {
+        funds: 5,
+        rowOverrides: [{ chargeId: 'A', checked: true }],
+      })
+    )
+    expect(result.isValid).toBe(true)
+    expect(result.rowAmounts).toEqual({ A: 5 })
+    expect(result.fundsAllocations).toEqual([{ chargeId: 'A', amount: 5 }])
+    expect(result.cashAllocations).toEqual([])
+  })
+
+  it('cash-only payment puts everything in cashAllocations', () => {
+    const charges = [makeCharge('A', 25, '2026-06-01')]
+    const result = computeAllocations(
+      makeInput(charges, {
+        cash: 25,
+        rowOverrides: [{ chargeId: 'A', checked: true }],
+      })
+    )
+    expect(result.fundsAllocations).toEqual([])
+    expect(result.cashAllocations).toEqual([{ chargeId: 'A', amount: 25 }])
+  })
+})
