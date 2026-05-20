@@ -265,3 +265,108 @@ describe('computeAllocations — funds/cash drain split', () => {
     expect(result.cashAllocations).toEqual([{ chargeId: 'A', amount: 25 }])
   })
 })
+
+describe('computeAllocations — validation', () => {
+  it('cash + funds exceeds outstanding (non-card) → exceeds_outstanding', () => {
+    const charges = [makeCharge('A', 25, '2026-06-01')]
+    const result = computeAllocations(
+      makeInput(charges, {
+        cash: 50, // outstandingBalance defaults to sum of owed = 25
+        rowOverrides: [{ chargeId: 'A', checked: true }],
+      })
+    )
+    expect(result.isValid).toBe(false)
+    expect(result.issues).toContainEqual({
+      kind: 'exceeds_outstanding',
+      total: 50,
+      outstanding: 25,
+    })
+  })
+
+  it('card path: gross > outstanding but net <= outstanding → valid', () => {
+    const charges = [makeCharge('A', 100, '2026-06-01')]
+    const result = computeAllocations(
+      makeInput(charges, {
+        cash: 103.20, // gross
+        cardFeeNet: 100, // net = gross - fee
+        outstandingBalance: 100,
+        rowOverrides: [{ chargeId: 'A', checked: true, manualAmount: 103.20 }],
+      })
+    )
+    expect(result.isValid).toBe(true)
+  })
+
+  it('card path: net > outstanding → exceeds_outstanding', () => {
+    const charges = [makeCharge('A', 50, '2026-06-01')]
+    const result = computeAllocations(
+      makeInput(charges, {
+        cash: 100,
+        cardFeeNet: 96.80,
+        outstandingBalance: 50,
+        rowOverrides: [{ chargeId: 'A', checked: true, manualAmount: 100 }],
+      })
+    )
+    expect(result.isValid).toBe(false)
+    expect(result.issues).toContainEqual({
+      kind: 'exceeds_outstanding',
+      total: 96.80,
+      outstanding: 50,
+    })
+  })
+
+  it('all rows unchecked + no manual amounts → no_charges_checked is not raised when auto-extend covers', () => {
+    // Dashboard flow: treasurer hasn't manually picked anything, but types cash.
+    // Engine auto-extends FIFO; row gets a positive amount; no no_charges_checked issue.
+    const charges = [makeCharge('A', 30, '2026-06-01')]
+    const result = computeAllocations(makeInput(charges, { cash: 30 }))
+    expect(result.isValid).toBe(true)
+    expect(result.issues).not.toContainEqual({ kind: 'no_charges_checked' })
+  })
+
+  it('floating-point penny tolerance: sum equals cash within $0.01', () => {
+    const charges = [
+      makeCharge('A', 10, '2026-06-01'),
+      makeCharge('B', 20, '2026-06-15'),
+    ]
+    const result = computeAllocations(
+      makeInput(charges, {
+        cash: 30.005, // off by half a penny
+        rowOverrides: [
+          { chargeId: 'A', checked: true },
+          { chargeId: 'B', checked: true },
+        ],
+      })
+    )
+    // Tolerance allows it; isValid = true
+    expect(result.isValid).toBe(true)
+  })
+
+  it('partial-paid charge respects existing paid_amount in owed calculation', () => {
+    const charges: OutstandingCharge[] = [
+      {
+        id: 'A',
+        billingRecordId: 'br-A',
+        description: 'Charge A',
+        amount: 50,
+        paidAmount: 30, // already paid $30, owes $20
+        billingDate: '2026-06-01',
+        createdAt: '2026-06-01',
+      },
+    ]
+    const result = computeAllocations(
+      makeInput(charges, {
+        cash: 20,
+        outstandingBalance: 20,
+        rowOverrides: [{ chargeId: 'A', checked: true }],
+      })
+    )
+    expect(result.isValid).toBe(true)
+    expect(result.rowAmounts).toEqual({ A: 20 })
+  })
+
+  it('empty charges list with positive cash → no_charges_checked', () => {
+    const result = computeAllocations(makeInput([], { cash: 30 }))
+    expect(result.isValid).toBe(false)
+    expect(result.issues).toContainEqual({ kind: 'no_charges_checked' })
+  })
+})
