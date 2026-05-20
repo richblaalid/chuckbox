@@ -139,7 +139,7 @@ export function UseFundsModal({
               </Button>
             </div>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">$</span>
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">$</span>
               <Input
                 id="amount"
                 type="number"

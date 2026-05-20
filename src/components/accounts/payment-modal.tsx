@@ -212,7 +212,7 @@ export function PaymentModal({
             <Label htmlFor="payment-amount">Amount *</Label>
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">$</span>
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">$</span>
                 <input
                   id="payment-amount"
                   type="number"

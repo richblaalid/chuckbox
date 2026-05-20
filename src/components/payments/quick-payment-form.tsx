@@ -106,7 +106,7 @@ export function QuickPaymentForm({
   const [inlineBillingDate, setInlineBillingDate] = useState(new Date().toISOString().split('T')[0])
 
   // Funds-first split payment state
-  const [fundsToApply, setFundsToApply] = useState('0')
+  const [fundsToApply, setFundsToApply] = useState('')
   const parsedFundsToApply = parseFloat(fundsToApply) || 0
 
   // Square SDK state
@@ -173,7 +173,7 @@ export function QuickPaymentForm({
       setOutstandingCharges([])
       setRows([])
       setChargesLoaded(false)
-      setFundsToApply('0')
+      setFundsToApply('')
       setShowInlineBilling(false)
       setInlineBillingDescription('')
       setInlineBillingDate(new Date().toISOString().split('T')[0])
@@ -184,7 +184,7 @@ export function QuickPaymentForm({
     if (!accountId) return
 
     // Reset funds and inline billing when scout changes
-    setFundsToApply('0')
+    setFundsToApply('')
     setShowInlineBilling(false)
     setInlineBillingDescription('')
     setInlineBillingDate(new Date().toISOString().split('T')[0])
@@ -317,7 +317,7 @@ export function QuickPaymentForm({
     setMethod('cash')
     setReference('')
     setNotes('')
-    setFundsToApply('0')
+    setFundsToApply('')
     setOutstandingCharges([])
     setRows([])
     setError(null)
@@ -677,7 +677,7 @@ export function QuickPaymentForm({
           </div>
           <div className="flex items-center gap-2">
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">$</span>
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">$</span>
               <Input
                 type="number"
                 value={fundsToApply}
@@ -732,7 +732,7 @@ export function QuickPaymentForm({
           ))}
         </div>
         <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">$</span>
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">$</span>
           <Input
             id="quick-amount"
             type="number"
