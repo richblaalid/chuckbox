@@ -147,3 +147,52 @@ describe('computeAllocations — baseline', () => {
     expect(result.autoExtendedIds).toEqual(new Set(['older']))
   })
 })
+
+describe('computeAllocations — manual override', () => {
+  it('respects a manual row amount and distributes remainder FIFO to other checked rows', () => {
+    const charges = [
+      makeCharge('A', 30, '2026-06-01'),
+      makeCharge('B', 50, '2026-06-15'),
+    ]
+    // Treasurer types $10 on B; total cash $40; A and B both checked.
+    const result = computeAllocations(
+      makeInput(charges, {
+        cash: 40,
+        rowOverrides: [
+          { chargeId: 'A', checked: true },
+          { chargeId: 'B', checked: true, manualAmount: 10 },
+        ],
+      })
+    )
+    expect(result.isValid).toBe(true)
+    expect(result.rowAmounts).toEqual({ B: 10, A: 30 })
+  })
+
+  it('manual rows stay sticky when cash decreases (does not auto-clear)', () => {
+    const charges = [makeCharge('A', 30, '2026-06-01'), makeCharge('B', 50, '2026-06-15')]
+    const result = computeAllocations(
+      makeInput(charges, {
+        cash: 30, // decreased from a previous higher value
+        rowOverrides: [
+          { chargeId: 'A', checked: true, manualAmount: 20 },
+          { chargeId: 'B', checked: true },
+        ],
+      })
+    )
+    // A holds $20 (manual); remaining $10 fills B
+    expect(result.rowAmounts).toEqual({ A: 20, B: 10 })
+    expect(result.isValid).toBe(true)
+  })
+
+  it('manual rows summing more than cash produce sum_mismatch', () => {
+    const charges = [makeCharge('A', 50, '2026-06-01')]
+    const result = computeAllocations(
+      makeInput(charges, {
+        cash: 20,
+        rowOverrides: [{ chargeId: 'A', checked: true, manualAmount: 50 }],
+      })
+    )
+    expect(result.isValid).toBe(false)
+    expect(result.issues).toContainEqual({ kind: 'sum_mismatch', expected: 20, actual: 50 })
+  })
+})
