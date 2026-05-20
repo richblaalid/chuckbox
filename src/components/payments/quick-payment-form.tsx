@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,8 @@ import { recordQuickPayment } from '@/app/actions/payments'
 import { SQUARE_FEE_PERCENT, SQUARE_FEE_FIXED_DOLLARS } from '@/lib/billing'
 import { trackPaymentInitiated, trackPaymentCompleted, trackPaymentFailed } from '@/lib/analytics'
 import { ChargeAllocationList } from '@/components/payments/charge-allocation-list'
-import type { OutstandingCharge, Allocation } from '@/lib/payment-allocation'
+import type { OutstandingCharge, Allocation, RowState, ValidationIssue } from '@/lib/payment-allocation'
+import { computeAllocations } from '@/lib/payment-allocation'
 import { Banknote, Check, CreditCard, Loader2, X, Wallet } from 'lucide-react'
 import type { SquareCard } from '@/types/square'
 
@@ -67,7 +68,7 @@ export function QuickPaymentForm({
   const cardRef = useRef<SquareCard | null>(null)
 
   const [selectedScoutId, setSelectedScoutId] = useState(preselectedScoutId || '')
-  const [amount, setAmount] = useState(initialAmount ? initialAmount.toFixed(2) : '')
+  const [amount, setAmount] = useState('')
   const [method, setMethod] = useState<PaymentMethod>('cash')
   const [reference, setReference] = useState('')
   const [notes, setNotes] = useState('')
@@ -79,7 +80,7 @@ export function QuickPaymentForm({
   const [outstandingCharges, setOutstandingCharges] = useState<OutstandingCharge[]>([])
   const [chargesLoading, setChargesLoading] = useState(false)
   const [chargesLoaded, setChargesLoaded] = useState(false)
-  const [allocations, setAllocations] = useState<Allocation[]>([])
+  const [rows, setRows] = useState<RowState[]>([])
 
   // Inline billing creation state (shown when scout has no outstanding charges)
   const [showInlineBilling, setShowInlineBilling] = useState(false)
@@ -130,11 +131,29 @@ export function QuickPaymentForm({
   // Calculate new balance after total payment is applied
   const newBalance = currentBalance + totalPayment
 
+  // Engine: compute per-row allocations + validation on every render
+  const allocationResult = useMemo(
+    () =>
+      computeAllocations({
+        charges: outstandingCharges,
+        rows,
+        cash: parsedAmount,
+        funds: parsedFundsToApply,
+        outstandingBalance: Math.abs(currentBalance),
+        cardFeeNet: method === 'card' ? netAmount : undefined,
+      }),
+    [outstandingCharges, rows, parsedAmount, parsedFundsToApply, currentBalance, method, netAmount]
+  )
+
+  const handleRowChange = useCallback((chargeId: string, change: Partial<RowState>) => {
+    setRows((prev) => prev.map((r) => (r.chargeId === chargeId ? { ...r, ...change } : r)))
+  }, [])
+
   // Fetch outstanding charges when scout changes
   useEffect(() => {
     if (!selectedScoutId) {
       setOutstandingCharges([])
-      setAllocations([])
+      setRows([])
       setChargesLoaded(false)
       setFundsToApply('0')
       setShowInlineBilling(false)
@@ -182,17 +201,13 @@ export function QuickPaymentForm({
           }))
         setOutstandingCharges(charges)
 
-        // Pre-select initial charge if provided
-        if (initialChargeId) {
-          const matchingCharge = charges.find(c => c.id === initialChargeId)
-          if (matchingCharge) {
-            const remaining = matchingCharge.amount - matchingCharge.paidAmount
-            setAllocations([{
-              chargeId: matchingCharge.id,
-              amount: remaining,
-            }])
-          }
-        }
+        // Initialize rows: one entry per charge; pre-check the initial charge if provided.
+        const initialRows: RowState[] = charges.map((c) => ({
+          chargeId: c.id,
+          checked: initialChargeId === c.id,
+          manualAmount: null,
+        }))
+        setRows(initialRows)
       }
       setChargesLoading(false)
       setChargesLoaded(true)
@@ -286,7 +301,7 @@ export function QuickPaymentForm({
     setNotes('')
     setFundsToApply('0')
     setOutstandingCharges([])
-    setAllocations([])
+    setRows([])
     setError(null)
     setSuccess(false)
     onCancel?.()
@@ -595,14 +610,9 @@ export function QuickPaymentForm({
           <Label>Outstanding Charges</Label>
           <ChargeAllocationList
             charges={outstandingCharges}
-            paymentAmount={totalPayment}
-            onAllocationsChange={setAllocations}
-            onAmountChange={(newTotal) => {
-              // newTotal is the desired total payment based on selected charges.
-              // Amount field holds only the cash/check/card portion, so subtract funds.
-              const cashPortion = Math.max(0, newTotal - parsedFundsToApply)
-              setAmount(cashPortion.toFixed(2))
-            }}
+            rows={rows}
+            result={allocationResult}
+            onRowChange={handleRowChange}
           />
         </div>
       )}
