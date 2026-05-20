@@ -260,26 +260,6 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
       }
     }
 
-    // Check for overpayment and auto-transfer to Scout Funds
-    const { data: updatedAccount } = await supabase
-      .from('scout_accounts')
-      .select('billing_balance')
-      .eq('id', scoutAccountId)
-      .single()
-
-    if (updatedAccount && (updatedAccount.billing_balance || 0) > 0) {
-      const overpaymentAmount = updatedAccount.billing_balance || 0
-      const { error: transferError } = await supabase.rpc('auto_transfer_overpayment', {
-        p_scout_account_id: scoutAccountId,
-        p_amount: overpaymentAmount,
-      })
-
-      if (transferError) {
-        console.error('Failed to transfer overpayment:', transferError)
-        // Don't fail the payment, just log the error
-      }
-    }
-
     // Revalidate relevant paths
     revalidatePath('/finances')
     revalidatePath('/finances/payments')

@@ -411,7 +411,7 @@ describe('Payments Actions', () => {
       expect(result.paymentId).toBe('payment-1')
     })
 
-    it('should trigger overpayment transfer when billing_balance > 0', async () => {
+    it('should leave billing_balance credit as-is (no auto-transfer) when payment produces overpayment', async () => {
       mockSupabase.auth.getUser.mockResolvedValue({
         data: { user: { id: 'user-123' } },
       })
@@ -496,12 +496,9 @@ describe('Payments Actions', () => {
 
       const result = await recordQuickPayment(validParams)
       expect(result.success).toBe(true)
-      expect(mockSupabase.rpc).toHaveBeenCalledWith(
+      expect(mockSupabase.rpc).not.toHaveBeenCalledWith(
         'auto_transfer_overpayment',
-        {
-          p_scout_account_id: 'account-1',
-          p_amount: 25,
-        }
+        expect.anything()
       )
     })
   })
