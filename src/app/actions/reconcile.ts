@@ -206,21 +206,6 @@ export async function reconcileSquareTransaction(params: ReconcileParams): Promi
           }
         }
       }
-
-      // Auto-transfer overpayment
-      const { data: updatedAccount } = await supabase
-        .from('scout_accounts')
-        .select('billing_balance')
-        .eq('id', scoutParams.scoutAccountId)
-        .single()
-
-      if (updatedAccount && (updatedAccount.billing_balance || 0) > 0) {
-        const overpaymentAmount = updatedAccount.billing_balance || 0
-        await supabase.rpc('auto_transfer_overpayment', {
-          p_scout_account_id: scoutParams.scoutAccountId,
-          p_amount: overpaymentAmount,
-        })
-      }
     }
 
     revalidatePath('/finances')
