@@ -325,7 +325,7 @@ export function QuickPaymentForm({
     onCancel?.()
   }
 
-  const handleCardPayment = async () => {
+  const handleCardPayment = async (allocations: Allocation[]) => {
     if (!cardRef.current || !selectedScout?.scout_accounts?.id) return
 
     trackPaymentInitiated({
@@ -348,6 +348,9 @@ export function QuickPaymentForm({
           amountCents: Math.round(parsedAmount * 100),
           sourceId: tokenResult.token,
           description: `Payment for ${selectedScout.first_name} ${selectedScout.last_name}`,
+          allocations: allocations.length > 0
+            ? allocations.map((a) => ({ chargeId: a.chargeId, amount: a.amount }))
+            : undefined,
         }),
       })
 
@@ -532,7 +535,7 @@ export function QuickPaymentForm({
       if (parsedAmount > 0) {
         const allocationsForServer = inlineAllocation ?? allocationResult.cashAllocations
         if (method === 'card') {
-          await handleCardPayment()
+          await handleCardPayment(allocationsForServer)
         } else {
           await handleManualPayment(allocationsForServer)
         }
