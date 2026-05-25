@@ -490,28 +490,6 @@ export function PaymentEntry({
 
       if (paymentError) throw paymentError
 
-      // Check for overpayment and transfer to Scout Funds
-      const { data: updatedAccount } = await supabase
-        .from('scout_accounts')
-        .select('billing_balance')
-        .eq('id', scoutAccount.id)
-        .single()
-
-      if (updatedAccount && (updatedAccount.billing_balance || 0) > 0) {
-        const overpaymentAmount = updatedAccount.billing_balance || 0
-        const { error: transferError } = await supabase.rpc('auto_transfer_overpayment', {
-          p_scout_account_id: scoutAccount.id,
-          p_amount: overpaymentAmount,
-        })
-
-        if (transferError) {
-          log.error('Failed to transfer overpayment:', transferError)
-          // Don't fail the payment, just log the error
-        } else {
-          log.info(`Transferred $${overpaymentAmount.toFixed(2)} overpayment to Scout Funds`)
-        }
-      }
-
       handleSuccess()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
@@ -607,7 +585,7 @@ export function PaymentEntry({
       <div className="space-y-2">
         <Label htmlFor="amount">Amount *</Label>
         <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">$</span>
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">$</span>
           <Input
             id="amount"
             type="number"

@@ -80,6 +80,35 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
     return { success: false, error: 'Scout does not belong to this unit' }
   }
 
+  // Validate allocations (if provided) against the scout account and amount
+  if (params.allocations && params.allocations.length > 0) {
+    const allocSum = params.allocations.reduce((s, a) => s + a.amount, 0)
+    if (Math.abs(allocSum - amountDollars) > 0.01) {
+      return {
+        success: false,
+        error: `Allocation total ($${allocSum.toFixed(2)}) does not match payment amount ($${amountDollars.toFixed(2)})`,
+      }
+    }
+
+    // Verify every chargeId belongs to this scout account and isn't voided
+    const chargeIds = params.allocations.map((a) => a.chargeId)
+    const { data: validCharges } = await supabase
+      .from('billing_charges')
+      .select('id, is_void')
+      .in('id', chargeIds)
+      .eq('scout_account_id', scoutAccountId)
+
+    const validIds = new Set((validCharges || []).filter((c) => !c.is_void).map((c) => c.id))
+    for (const id of chargeIds) {
+      if (!validIds.has(id)) {
+        return {
+          success: false,
+          error: `Charge ${id} is not owned by this scout account or is voided`,
+        }
+      }
+    }
+  }
+
   try {
     const paymentDate = params.entryDate || new Date().toISOString().split('T')[0]
 
@@ -228,26 +257,6 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
             .update({ paid_amount: (charge.paid_amount || 0) + alloc.amount })
             .eq('id', alloc.chargeId)
         }
-      }
-    }
-
-    // Check for overpayment and auto-transfer to Scout Funds
-    const { data: updatedAccount } = await supabase
-      .from('scout_accounts')
-      .select('billing_balance')
-      .eq('id', scoutAccountId)
-      .single()
-
-    if (updatedAccount && (updatedAccount.billing_balance || 0) > 0) {
-      const overpaymentAmount = updatedAccount.billing_balance || 0
-      const { error: transferError } = await supabase.rpc('auto_transfer_overpayment', {
-        p_scout_account_id: scoutAccountId,
-        p_amount: overpaymentAmount,
-      })
-
-      if (transferError) {
-        console.error('Failed to transfer overpayment:', transferError)
-        // Don't fail the payment, just log the error
       }
     }
 

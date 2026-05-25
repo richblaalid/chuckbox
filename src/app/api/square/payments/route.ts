@@ -382,27 +382,6 @@ export async function POST(request: NextRequest) {
       note: paymentNote,
     })
 
-    // Check for overpayment and transfer excess to Scout Funds
-    const { data: updatedAccount } = await supabase
-      .from('scout_accounts')
-      .select('billing_balance')
-      .eq('id', scoutAccountId)
-      .single()
-
-    // If billing went positive (overpayment), auto-transfer to funds
-    if (updatedAccount && (updatedAccount.billing_balance || 0) > 0) {
-      const overpaymentAmount = updatedAccount.billing_balance || 0
-      const { error: transferError } = await supabase.rpc('auto_transfer_overpayment', {
-        p_scout_account_id: scoutAccountId,
-        p_amount: overpaymentAmount,
-      })
-
-      if (transferError) {
-        console.error('Failed to transfer overpayment:', transferError)
-        // Don't fail the payment, just log the error
-      }
-    }
-
     return NextResponse.json({
       success: true,
       payment: {

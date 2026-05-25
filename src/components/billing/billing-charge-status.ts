@@ -20,6 +20,13 @@ export function chargeStatus(c: ChargeStatusInput): ChargeStatus {
 }
 
 export function chargeRemaining(c: ChargeStatusInput): number {
+  // Defensive: align with chargeStatus()'s definition of "paid". If is_paid is
+  // true OR paid_amount has reached the charge amount, the charge contributes
+  // zero to outstanding totals — regardless of historical inconsistencies in
+  // either field. Prevents aggregate displays from showing residuals on
+  // already-paid charges (e.g., Bug 5 funds-transfer victims with is_paid=true
+  // but paid_amount=0).
+  if (c.is_paid) return 0
   return Math.max(0, c.amount - (c.paid_amount ?? 0))
 }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -11,9 +11,28 @@ import { recordQuickPayment } from '@/app/actions/payments'
 import { SQUARE_FEE_PERCENT, SQUARE_FEE_FIXED_DOLLARS } from '@/lib/billing'
 import { trackPaymentInitiated, trackPaymentCompleted, trackPaymentFailed } from '@/lib/analytics'
 import { ChargeAllocationList } from '@/components/payments/charge-allocation-list'
-import type { OutstandingCharge, Allocation } from '@/lib/payment-allocation'
+import type { OutstandingCharge, Allocation, RowState, ValidationIssue } from '@/lib/payment-allocation'
+import { computeAllocations } from '@/lib/payment-allocation'
 import { Banknote, Check, CreditCard, Loader2, X, Wallet } from 'lucide-react'
 import type { SquareCard } from '@/types/square'
+
+function formatValidationIssue(
+  issue: ValidationIssue,
+  ctx: { fundsBalance: number; outstandingBalance: number }
+): string {
+  switch (issue.kind) {
+    case 'no_money':
+      return 'Please enter a payment amount'
+    case 'no_charges_checked':
+      return 'Please select at least one charge to apply this payment to'
+    case 'sum_mismatch':
+      return `Allocation total (${formatCurrency(issue.actual)}) does not match payment amount (${formatCurrency(issue.expected)})`
+    case 'exceeds_outstanding':
+      return `Payment exceeds outstanding balance. Maximum: ${formatCurrency(ctx.outstandingBalance)}`
+    case 'funds_exceeds_available':
+      return `Insufficient funds. Maximum available: ${formatCurrency(ctx.fundsBalance)}`
+  }
+}
 
 interface Scout {
   id: string
@@ -67,7 +86,7 @@ export function QuickPaymentForm({
   const cardRef = useRef<SquareCard | null>(null)
 
   const [selectedScoutId, setSelectedScoutId] = useState(preselectedScoutId || '')
-  const [amount, setAmount] = useState(initialAmount ? initialAmount.toFixed(2) : '')
+  const [amount, setAmount] = useState('')
   const [method, setMethod] = useState<PaymentMethod>('cash')
   const [reference, setReference] = useState('')
   const [notes, setNotes] = useState('')
@@ -79,7 +98,7 @@ export function QuickPaymentForm({
   const [outstandingCharges, setOutstandingCharges] = useState<OutstandingCharge[]>([])
   const [chargesLoading, setChargesLoading] = useState(false)
   const [chargesLoaded, setChargesLoaded] = useState(false)
-  const [allocations, setAllocations] = useState<Allocation[]>([])
+  const [rows, setRows] = useState<RowState[]>([])
 
   // Inline billing creation state (shown when scout has no outstanding charges)
   const [showInlineBilling, setShowInlineBilling] = useState(false)
@@ -87,7 +106,7 @@ export function QuickPaymentForm({
   const [inlineBillingDate, setInlineBillingDate] = useState(new Date().toISOString().split('T')[0])
 
   // Funds-first split payment state
-  const [fundsToApply, setFundsToApply] = useState('0')
+  const [fundsToApply, setFundsToApply] = useState('')
   const parsedFundsToApply = parseFloat(fundsToApply) || 0
 
   // Square SDK state
@@ -130,13 +149,31 @@ export function QuickPaymentForm({
   // Calculate new balance after total payment is applied
   const newBalance = currentBalance + totalPayment
 
+  // Engine: compute per-row allocations + validation on every render
+  const allocationResult = useMemo(
+    () =>
+      computeAllocations({
+        charges: outstandingCharges,
+        rows,
+        cash: parsedAmount,
+        funds: parsedFundsToApply,
+        outstandingBalance: Math.abs(currentBalance),
+        cardFeeNet: method === 'card' ? netAmount : undefined,
+      }),
+    [outstandingCharges, rows, parsedAmount, parsedFundsToApply, currentBalance, method, netAmount]
+  )
+
+  const handleRowChange = useCallback((chargeId: string, change: Partial<RowState>) => {
+    setRows((prev) => prev.map((r) => (r.chargeId === chargeId ? { ...r, ...change } : r)))
+  }, [])
+
   // Fetch outstanding charges when scout changes
   useEffect(() => {
     if (!selectedScoutId) {
       setOutstandingCharges([])
-      setAllocations([])
+      setRows([])
       setChargesLoaded(false)
-      setFundsToApply('0')
+      setFundsToApply('')
       setShowInlineBilling(false)
       setInlineBillingDescription('')
       setInlineBillingDate(new Date().toISOString().split('T')[0])
@@ -147,7 +184,7 @@ export function QuickPaymentForm({
     if (!accountId) return
 
     // Reset funds and inline billing when scout changes
-    setFundsToApply('0')
+    setFundsToApply('')
     setShowInlineBilling(false)
     setInlineBillingDescription('')
     setInlineBillingDate(new Date().toISOString().split('T')[0])
@@ -182,17 +219,13 @@ export function QuickPaymentForm({
           }))
         setOutstandingCharges(charges)
 
-        // Pre-select initial charge if provided
-        if (initialChargeId) {
-          const matchingCharge = charges.find(c => c.id === initialChargeId)
-          if (matchingCharge) {
-            const remaining = matchingCharge.amount - matchingCharge.paidAmount
-            setAllocations([{
-              chargeId: matchingCharge.id,
-              amount: remaining,
-            }])
-          }
-        }
+        // Initialize rows: one entry per charge; pre-check the initial charge if provided.
+        const initialRows: RowState[] = charges.map((c) => ({
+          chargeId: c.id,
+          checked: initialChargeId === c.id,
+          manualAmount: null,
+        }))
+        setRows(initialRows)
       }
       setChargesLoading(false)
       setChargesLoaded(true)
@@ -284,15 +317,15 @@ export function QuickPaymentForm({
     setMethod('cash')
     setReference('')
     setNotes('')
-    setFundsToApply('0')
+    setFundsToApply('')
     setOutstandingCharges([])
-    setAllocations([])
+    setRows([])
     setError(null)
     setSuccess(false)
     onCancel?.()
   }
 
-  const handleCardPayment = async () => {
+  const handleCardPayment = async (allocations: Allocation[]) => {
     if (!cardRef.current || !selectedScout?.scout_accounts?.id) return
 
     trackPaymentInitiated({
@@ -315,6 +348,9 @@ export function QuickPaymentForm({
           amountCents: Math.round(parsedAmount * 100),
           sourceId: tokenResult.token,
           description: `Payment for ${selectedScout.first_name} ${selectedScout.last_name}`,
+          allocations: allocations.length > 0
+            ? allocations.map((a) => ({ chargeId: a.chargeId, amount: a.amount }))
+            : undefined,
         }),
       })
 
@@ -342,7 +378,7 @@ export function QuickPaymentForm({
     }
   }
 
-  const handleFundsTransfer = async (transferAmount: number) => {
+  const handleFundsTransfer = async (transferAmount: number, allocations: Allocation[]) => {
     if (!selectedScout?.scout_accounts?.id) return
 
     const supabase = createClient()
@@ -351,6 +387,10 @@ export function QuickPaymentForm({
       p_scout_account_id: selectedScout.scout_accounts.id,
       p_amount: transferAmount,
       p_description: notes || 'Transfer from Scout Funds to pay balance',
+      p_allocations: allocations.length > 0
+        ? allocations.map((a) => ({ charge_id: a.chargeId, amount: a.amount }))
+        : null,
+      p_entry_date: new Date().toLocaleDateString('en-CA'),
     })
 
     if (rpcError) {
@@ -362,7 +402,7 @@ export function QuickPaymentForm({
     if (!selectedScout?.scout_accounts?.id) return
 
     const paymentMethod = method as 'cash' | 'check'
-    const effectiveAllocations = allocationsOverride ?? allocations
+    const effectiveAllocations = allocationsOverride ?? []
 
     trackPaymentInitiated({
       amount: parsedAmount,
@@ -413,24 +453,22 @@ export function QuickPaymentForm({
       setError('Please select a scout')
       return
     }
-    if (totalPayment <= 0) {
-      setError('Please enter a payment amount')
-      return
-    }
-    if (parsedFundsToApply > fundsBalance) {
-      setError(`Insufficient funds. Maximum available: ${formatCurrency(fundsBalance)}`)
-      return
-    }
-    if (parsedFundsToApply > Math.abs(currentBalance)) {
-      setError(`Funds amount exceeds balance owed: ${formatCurrency(Math.abs(currentBalance))}`)
-      return
-    }
     if (method === 'card' && parsedAmount > 0 && parsedAmount < 1) {
       setError('Minimum card payment is $1.00')
       return
     }
     if (chargesLoaded && outstandingCharges.length === 0 && !inlineBillingDescription.trim()) {
       setError('Please create a billing record for this payment')
+      return
+    }
+    // Engine validation (covers no_money, sum_mismatch, exceeds_outstanding, no_charges_checked)
+    if (outstandingCharges.length > 0 && !allocationResult.isValid) {
+      setError(formatValidationIssue(allocationResult.issues[0], { fundsBalance, outstandingBalance: Math.abs(currentBalance) }))
+      return
+    }
+    // Manual funds-balance check (engine doesn't know funds_balance — caller passes it)
+    if (parsedFundsToApply > fundsBalance + 0.01) {
+      setError(`Insufficient funds. Maximum available: ${formatCurrency(fundsBalance)}`)
       return
     }
 
@@ -485,7 +523,7 @@ export function QuickPaymentForm({
           scoutAccountId,
           method: 'transfer',
         })
-        await handleFundsTransfer(parsedFundsToApply)
+        await handleFundsTransfer(parsedFundsToApply, allocationResult.fundsAllocations)
         trackPaymentCompleted({
           amount: parsedFundsToApply,
           scoutAccountId,
@@ -495,10 +533,11 @@ export function QuickPaymentForm({
 
       // Step 2: Collect external payment (cash/check/card) if any
       if (parsedAmount > 0) {
+        const allocationsForServer = inlineAllocation ?? allocationResult.cashAllocations
         if (method === 'card') {
-          await handleCardPayment()
+          await handleCardPayment(allocationsForServer)
         } else {
-          await handleManualPayment(inlineAllocation)
+          await handleManualPayment(allocationsForServer)
         }
       }
 
@@ -595,14 +634,9 @@ export function QuickPaymentForm({
           <Label>Outstanding Charges</Label>
           <ChargeAllocationList
             charges={outstandingCharges}
-            paymentAmount={totalPayment}
-            onAllocationsChange={setAllocations}
-            onAmountChange={(newTotal) => {
-              // newTotal is the desired total payment based on selected charges.
-              // Amount field holds only the cash/check/card portion, so subtract funds.
-              const cashPortion = Math.max(0, newTotal - parsedFundsToApply)
-              setAmount(cashPortion.toFixed(2))
-            }}
+            rows={rows}
+            result={allocationResult}
+            onRowChange={handleRowChange}
           />
         </div>
       )}
@@ -647,7 +681,7 @@ export function QuickPaymentForm({
           </div>
           <div className="flex items-center gap-2">
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">$</span>
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">$</span>
               <Input
                 type="number"
                 value={fundsToApply}
@@ -702,7 +736,7 @@ export function QuickPaymentForm({
           ))}
         </div>
         <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">$</span>
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-500">$</span>
           <Input
             id="quick-amount"
             type="number"
@@ -858,7 +892,8 @@ export function QuickPaymentForm({
             disabled={
               isSubmitting ||
               !selectedScoutId ||
-              totalPayment <= 0 ||
+              (outstandingCharges.length > 0 && !allocationResult.isValid) ||
+              (outstandingCharges.length === 0 && totalPayment <= 0) ||
               (!fundsCoverAll && method === 'card' && !cardInitialized) ||
               (chargesLoaded && outstandingCharges.length === 0 && !inlineBillingDescription.trim())
             }

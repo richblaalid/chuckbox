@@ -411,7 +411,118 @@ describe('Payments Actions', () => {
       expect(result.paymentId).toBe('payment-1')
     })
 
-    it('should trigger overpayment transfer when billing_balance > 0', async () => {
+    it('rejects when allocations sum does not match amount', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'user-123' } },
+      })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: 'profile-123' },
+              error: null,
+            }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { role: 'treasurer' },
+              error: null,
+            }),
+          }
+        }
+        if (table === 'scout_accounts') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({
+              data: { id: 'sa-1', scouts: { unit_id: 'u-1' } },
+              error: null,
+            }),
+          }
+        }
+        return defaultChain()
+      })
+
+      const result = await recordQuickPayment({
+        unitId: 'u-1',
+        scoutAccountId: 'sa-1',
+        scoutName: 'Test Scout',
+        amountDollars: 10,
+        method: 'cash',
+        allocations: [{ chargeId: 'c-1', amount: 20 }],
+      })
+
+      expect(result.success).toBe(false)
+      expect(result.error).toMatch(/does not match/i)
+    })
+
+    it('rejects when allocation references a charge not owned by the scout', async () => {
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'user-123' } },
+      })
+
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: 'profile-123' },
+              error: null,
+            }),
+          }
+        }
+        if (table === 'unit_memberships') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { role: 'treasurer' },
+              error: null,
+            }),
+          }
+        }
+        if (table === 'scout_accounts') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({
+              data: { id: 'sa-1', scouts: { unit_id: 'u-1' } },
+              error: null,
+            }),
+          }
+        }
+        if (table === 'billing_charges') {
+          return {
+            select: vi.fn().mockReturnThis(),
+            in: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+          }
+        }
+        return defaultChain()
+      })
+
+      const result = await recordQuickPayment({
+        unitId: 'u-1',
+        scoutAccountId: 'sa-1',
+        scoutName: 'Test Scout',
+        amountDollars: 10,
+        method: 'cash',
+        allocations: [{ chargeId: 'foreign-charge', amount: 10 }],
+      })
+
+      expect(result.success).toBe(false)
+      expect(result.error).toMatch(/not owned/i)
+    })
+
+    it('should leave billing_balance credit as-is (no auto-transfer) when payment produces overpayment', async () => {
       mockSupabase.auth.getUser.mockResolvedValue({
         data: { user: { id: 'user-123' } },
       })
@@ -496,12 +607,9 @@ describe('Payments Actions', () => {
 
       const result = await recordQuickPayment(validParams)
       expect(result.success).toBe(true)
-      expect(mockSupabase.rpc).toHaveBeenCalledWith(
+      expect(mockSupabase.rpc).not.toHaveBeenCalledWith(
         'auto_transfer_overpayment',
-        {
-          p_scout_account_id: 'account-1',
-          p_amount: 25,
-        }
+        expect.anything()
       )
     })
   })
