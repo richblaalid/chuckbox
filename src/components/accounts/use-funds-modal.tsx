@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { formatCurrency } from '@/lib/utils'
+import { allocatePayment, type OutstandingCharge } from '@/lib/payment-allocation'
 import { Wallet, ArrowRight, AlertCircle } from 'lucide-react'
 
 interface UseFundsModalProps {
@@ -69,10 +70,37 @@ export function UseFundsModal({
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       )
 
-      const { data, error: rpcError } = await supabase.rpc('transfer_funds_to_billing', {
+      // Load outstanding charges for FIFO allocation across them
+      const { data: chargesData } = await supabase
+        .from('billing_charges')
+        .select('id, amount, paid_amount, is_paid, billing_records!inner(billing_date, created_at)')
+        .eq('scout_account_id', scoutAccountId)
+        .or('is_void.is.null,is_void.eq.false')
+
+      const outstanding: OutstandingCharge[] = (chargesData || [])
+        .filter((c) => !c.is_paid && c.amount - (c.paid_amount || 0) > 0)
+        .map((c) => {
+          const record = c.billing_records as unknown as { billing_date: string; created_at: string | null } | null
+          return {
+            id: c.id,
+            billingRecordId: '',
+            description: '',
+            amount: c.amount,
+            paidAmount: c.paid_amount || 0,
+            billingDate: record?.billing_date || '',
+            createdAt: record?.created_at || '',
+          }
+        })
+
+      const fifo = allocatePayment(outstanding, transferAmount)
+      const allocations = fifo.map((a) => ({ charge_id: a.chargeId, amount: a.amount }))
+
+      const { error: rpcError } = await supabase.rpc('transfer_funds_to_billing', {
         p_scout_account_id: scoutAccountId,
         p_amount: transferAmount,
         p_description: 'Transfer from Scout Funds to pay balance',
+        p_allocations: allocations.length > 0 ? allocations : null,
+        p_entry_date: new Date().toLocaleDateString('en-CA'),
       })
 
       if (rpcError) {

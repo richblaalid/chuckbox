@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { z } from 'zod'
+import { allocatePayment, type OutstandingCharge } from '@/lib/payment-allocation'
 
 interface RouteParams {
   params: Promise<{ token: string }>
@@ -146,11 +147,45 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const scout = scoutAccount.scouts
     const scoutName = `${scout.first_name} ${scout.last_name}`
 
+    // Determine allocations:
+    // - Charge-specific link: allocate entirely to that charge.
+    // - Generic link: FIFO across the scout's outstanding charges.
+    let allocations: Array<{ charge_id: string; amount: number }> | null = null
+
+    if (paymentLink.billing_charge_id) {
+      allocations = [{ charge_id: paymentLink.billing_charge_id, amount: amountDollars }]
+    } else {
+      const { data: chargesData } = await supabase
+        .from('billing_charges')
+        .select('id, amount, paid_amount, is_paid, billing_records!inner(billing_date, created_at)')
+        .eq('scout_account_id', scoutAccount.id)
+        .or('is_void.is.null,is_void.eq.false')
+
+      const outstanding: OutstandingCharge[] = (chargesData || [])
+        .filter((c) => !c.is_paid && c.amount - (c.paid_amount || 0) > 0)
+        .map((c) => {
+          const record = c.billing_records as unknown as { billing_date: string; created_at: string | null } | null
+          return {
+            id: c.id,
+            billingRecordId: '',
+            description: '',
+            amount: c.amount,
+            paidAmount: c.paid_amount || 0,
+            billingDate: record?.billing_date || '',
+            createdAt: record?.created_at || '',
+          }
+        })
+
+      const fifo = allocatePayment(outstanding, amountDollars)
+      allocations = fifo.length > 0 ? fifo.map((a) => ({ charge_id: a.chargeId, amount: a.amount })) : null
+    }
+
     // Transfer funds from Scout Funds to Billing using RPC
     const { data: transferResult, error: transferError } = await supabase.rpc('transfer_funds_to_billing', {
       p_scout_account_id: scoutAccount.id,
       p_amount: amountDollars,
       p_description: `Payment applied to: ${paymentLink.description}`,
+      p_allocations: allocations,
     })
 
     if (transferError) {
