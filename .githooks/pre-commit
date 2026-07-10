@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Lints staged .ts/.tsx files with ESLint (--fix) so violations never reach a
+# commit, then re-stages the fixer's edits.
+#
+# Caveat: re-staging picks up the whole file. If you used `git add -p` to
+# stage only part of a file, the fixer's changes may pick up unstaged edits
+# to the same file. Avoid partial stages of .ts/.tsx files, or bypass for
+# that commit with `git commit --no-verify`.
+
+set -e
+
+STAGED_TS=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx)$' || true)
+[ -z "$STAGED_TS" ] && exit 0
+
+echo "$STAGED_TS" | xargs npx eslint --fix --no-warn-ignored
+
+# Re-stage any files the fixer modified.
+echo "$STAGED_TS" | xargs git add

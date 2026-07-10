@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Runs the build gate before allowing a push. Catches Next.js production-build
+# and TypeScript failures — the same `make build` CI runs first.
+# Lint and tests stay in CI (they run on every PR/push to main).
+# To bypass in an emergency: git push --no-verify (use sparingly).
+
+set -e
+exec make build

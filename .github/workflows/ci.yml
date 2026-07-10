@@ -1,0 +1,33 @@
+# CI runs exactly the make verbs, so local, pre-push hook, and CI agree on
+# what green means: make build → make lint → make test.
+#
+# Required repo secrets (Settings → Secrets → Actions):
+#   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY  (dev project)
+# The service-role key is intentionally NOT provided: real-DB integration
+# tests skip without it (they must never mutate the dev DB from CI).
+# PLATFORM-009 (split test:integration out of the unit run) makes this fully
+# hermetic.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: make build
+      - run: make lint
+      - run: make test
