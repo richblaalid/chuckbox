@@ -1,6 +1,6 @@
 # Platform Foundation — Tasks
 
-Task IDs use the prefix `PLATFORM-`. **Next free ID: PLATFORM-011.** (Claim ranges explicitly and update this note — see `docs/process.md` Task ID discipline.)
+Task IDs use the prefix `PLATFORM-`. **Next free ID: PLATFORM-012.** (Claim ranges explicitly and update this note — see `docs/process.md` Task ID discipline.)
 
 ## Summary
 
@@ -8,6 +8,7 @@ Task IDs use the prefix `PLATFORM-`. **Next free ID: PLATFORM-011.** (Claim rang
 |---|---|---|
 | Method adoption (this installation) | 6 | P0 |
 | Delivery infrastructure follow-ups | 4 | P0/P1 |
+| Finance hardening (Epic A / CHUCK-7) | 1 | P0 |
 
 ## Parallelization Guide
 
@@ -41,6 +42,7 @@ After Phase 0 merges. Lane B touches test config only; Lane A touches Supabase/m
 
 | Task ID | Description | Completed | Commit |
 |---|---|---|---|
+| PLATFORM-011 | CHUCK-7: TDD regression tests (`tests/integration/rpc-authz.test.ts`) + migration `20260710000001_rpc_role_checks.sql` adding internal authz to `transfer_funds_to_billing` / `auto_transfer_overpayment` / `void_payment` (service_role OR admin/treasurer; + guardian-of-scout for transfer); dev push only | 2026-07-10 | e97a1fe |
 | PLATFORM-001 | Copy the method's generic skills (ground, decide, execute) into `.claude/skills/`; verify zero source-project references | 2026-07-09 | 57af239 |
 | PLATFORM-002 | Copy + parameterize Linear-coupled skills (implement, qa, presentation, epic-progress) for CHUCK/Chuckbox/`epic:*`+`Epic [A-Z] —`; adapt stack machinery to Next.js+Supabase; zero-grep gate passed | 2026-07-09 | 57af239 |
 | PLATFORM-003 | Install doc system: docs/CLAUDE.md constitution, grounding/decisions skeleton, glossary, lean prd/tech/testing snapshots, this pseudo-feature | 2026-07-09 | 8dbbd5a |
