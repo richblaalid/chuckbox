@@ -776,7 +776,7 @@ export async function confirmStagedImport(
       const fieldResolutions = (member as unknown as { field_resolutions: Record<string, ConflictResolution> | null }).field_resolutions || {}
 
       // Helper to check if user wants to use Scoutbook value for a field
-      const useScoutbookValue = (field: string): boolean => {
+      const shouldUseScoutbookValue = (field: string): boolean => {
         return fieldResolutions[field] === 'scoutbook'
       }
 
@@ -796,7 +796,7 @@ export async function confirmStagedImport(
 
       // Rank: Only update if it's a progression (never downgrade) - unless user overrode
       const currentRank = currentScout?.rank
-      if (useScoutbookValue('rank')) {
+      if (shouldUseScoutbookValue('rank')) {
         // User explicitly chose to use Scoutbook rank (even if downgrade)
         updateData.rank = member.rank
         console.log(
@@ -814,7 +814,7 @@ export async function confirmStagedImport(
       }
 
       // Patrol: Only update if new value is non-null (don't clear existing patrol) - unless user overrode
-      if (useScoutbookValue('patrol')) {
+      if (shouldUseScoutbookValue('patrol')) {
         // User explicitly chose to use Scoutbook patrol (even if null)
         updateData.patrol_id = patrolId // May be null
       } else if (patrolId !== null) {
@@ -822,14 +822,14 @@ export async function confirmStagedImport(
       }
 
       // Position: Only update if new value is non-null (preserve existing) - unless user overrode
-      if (useScoutbookValue('position')) {
+      if (shouldUseScoutbookValue('position')) {
         // User explicitly chose to use Scoutbook position (even if null)
         updateData.current_position = member.position // May be null
       } else if (member.position !== null) {
         updateData.current_position = member.position
       }
 
-      if (useScoutbookValue('position_2')) {
+      if (shouldUseScoutbookValue('position_2')) {
         // User explicitly chose to use Scoutbook position_2 (even if null)
         updateData.current_position_2 = member.position_2 // May be null
       } else if (member.position_2 !== null) {

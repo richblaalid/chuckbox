@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
-// Use service role for inserting without RLS issues
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Use service role for inserting without RLS issues.
+// Created lazily inside the handler — module-scope creation crashes
+// `next build` page-data collection when the key is absent (e.g. CI).
+function getServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 // Zod schema for waitlist submission validation
 const waitlistSchema = z.object({
@@ -138,7 +142,7 @@ export async function POST(request: NextRequest) {
     const userAgent = request.headers.get('user-agent') || 'unknown'
 
     // Insert into database (convert arrays to comma-separated strings)
-    const { error } = await supabase
+    const { error } = await getServiceClient()
       .from('waitlist')
       .insert({
         email: body.email.toLowerCase().trim(),
