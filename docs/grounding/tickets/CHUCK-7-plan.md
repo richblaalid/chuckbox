@@ -3,7 +3,7 @@
 **Generated:** 2026-07-09
 **Linear:** CHUCK-7 — https://linear.app/blaahd-projects/issue/CHUCK-7/add-role-checks-to-money-moving-security-definer-rpcs
 **Branch:** richardblaalid/chuck-7-add-role-checks-to-money-moving-security-definer-rpcs
-**Status:** In Progress (PLATFORM-011 committed `e97a1fe`; verification pending)
+**Status:** Verified (PLATFORM-011 `e97a1fe`; all ACs pass 2026-07-10)
 
 > **Deviation from plan:** the post-migration `src/types/database.ts` regen was NOT adopted. The fresh generate surfaced **pre-existing dev-DB↔types drift unrelated to this ticket** — most notably the dev database is missing `create_expense_journal_entry` (defined only in `supabase/migrations/archive/20260216000002_expense_journal_rpc.sql`), so adopting the regen breaks `src/app/actions/expenses.ts` compilation; conversely the committed types are stale (missing `debit_funds_from_scout`, `transfer_funds_to_billing`'s `p_allocations`/`p_entry_date`, the `funds_adjustment` enum — see the cast comment at `src/app/actions/funds.ts:107`). This ticket's migration changes no signatures, so the committed types remain correct for it. The reconciliation belongs to PLATFORM-007 (prod/dev schema reconciliation).
 **Affects Features:** platform-foundation (finance hardening)
@@ -57,12 +57,12 @@ One task = one commit: the change is a single migration + a single test file —
 
 ## Verification Plan (AC → observable check)
 
-| # | Acceptance criterion | How it's verified |
-|---|---|---|
-| 1 | Each RPC raises `Permission denied` for an authenticated caller without admin/treasurer membership in the affected unit (incl. an admin of a *different* unit) | `tests/integration/rpc-authz.test.ts`: ephemeral cross-unit admin + same-unit parent (non-guardian) call each RPC via anon-key session → error |
-| 2 | Existing legitimate call sites still pass | Integration tests: treasurer session, guardian session (transfer), and service-role client all get past the authz gate. Functional smoke on :3079: parent uses Use Scout Funds successfully; treasurer voids a cash payment successfully |
-| 3 | Regression test proves a cross-unit call is rejected | Same test file, committed and green in `make test` locally (skips hermetically in CI without service key, per existing `tests/integration/` pattern) |
-| 4 | Dev push only | `supabase projects list` confirms link to `feownmcpkfugkcivdoal` before `db push`; no prod interaction |
+| # | Acceptance criterion | How it's verified | Result |
+|---|---|---|---|
+| 1 | Each RPC raises `Permission denied` for an authenticated caller without admin/treasurer membership in the affected unit (incl. an admin of a *different* unit) | `tests/integration/rpc-authz.test.ts`: ephemeral cross-unit admin + same-unit parent (non-guardian) call each RPC via anon-key session → error | ✅ PASS — 6/6 rejection tests green (all 6 failed pre-migration, proving the hole was live) |
+| 2 | Existing legitimate call sites still pass | Integration tests: treasurer, guardian (transfer), and service-role clients pass the authz gate. Functional smoke on :3079 (2026-07-10): parent used Use Scout Funds ($2.50 → billing −27.50→−25.00, funds 81.02→78.52); treasurer voided a cash payment via the payments UI (`voided_at` set) | ✅ PASS — 5/5 acceptance tests green + both browser flows succeeded (screenshots in `CHUCK-7-screenshots/`) |
+| 3 | Regression test proves a cross-unit call is rejected | Same test file, committed and green in `make test` locally (skips hermetically in CI without service key, per existing `tests/integration/` pattern) | ✅ PASS — full `make test`: 1246/1246 across 67 files; `make build` green |
+| 4 | Dev push only | Dry-run confirmed link to `feownmcpkfugkcivdoal` before `db push`; no prod interaction | ✅ PASS |
 
 ## Screenshot Plan
 
