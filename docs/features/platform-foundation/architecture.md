@@ -12,4 +12,4 @@ Indexes the authoritative sources rather than restating them.
 | Test strategy | `docs/testing.md` |
 | Known platform debt | `reports/2026-07-09-chuckbox-current-state-audit.md` (Epics B, C, F) |
 
-Active DRs constraining this pseudo-feature: _none yet_ (retroactive DRs pending — see `docs/tech.md` DR index).
+Active DRs constraining this pseudo-feature: [DR-2026-07-09-custom-double-entry-ledger-v1](../../decisions/DR-2026-07-09-custom-double-entry-ledger-v1.md) (obligations 1–4 shape the finance-hardening tasks here and in future finance feature folders).

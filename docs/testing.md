@@ -23,7 +23,7 @@
 
 ## Money edge cases — required coverage for finance work
 
-Rounding (round-to-cent, fee ceil, net+fee==gross), allocation (FIFO, partial, zero/negative, over-payment caps), void reversal (journal + balances + allocations), journal balance invariant (Σdebit = Σcredit), idempotency (webhook redelivery, request retry). Unit-level coverage exists for the first two; the transactional invariants are specified in `docs/superpowers/specs/2026-05-25-finance-integration-tests-design.md` (approved, unimplemented — platform-foundation task).
+Rounding (round-to-cent, fee ceil, net+fee==gross), allocation (FIFO, partial, zero/negative, over-payment caps), void reversal (journal + balances + allocations), journal balance invariant (Σdebit = Σcredit), idempotency (webhook redelivery, request retry). Unit-level coverage exists for the first two; the transactional invariants are specified in `docs/superpowers/specs/2026-05-25-finance-integration-tests-design.md` (approved, unimplemented — platform-foundation task) and are **binding obligations** under [DR-2026-07-09-custom-double-entry-ledger-v1](decisions/DR-2026-07-09-custom-double-entry-ledger-v1.md).
 
 ## Known gaps (test-debt queue)
 

@@ -50,4 +50,6 @@ DRs live in `docs/decisions/` (see `docs/CLAUDE.md` for template/supersession ru
 
 | DR | Topic |
 |---|---|
-| _none yet_ | Retroactive DRs for load-bearing choices (custom double-entry ledger, dual-balance model, extension AI-parsing) are candidates |
+| [DR-2026-07-09-custom-double-entry-ledger-v1](decisions/DR-2026-07-09-custom-double-entry-ledger-v1.md) | Postgres-native ledger (not Medici); binds 4 hardening obligations on all money-moving code |
+
+Further retroactive-DR candidates: dual-balance model, extension AI-parsing.
