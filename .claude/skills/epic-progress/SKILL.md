@@ -2,7 +2,7 @@
 name: epic-progress
 description: Compute and print ticket %-complete for each Linear "epic:*" label on the Chuckbox team. Reports per-epic completion with Done + In Review counting as complete, plus an overall roll-up — for dropping into product-update presentation graphics. Use when the user asks for epic progress, epic completion %, or a per-epic burndown from Linear.
 argument-hint: (none) — optional: a single epic label like epic:A to report just that one
-allowed-tools: Bash mcp__claude_ai_Linear__list_issue_labels mcp__claude_ai_Linear__list_issues
+allowed-tools: Bash mcp__linear-chuckbox__list_issue_labels mcp__linear-chuckbox__list_issues
 ---
 
 # Epic Progress Report

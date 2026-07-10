@@ -2,7 +2,7 @@
 name: qa
 description: Take a batch of functional/UX QA feedback end-to-end — triage each item (defect vs. change-of-intent), reproduce confirmed defects in a running stack, fix them through the validated loop (one PR per feature, one Linear ticket + commit per defect), re-verify each acceptance criterion with a browser screenshot, and route intent changes to /ground. Use when the user hands you a batch of QA feedback to fix.
 argument-hint: [inline feedback text | path/to/feedback.md | empty to scan docs/grounding/qa/inbox/]
-allowed-tools: Read Write Edit Glob Grep Bash Agent TodoWrite AskUserQuestion mcp__claude_ai_Linear__get_issue mcp__claude_ai_Linear__list_issues mcp__claude_ai_Linear__list_issue_statuses mcp__claude_ai_Linear__save_issue mcp__claude_ai_Linear__save_comment mcp__claude_ai_Linear__prepare_attachment_upload mcp__claude_ai_Linear__create_attachment_from_upload
+allowed-tools: Read Write Edit Glob Grep Bash Agent TodoWrite AskUserQuestion mcp__linear-chuckbox__get_issue mcp__linear-chuckbox__list_issues mcp__linear-chuckbox__list_issue_statuses mcp__linear-chuckbox__save_issue mcp__linear-chuckbox__save_comment mcp__linear-chuckbox__prepare_attachment_upload mcp__linear-chuckbox__create_attachment_from_upload
 ---
 
 # QA Feedback Pipeline

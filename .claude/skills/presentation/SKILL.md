@@ -2,7 +2,7 @@
 name: presentation
 description: Generate the recurring product-update slides — a full bullet list of everything tackled, ACCOMPLISHMENTS (what shipped since a given date), and OUR CURRENT FOCUS (what's next) — drawing on Linear (primary source of truth for features) and git history
 argument-hint: [date phrase | YYYY-MM-DD]
-allowed-tools: Read Bash(git *) Bash(ls *) Bash(grep *) Bash(wc *) Bash(awk *) Bash(sed *) Bash(python3 *) Glob Grep AskUserQuestion ToolSearch mcp__claude_ai_Linear__list_issues mcp__claude_ai_Linear__list_projects mcp__claude_ai_Linear__list_teams mcp__claude_ai_Linear__list_cycles
+allowed-tools: Read Bash(git *) Bash(ls *) Bash(grep *) Bash(wc *) Bash(awk *) Bash(sed *) Bash(python3 *) Glob Grep AskUserQuestion ToolSearch mcp__linear-chuckbox__list_issues mcp__linear-chuckbox__list_projects mcp__linear-chuckbox__list_teams mcp__linear-chuckbox__list_cycles
 ---
 
 # Presentation Slide Generator
@@ -69,7 +69,7 @@ Git tells you *what code landed*; Linear tells you *which product capabilities s
 Fetch issues updated in the window (use an ISO-8601 duration relative to today, e.g. `-P4D` for the last 4 days; widen if the window is longer):
 
 ```
-mcp__claude_ai_Linear__list_issues(updatedAt="-P<N>D", limit=100, orderBy="updatedAt")
+mcp__linear-chuckbox__list_issues(updatedAt="-P<N>D", limit=100, orderBy="updatedAt")
 ```
 
 The result is large and is written to a tool-results file. Parse it with `python3` (the raw call will exceed the token limit — do not try to read it inline). Bucket by timestamp against the cutoff:

@@ -2,7 +2,7 @@
 name: implement
 description: Take a Linear ticket end-to-end — fetch it, ground it against the docs/DRs, write a ticket plan, execute the tasks, verify against acceptance criteria with a browser screenshot, open a PR against main, and keep the ticket updated throughout. Use when the user points you at a Linear issue (ID or linear.app URL) and wants it built.
 argument-hint: [Linear issue ID or URL, e.g. CHUCK-123 or https://linear.app/...]
-allowed-tools: Read Write Edit Glob Grep Bash Agent TodoWrite AskUserQuestion mcp__claude_ai_Linear__get_issue mcp__claude_ai_Linear__list_issues mcp__claude_ai_Linear__get_project mcp__claude_ai_Linear__list_comments mcp__claude_ai_Linear__save_comment mcp__claude_ai_Linear__save_issue mcp__claude_ai_Linear__list_issue_statuses mcp__claude_ai_Linear__prepare_attachment_upload mcp__claude_ai_Linear__create_attachment_from_upload
+allowed-tools: Read Write Edit Glob Grep Bash Agent TodoWrite AskUserQuestion mcp__linear-chuckbox__get_issue mcp__linear-chuckbox__list_issues mcp__linear-chuckbox__get_project mcp__linear-chuckbox__list_comments mcp__linear-chuckbox__save_comment mcp__linear-chuckbox__save_issue mcp__linear-chuckbox__list_issue_statuses mcp__linear-chuckbox__prepare_attachment_upload mcp__linear-chuckbox__create_attachment_from_upload
 ---
 
 # Ticket Implementation Pipeline
