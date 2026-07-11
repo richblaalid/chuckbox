@@ -60,7 +60,6 @@ export function CollectionSettingsCard({
         reminder_email_template: 'default',
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: updateError } = await supabase
         .from('units')
         .update({ collection_settings: newSettings as any })

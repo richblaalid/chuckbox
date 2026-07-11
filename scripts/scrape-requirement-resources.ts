@@ -547,7 +547,6 @@ async function scrapeAllBadges(page: Page, outputPath: string): Promise<ScrapePr
       const card = await nameEl.evaluateHandle(
         el => el.closest('[class*="AdvancementCardItem"]')
       )
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (card as any).click({ force: true })
 
       await page.waitForSelector(

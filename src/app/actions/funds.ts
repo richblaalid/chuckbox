@@ -106,7 +106,6 @@ export async function adjustScoutFunds(
   // Call the appropriate RPC based on direction
   // Note: debit_funds_from_scout is not yet in generated types — cast needed until types are regenerated
   const { data, error } = direction === 'remove'
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ? await (supabase as any).rpc('debit_funds_from_scout', {
         p_scout_account_id: scoutAccountId,
         p_amount: amount,
