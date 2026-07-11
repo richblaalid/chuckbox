@@ -3,7 +3,7 @@
 **Generated:** 2026-07-11
 **Linear:** CHUCK-19 — https://linear.app/blaahd-projects/issue/CHUCK-19/add-sentry-error-tracking-route-consoleerror-hot-paths-through-logger
 **Branch:** richardblaalid/chuck-19-add-sentry-error-tracking-route-consoleerror-hot-paths (worktree branch: CHUCK-19)
-**Status:** In Progress (plan approved 2026-07-11; gate answers: no Sentry account yet — build DSN-agnostic, prove capture via Spotlight locally, cloud verification deferred until user creates a project; source-map upload deferred to Vercel; no tunnelRoute)
+**Status:** Verified (plan approved 2026-07-11; gate answers: no Sentry account yet — build DSN-agnostic, prove capture via Spotlight locally, cloud verification deferred until user creates a project; source-map upload deferred to Vercel; no tunnelRoute)
 **Affects Features:** platform-foundation (pseudo-feature)
 **Epic:** CHUCK-2 — Epic B: Delivery Infrastructure
 
@@ -62,12 +62,16 @@ Added to `docs/features/platform-foundation/tasks.md` (next free ID was PLATFORM
 
 ## Verification Plan (AC → observable check)
 
-| # | Acceptance criterion (ticket done-when) | How it's verified |
-|---|---|---|
-| 1 | Forced dev exception visible in Sentry with release + user context | log in as treasurer on :3016, trigger a forced error in a dashboard route, open the Sentry issue and confirm release tag + user (id/email) attached |
-| 2 | Swallowed-error sites in the payment paths alert | drive one swallowed path via `logger` in dev (e.g. forced allocation-insert failure or direct `logger.payment.error` exercise) and confirm a Sentry event tagged with the namespace |
-| 3 | Build green | `make build` exit 0 (full gate: build + lint + `make test` diffed against the green pre-work baseline) |
-| 4 | No-DSN safety (implied) | `make test` and dev boot with no Sentry env vars — zero network sends, zero failures |
+No cloud DSN exists yet (gate answer: no Sentry account), so "visible in Sentry" was proven against Sentry's official local Spotlight sidecar — same SDK, same envelopes, no DSN. Cloud-side re-verification is a 2-minute step once a DSN exists (see Open Questions).
+
+| # | Acceptance criterion (ticket done-when) | How it's verified | Result (2026-07-11) |
+|---|---|---|---|
+| 1 | Forced dev exception visible in Sentry with release + user context | logged in as treasurer on :3016, threw a render error in a temporary dashboard page → `(dashboard)/error.tsx` boundary → event in Spotlight; envelope intercepted and inspected | ✅ PASS — event carries `user: {id: 28666619…, email: richard.blaalid+treasurer@…}`, `release: 9536c70`, `environment: development`, tags `role: treasurer`, `unit_id: 1000…0001` (`sentry-issue-forced-error.png`, `forced-error-context.png`) |
+| 2 | Swallowed-error sites in the payment paths alert | exercised the exact server pipe all 48 sites use (`logger.payment.error(msg, Error)`) via a temporary route; envelope captured from the sidecar SSE stream | ✅ PASS — event carries `logger: Payment` tag, `release: 9536c70`, formatted message in extra, Error as exception (`sentry-issue-swallowed-path.png`, `swallowed-path-context.png`) |
+| 3 | Build green | full gate after all commits: `make build` exit 0, `make lint` exit 0, `make test` exit 0 | ✅ PASS — identical to the green pre-work baseline (no new failures) |
+| 4 | No-DSN safety (implied) | `make test` + `make build` run with zero Sentry env vars configured | ✅ PASS — SDK no-ops; suite and build green |
+
+Temporary verification artifacts (`sentry-verify` page, `dev-sentry-logger-test` route, driver scripts) were deleted after the run — nothing synthetic is committed.
 
 ## Screenshot Plan
 
@@ -75,8 +79,8 @@ Added to `docs/features/platform-foundation/tasks.md` (next free ID was PLATFORM
 - **Route(s):** `/dashboard` (forced error) on `http://localhost:3016`; Sentry web UI for the evidence shot.
 - **Login:** treasurer test user (`richard.blaalid+treasurer@withcaldera.com`) — finance ACs verified as a finance role.
 
-## Open Questions
+## Open Questions — resolved at the gate (2026-07-11)
 
-1. **Sentry DSN (blocking for AC 1–2).** No real DSN exists — `.env.local` has no Sentry keys; only the `.env.local.example` placeholder. I need a Sentry project DSN (`SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` in `.env.local`). Options: (a) you create a Sentry project and paste the DSN at the gate; (b) I build everything DSN-agnostic, verify build/tests/no-op behavior, and you verify the Sentry-visible ACs when you add the DSN. **(a) is strongly preferred — the ticket's done-when requires seeing the event.**
-2. **Source-map upload:** uploading source maps needs `SENTRY_AUTH_TOKEN` + org/project settings in `withSentryConfig`. Recommend **deferring** to the Vercel prod deploy config (env vars there) — local/CI builds run without upload. Confirm.
-3. **Tunnel route:** Sentry offers `tunnelRoute` to bypass ad-blockers for client events. Recommend **skipping** for now (pilot troop, low volume). Confirm.
+1. **Sentry DSN:** user has no Sentry account. Built DSN-agnostic; local capture proven via Spotlight. **Remaining user action to go live:** create a free Sentry account/project (sentry.io → Create Project → Next.js), then set `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` to the project DSN in `.env.local` (dev) and the Vercel environment (prod). No code change needed; re-verify by repeating the forced-exception check.
+2. **Source-map upload:** deferred to Vercel prod env (`SENTRY_AUTH_TOKEN` + org/project in `withSentryConfig` later). Local/CI builds run without upload.
+3. **Tunnel route:** skipped for the pilot.
