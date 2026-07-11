@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentMembership, getRequestedUnitId } from '@/lib/auth'
+import { logger } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
   try {
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
     const { data: transactions, error } = await query
 
     if (error) {
-      console.error('Error fetching Square transactions:', error)
+      logger.square.error('Error fetching Square transactions', error)
       return NextResponse.json({ error: 'Failed to fetch transactions' }, { status: 500 })
     }
 
@@ -72,7 +73,7 @@ export async function GET(request: NextRequest) {
       lastSyncAt: credentials?.last_sync_at || null,
     })
   } catch (error) {
-    console.error('Square transactions error:', error)
+    logger.square.error('Square transactions error', error)
     return NextResponse.json(
       { error: 'Failed to fetch transactions' },
       { status: 500 }

@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getSquareClientForUnitPublic } from '@/lib/square/client'
 import { createHash } from 'crypto'
 import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 interface RouteParams {
   params: Promise<{ token: string }>
@@ -291,7 +292,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     })
 
     if (rpcError) {
-      console.error('Failed to process payment in database:', rpcError)
+      logger.payment.error('Failed to process payment in database', rpcError)
       // Payment succeeded in Square but failed to record in database
       // Log the Square payment ID for manual reconciliation
       return NextResponse.json(
@@ -336,7 +337,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     })
   } catch (error) {
     // Log full error for debugging but return sanitized message to client
-    console.error('Payment link payment error:', error)
+    logger.payment.error('Payment link payment error', error)
 
     const userMessage = sanitizeSquareError(error)
     return NextResponse.json({ error: userMessage }, { status: 400 })

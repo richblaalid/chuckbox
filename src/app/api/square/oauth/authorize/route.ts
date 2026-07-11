@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getCurrentMembership, getRequestedUnitId } from '@/lib/auth'
 import { getOAuthAuthorizeUrl, saveSquareCredentials } from '@/lib/square/client'
 import { randomBytes } from 'crypto'
+import { logger } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
   try {
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(authorizeUrl)
   } catch (error) {
-    console.error('Square OAuth authorize error:', error)
+    logger.square.error('Square OAuth authorize error', error)
     return NextResponse.json(
       { error: 'Failed to initiate Square authorization' },
       { status: 500 }

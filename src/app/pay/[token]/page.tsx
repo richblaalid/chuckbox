@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import type { SquareCard } from '@/types/square'
+import { logger } from '@/lib/logger'
 
 interface PaymentLinkData {
   id: string
@@ -221,7 +222,7 @@ export default function PaymentCheckoutPage() {
       cardRef.current = card
       setCardLoading(false)
     } catch (err) {
-      console.error('Failed to initialize Square card:', err)
+      logger.payment.error('Failed to initialize Square card', err)
       setError('Failed to initialize payment form')
       setCardLoading(false)
     }
@@ -234,7 +235,7 @@ export default function PaymentCheckoutPage() {
 
     return () => {
       if (cardRef.current) {
-        cardRef.current.destroy().catch(console.error)
+        cardRef.current.destroy().catch((err) => logger.payment.error('Failed to destroy Square card', err))
         cardRef.current = null
       }
     }

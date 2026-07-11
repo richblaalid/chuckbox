@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { WebhooksHelper } from 'square'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
+import { logger } from '@/lib/logger'
 
 // Use admin client for webhook processing (no user session)
 function getAdminSupabase() {
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
     const signatureHeader = request.headers.get('x-square-hmacsha256-signature')
 
     if (!signatureHeader) {
-      console.error('Missing Square webhook signature header')
+      logger.square.error('Missing Square webhook signature header')
       return NextResponse.json({ error: 'Missing signature' }, { status: 401 })
     }
 
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!isValid) {
-      console.error('Invalid Square webhook signature')
+      logger.square.error('Invalid Square webhook signature')
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true })
   } catch (error) {
-    console.error('Square webhook error:', error)
+    logger.square.error('Square webhook error', error)
     // Return 200 to prevent retries for processing errors
     // Square will retry on 4xx/5xx responses
     return NextResponse.json({ received: true, error: 'Processing error' })
@@ -268,7 +269,7 @@ async function handleRefundEvent(
     })
 
     if (journalError) {
-      console.error(`Failed to create refund journal entry for ${refund.id}:`, journalError)
+      logger.square.error(`Failed to create refund journal entry for ${refund.id}`, journalError)
       // Don't throw - the refund itself is processed, just log the accounting error
     }
   }

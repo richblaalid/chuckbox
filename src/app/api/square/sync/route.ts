@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentMembership, getRequestedUnitId } from '@/lib/auth'
 import { syncSquareTransactions, getUnreconciledTransactions } from '@/lib/square/sync'
+import { logger } from '@/lib/logger'
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result)
   } catch (error) {
-    console.error('Square sync error:', error)
+    logger.square.error('Square sync error', error)
     return NextResponse.json(
       { error: 'Failed to sync transactions' },
       { status: 500 }
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ transactions })
   } catch (error) {
-    console.error('Error fetching unreconciled transactions:', error)
+    logger.square.error('Error fetching unreconciled transactions', error)
     return NextResponse.json(
       { error: 'Failed to fetch transactions' },
       { status: 500 }
