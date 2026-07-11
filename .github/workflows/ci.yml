@@ -3,10 +3,10 @@
 #
 # Required repo secrets (Settings → Secrets → Actions):
 #   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY  (dev project)
-# The service-role key is intentionally NOT provided: real-DB integration
-# tests skip without it (they must never mutate the dev DB from CI).
-# PLATFORM-009 (split test:integration out of the unit run) makes this fully
-# hermetic.
+# The service-role key is intentionally NOT provided: the real-DB suite must
+# never mutate the dev DB from CI. Since PLATFORM-009, `make test` is fully
+# hermetic — tests/integration/ is excluded from the default run and only
+# executes via the explicit `npm run test:integration` (local, dev creds).
 
 name: CI
 

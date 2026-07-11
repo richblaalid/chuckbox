@@ -3,7 +3,9 @@
 **Generated:** 2026-07-11
 **Linear:** CHUCK-8 — https://linear.app/blaahd-projects/issue/CHUCK-8/close-anonymous-read-of-payment-links-token-harvesting
 **Branch:** richardblaalid/chuck-8-close-anonymous-read-of-payment_links-token-harvesting
-**Status:** Verified (PLATFORM-013 `8b4bd6a`; all ACs pass 2026-07-11)
+**Status:** Verified (PLATFORM-014 `8b4bd6a`; all ACs pass 2026-07-11)
+
+> **Task-ID note:** this ticket's task was claimed as PLATFORM-013, but the parallel CHUCK-20 run claimed the same ID and merged first (PR #39). Renumbered to **PLATFORM-014** at merge-conflict resolution; the branch commits (`8b4bd6a`, docs commits) still say PLATFORM-013 in their messages.
 **Affects Features:** platform-foundation (finance hardening)
 **Epic:** CHUCK-1 — Epic A: Financial Integrity Hardening
 
@@ -55,7 +57,7 @@ Tasks added to `docs/features/platform-foundation/tasks.md` (status "Not Started
 
 | Task ID | Description | TDD? | Dependencies | Verification |
 |---|---|---|---|---|
-| PLATFORM-013 | TDD: add `tests/integration/payment-links-anon.test.ts` (anon key cannot read a seeded payment link — by dump or by exact token — nor other sensitive tables; treasurer/guardian policies and the service client still read) + migration `20260711000001_close_anon_payment_links_read.sql` dropping the anon-readable policy and revoking the blanket anon table/sequence grants; push to dev Supabase | yes | none | AC 1–2 via the new integration tests; AC 2 also via functional pay-flow smoke (Phase 4) |
+| PLATFORM-014 | TDD: add `tests/integration/payment-links-anon.test.ts` (anon key cannot read a seeded payment link — by dump or by exact token — nor other sensitive tables; treasurer/guardian policies and the service client still read) + migration `20260711000001_close_anon_payment_links_read.sql` dropping the anon-readable policy and revoking the blanket anon table/sequence grants; push to dev Supabase | yes | none | AC 1–2 via the new integration tests; AC 2 also via functional pay-flow smoke (Phase 4) |
 
 One task = one commit (same rationale as PLATFORM-011: the test can only go green once the shared-dev-DB migration is pushed; splitting would commit a red test).
 
