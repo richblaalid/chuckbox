@@ -3,7 +3,7 @@
 **Generated:** 2026-07-11
 **Linear:** CHUCK-20 — https://linear.app/blaahd-projects/issue/CHUCK-20/split-real-db-integration-tests-out-of-npm-test-platform-009
 **Branch:** richardblaalid/chuck-20-split-real-db-integration-tests-out-of-npm-test-platform-009 (worktree branch `CHUCK-20`)
-**Status:** Planned
+**Status:** Verified
 **Affects Features:** platform-foundation (pseudo-feature)
 **Epic:** CHUCK-2 — Epic B: Delivery Infrastructure
 
@@ -51,12 +51,14 @@ Tasks in `docs/features/platform-foundation/tasks.md` (PLATFORM-009 pre-exists; 
 
 ## Verification Plan (AC → observable check)
 
-| # | Acceptance criterion | How it's verified |
-|---|---|---|
-| 1 | `make test` green with no `.env.local` present, <15s wall | Run `make test` in this worktree (has no `.env.local`). Baseline pre-change: 64 passed / 3 skipped, 7.33s. Post-change: all green, integration files not collected at all, duration <15s |
-| 2 | `make test` never touches the DB even when `.env.local` exists | Copy `.env.local` from main checkout, run `npx vitest list` + `make test`: zero `tests/integration/` files collected (the only files that open real DB connections) |
-| 3 | `npm run test:integration` runs the real-DB suite standalone | With `.env.local` present, run it: the 3 integration files execute against the dev DB (TestContext cleanup, test-prefixed UUIDs) and pass |
-| 4 | CI unchanged | `git diff .github/workflows/ci.yml` — comment-only; job/steps byte-identical |
+| # | Acceptance criterion | How it's verified | Result (2026-07-11) |
+|---|---|---|---|
+| 1 | `make test` green with no `.env.local` present, <15s wall | Run `make test` in this worktree (has no `.env.local`). Baseline pre-change: 64 passed / 3 skipped, 7.33s | **PASS** — 64 files / 1,210 tests green in **4.07s**; integration files not collected |
+| 2 | `make test` never touches the DB even when `.env.local` exists | Copy `.env.local` from main checkout, run `npx vitest list` + `make test`: zero `tests/integration/` files collected (the only files that open real DB connections) | **PASS** — `vitest list` collected **0** integration files; suite green in 4.72s |
+| 3 | `npm run test:integration` runs the real-DB suite standalone | With `.env.local` present, run it: the 3 integration files execute against the dev DB (TestContext cleanup, test-prefixed UUIDs) and pass | **PASS** — 3 files / **36 tests passed** against dev in 88.65s; also degrades to 36 skipped without credentials |
+| 4 | CI unchanged | `git diff .github/workflows/ci.yml` — comment-only; job/steps byte-identical | **PASS** — diff touches only the header comment block |
+
+Full gate: `make build` exit 0; full `make test` green; no new failures vs. the pre-change baseline (baseline was fully green).
 
 ## Screenshot Plan
 
