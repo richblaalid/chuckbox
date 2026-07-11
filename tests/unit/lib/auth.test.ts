@@ -37,7 +37,6 @@ function buildSupabase(opts: {
   return {
     auth: { getUser: vi.fn().mockResolvedValue({ data: { user: opts.user } }) },
     from: fromMock,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any
 }
 

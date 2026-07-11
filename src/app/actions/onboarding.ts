@@ -332,7 +332,6 @@ export async function provisionUnit(input: ProvisionUnitInput, ipAddress: string
     // Set needs_setup=true for manual path (no CSV uploaded)
     const needsSetup = input.signupPath === 'manual'
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: unit, error: unitError } = await adminSupabase
       .from('units')
       .insert({
@@ -414,7 +413,6 @@ export async function provisionUnit(input: ProvisionUnitInput, ipAddress: string
     }
 
     // 5. Stage the roster data for later import
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error: stageError } = await adminSupabase.from('staged_roster_imports').insert({
       provisioning_token_id: provisioningToken.id,
       parsed_adults: parsedAdults as unknown as Json,
@@ -506,7 +504,6 @@ export async function provisionUnitAuthenticated(input: ProvisionAuthenticatedIn
     const needsSetup = input.signupPath === 'manual'
 
     // 5. Create unit
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: unit, error: unitError } = await adminSupabase
       .from('units')
       .insert({
@@ -558,7 +555,6 @@ export async function provisionUnitAuthenticated(input: ProvisionAuthenticatedIn
 
     // 8. Stage roster data for import on /setup
     if (parsedAdults.length > 0 || parsedScouts.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error: stageError } = await adminSupabase.from('staged_roster_imports').insert({
         unit_id: unit.id,
         profile_id: profileId,
