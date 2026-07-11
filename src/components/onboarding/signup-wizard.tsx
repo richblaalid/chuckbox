@@ -236,7 +236,7 @@ export function SignupWizard({ onComplete }: SignupWizardProps) {
       setError(err instanceof Error ? err.message : 'An error occurred')
       setIsLoading(false)
     }
-  }, [unitMetadata, parsedRoster, adminInfo, onComplete])
+  }, [unitMetadata, parsedRoster, adminInfo, signupPath, onComplete])
 
   // ============================================
   // Render: Success State
