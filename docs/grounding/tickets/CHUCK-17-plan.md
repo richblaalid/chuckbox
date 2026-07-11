@@ -64,7 +64,7 @@ Added to `docs/features/platform-foundation/tasks.md` (next free ID was PLATFORM
 | # | Acceptance criterion | How it's verified | Result (2026-07-11) |
 |---|---|---|---|
 | 1 | `make lint` exits 0 locally | run `make lint`, capture exit code + clean output (0 errors, 0 warnings) | ✅ PASS — exit 0, zero errors/warnings after `3df2615` |
-| 2 | First CI run on a PR fully green (build → lint → test) | this ticket's own PR: `gh pr checks` / Actions run showing build → lint → test success | pending PR CI run (recorded on the ticket when green) |
+| 2 | First CI run on a PR fully green (build → lint → test) | this ticket's own PR: `gh pr checks` / Actions run showing build → lint → test success | ✅ PASS — PR #38 run 29170338143: Success, verify 2m33s (`ci-green.png`) |
 | 3 | Repo secrets present (user action, already done) | `gh secret list` shows both `NEXT_PUBLIC_SUPABASE_*` keys | ✅ PASS — both present, set 2026-07-10 |
 | 4 | Ticket items 1–2 remain fixed | grep shows no `useScoutbookValue`; lint reports no rules-of-hooks / react-compiler errors | ✅ PASS — 0 grep hits; lint clean |
 
