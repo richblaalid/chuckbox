@@ -1,6 +1,6 @@
 # Platform Foundation — Tasks
 
-Task IDs use the prefix `PLATFORM-`. **Next free ID: PLATFORM-013.** (Claim ranges explicitly and update this note — see `docs/process.md` Task ID discipline.)
+Task IDs use the prefix `PLATFORM-`. **Next free ID: PLATFORM-014.** (Claim ranges explicitly and update this note — see `docs/process.md` Task ID discipline.)
 
 ## Summary
 
@@ -35,13 +35,14 @@ After Phase 0 merges. Lane B touches test config only; Lane A touches Supabase/m
 |---|---|---|---|---|---|
 | PLATFORM-007 | Reconcile prod schema with migration ledger: diff prod against `supabase/migrations/` chain; commit or delete the three untracked `supabase/scripts/*.sql`; document the single push path in docs/tech.md | no | none | Not Started | Schema diff clean; scripts resolved; **requires explicit user approval for any prod touch** |
 | PLATFORM-008 | Add Sentry error tracking (app + server actions); route the `console.error` hot paths through `src/lib/logger.ts` | no | none | Not Started | Error visible in Sentry from a forced dev exception; build green |
-| PLATFORM-009 | Split real-DB integration tests out of `npm test` into `test:integration` (per approved spec 2026-05-25 Decision #3); unit runs become hermetic | no | none | Not Started | `make test` green with no `.env.local`; integration suite runs standalone |
 | PLATFORM-010 | Bring `tests/**` into typecheck (tsconfig.test.json or include) and add coverage `json-summary` + thresholds | no | PLATFORM-009 | Not Started | `npx tsc --noEmit` covers tests; fresh coverage report |
 
 ## Completed Tasks
 
 | Task ID | Description | Completed | Commit |
 |---|---|---|---|
+| PLATFORM-009 | CHUCK-20: split real-DB integration tests out of `npm test` — `vitest.integration.config.ts` (node env, `tests/integration/**` only) + `npm run test:integration`; default run excludes `tests/integration`, so `make test` is hermetic (64 files / 1,210 tests, ~4s, no `.env.local` needed) | 2026-07-11 | 263745c |
+| PLATFORM-013 | CHUCK-20: doc sync after the split — `docs/testing.md` layers/verbs/gaps, `ci.yml` stale comment (comment-only), task-status bookkeeping | 2026-07-11 | (docs commit, CHUCK-20 PR) |
 | PLATFORM-012 | CHUCK-17: remove the 8 unused `eslint-disable` directives (5 files) — `make lint` now 0 errors / 0 warnings; rest of CHUCK-17 (rename, signup-wizard fix, repo secrets) already delivered via CHUCK-7/PR #37 | 2026-07-11 | 3df2615 |
 | PLATFORM-011 | CHUCK-7: TDD regression tests (`tests/integration/rpc-authz.test.ts`) + migration `20260710000001_rpc_role_checks.sql` adding internal authz to `transfer_funds_to_billing` / `auto_transfer_overpayment` / `void_payment` (service_role OR admin/treasurer; + guardian-of-scout for transfer); dev push only | 2026-07-10 | e97a1fe |
 | PLATFORM-001 | Copy the method's generic skills (ground, decide, execute) into `.claude/skills/`; verify zero source-project references | 2026-07-09 | 57af239 |
