@@ -3,7 +3,7 @@
 **Generated:** 2026-07-11
 **Linear:** CHUCK-8 — https://linear.app/blaahd-projects/issue/CHUCK-8/close-anonymous-read-of-payment-links-token-harvesting
 **Branch:** richardblaalid/chuck-8-close-anonymous-read-of-payment_links-token-harvesting
-**Status:** Approved (gate passed 2026-07-11; ALTER DEFAULT PRIVILEGES line confirmed in)
+**Status:** Verified (PLATFORM-013 `8b4bd6a`; all ACs pass 2026-07-11)
 **Affects Features:** platform-foundation (finance hardening)
 **Epic:** CHUCK-1 — Epic A: Financial Integrity Hardening
 
@@ -61,11 +61,15 @@ One task = one commit (same rationale as PLATFORM-011: the test can only go gree
 
 ## Verification Plan (AC → observable check)
 
-| # | Acceptance criterion | How it's verified |
-|---|---|---|
-| 1 | `GET /rest/v1/payment_links?select=*` with the anon key returns zero rows (a seeded link does not leak, by dump or by exact-token filter) | `tests/integration/payment-links-anon.test.ts`: seed a link via service client, assert the anon client sees nothing (empty result or permission-denied — both leak zero rows); also assert anon reads of `payments`, `scout_accounts`, `profiles` leak nothing (blanket-revoke check) |
-| 2 | The `/pay/[token]` flow still works end-to-end (verified as parent role) | Integration tests: treasurer + guardian sessions still read links; service client still resolves by token. Functional smoke on :3055: create/locate a payment link, load `/pay/[token]` in the browser, exercise the pay path as the parent test user; screenshot |
-| 3 | Dev push only | `supabase projects list` link check before `db push`; no prod interaction |
+| # | Acceptance criterion | How it's verified | Result |
+|---|---|---|---|
+| 1 | `GET /rest/v1/payment_links?select=*` with the anon key returns zero rows (a seeded link does not leak, by dump or by exact-token filter) | `tests/integration/payment-links-anon.test.ts`: seed a link via service client, assert the anon client sees nothing; also assert anon reads of `payments`, `scout_accounts`, `profiles` leak nothing (blanket-revoke check) | ✅ PASS — pre-migration the anon key dumped 16 rows and resolved the seeded token (both tests red, hole proven live); post-push 7/7 green; raw curl now returns HTTP 401, zero rows |
+| 2 | The `/pay/[token]` flow still works end-to-end (verified as parent role) | Integration tests: treasurer + guardian sessions still read links; service client still resolves by token. Functional smoke on :3055 (2026-07-11): parent session loaded `/pay/[token]` for a fresh $25 link on Ben B., paid with Scout Funds — success screen, billing_balance −25→0, funds_balance 78.52→53.52 (screenshots in `CHUCK-8-screenshots/`) | ✅ PASS — 3/3 legitimate-reader tests green + browser flow succeeded |
+| 3 | Dev push only | `supabase projects list` link check before `db push`; no prod interaction | ✅ PASS — linked to `feownmcpkfugkcivdoal` (chuckbox-dev) before push |
+
+Full gate 2026-07-11: `make build` green; `make test` 1253/1253 across 68 files (baseline `implement-baseline.log` was green; the +7 tests are this ticket's).
+
+**Observation (pre-existing, not this ticket):** a fully-funds-paid link keeps `status='pending'` with `payment_id` set (balances settle correctly). Candidate note for the parked void/delete-billing UX work.
 
 ## Screenshot Plan
 
