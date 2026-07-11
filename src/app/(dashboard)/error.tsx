@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import * as Sentry from '@sentry/nextjs'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -12,11 +13,10 @@ export default function DashboardError({
   reset: () => void
 }) {
   useEffect(() => {
-    // Only log in development - in production, send to error monitoring service
+    Sentry.captureException(error)
     if (process.env.NODE_ENV === 'development') {
       console.error('Dashboard error:', error)
     }
-    // TODO: Add error reporting service integration (e.g., Sentry)
   }, [error])
 
   return (
