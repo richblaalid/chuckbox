@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/dashboard/sidebar'
 import { MobileNav } from '@/components/dashboard/mobile-nav'
 import { MainContent } from '@/components/dashboard/main-content'
 import { PostHogIdentify } from '@/components/providers/posthog-identify'
+import { SentryIdentify } from '@/components/providers/sentry-identify'
 import { UnitProvider, UnitMembership, UnitGroup } from '@/components/providers/unit-context'
 import { SidebarProvider } from '@/components/providers/sidebar-context'
 import { ToastProvider } from '@/components/ui/toast'
@@ -78,6 +79,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
         role={primaryMembership?.role || groupMemberships[0]?.role}
         unitId={primaryUnit?.id}
         unitName={primaryUnit?.name}
+      />
+      <SentryIdentify
+        userId={user.id}
+        email={user.email}
+        role={primaryMembership?.role || groupMemberships[0]?.role}
+        unitId={primaryUnit?.id}
       />
       <Suspense fallback={null}>
         <ToastProvider>

@@ -16,6 +16,8 @@
  * log.debug('Something happened')
  */
 
+import * as Sentry from '@sentry/nextjs'
+
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 interface LoggerOptions {
@@ -53,6 +55,22 @@ function shouldLog(level: LogLevel, enabled: boolean): boolean {
   return enabled
 }
 
+// Forward errors to Sentry (no-op without a configured DSN) so
+// log-and-continue sites still alert in production.
+function reportToSentry(namespace: string, formattedMessage: string, data?: unknown): void {
+  const context = {
+    level: 'error' as const,
+    tags: { logger: namespace },
+    extra: { message: formattedMessage, data },
+  }
+
+  if (data instanceof Error) {
+    Sentry.captureException(data, context)
+  } else {
+    Sentry.captureMessage(formattedMessage, context)
+  }
+}
+
 /**
  * Create a logger instance with a specific namespace
  */
@@ -64,6 +82,10 @@ export function createLogger(namespace: string, options?: { enabled?: boolean })
 
     const formattedMessage = formatMessage(namespace, level, message)
     const color = levelColors[level]
+
+    if (level === 'error') {
+      reportToSentry(namespace, formattedMessage, data)
+    }
 
     // Use appropriate console method
     const consoleFn = level === 'error' ? console.error :

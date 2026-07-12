@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentMembership } from '@/lib/auth'
 import { exchangeCodeForTokens, saveSquareCredentials } from '@/lib/square/client'
+import { logger } from '@/lib/logger'
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
 
   // Handle OAuth errors from Square
   if (error) {
-    console.error('Square OAuth error:', error, errorDescription)
+    logger.square.error('Square OAuth error', { error, errorDescription })
     const errorUrl = new URL(settingsUrl)
     errorUrl.searchParams.set('error', errorDescription || error)
     return NextResponse.redirect(errorUrl)
@@ -90,7 +91,7 @@ export async function GET(request: NextRequest) {
     successUrl.searchParams.set('success', 'Square connected successfully')
     return NextResponse.redirect(successUrl)
   } catch (err) {
-    console.error('Square OAuth callback error:', err)
+    logger.square.error('Square OAuth callback error', err)
     const errorUrl = new URL(settingsUrl)
     errorUrl.searchParams.set('error', 'Failed to connect Square account')
     return NextResponse.redirect(errorUrl)

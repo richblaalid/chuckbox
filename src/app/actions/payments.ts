@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { formatCurrency } from '@/lib/utils'
+import { logger } from '@/lib/logger'
 interface QuickPaymentParams {
   unitId: string
   scoutAccountId: string
@@ -151,7 +152,7 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
       .single()
 
     if (journalError || !journalEntry) {
-      console.error('Failed to create journal entry:', journalError)
+      logger.payment.error('Failed to create journal entry', journalError)
       return { success: false, error: 'Failed to create journal entry: ' + (journalError?.message || 'unknown') }
     }
     console.log('Journal entry created:', journalEntry.id)
@@ -198,7 +199,7 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
     ])
 
     if (linesError) {
-      console.error('Failed to create journal lines:', linesError)
+      logger.payment.error('Failed to create journal lines', linesError)
       await supabase.from('journal_entries').delete().eq('id', journalEntry.id)
       return { success: false, error: 'Failed to record payment details' }
     }
@@ -222,7 +223,7 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
       .single()
 
     if (paymentError) {
-      console.error('Failed to create payment record:', paymentError)
+      logger.payment.error('Failed to create payment record', paymentError)
       return { success: false, error: 'Failed to create payment record: ' + paymentError.message }
     }
 
@@ -239,7 +240,7 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
         .insert(allocationRows)
 
       if (allocError) {
-        console.error('Failed to create payment allocations:', allocError)
+        logger.payment.error('Failed to create payment allocations', allocError)
         // Don't fail the payment — allocations are supplementary
       }
 
@@ -268,7 +269,7 @@ export async function recordQuickPayment(params: QuickPaymentParams): Promise<Ac
 
     return { success: true, paymentId: payment?.id }
   } catch (err) {
-    console.error('recordQuickPayment error:', err)
+    logger.payment.error('recordQuickPayment error', err)
     return { success: false, error: 'An unexpected error occurred' }
   }
 }
