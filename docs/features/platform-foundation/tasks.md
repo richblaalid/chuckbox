@@ -1,6 +1,6 @@
 # Platform Foundation — Tasks
 
-Task IDs use the prefix `PLATFORM-`. **Next free ID: PLATFORM-014.** (Claim ranges explicitly and update this note — see `docs/process.md` Task ID discipline.)
+Task IDs use the prefix `PLATFORM-`. **Next free ID: PLATFORM-015.** (Claim ranges explicitly and update this note — see `docs/process.md` Task ID discipline.)
 
 ## Summary
 
@@ -8,7 +8,7 @@ Task IDs use the prefix `PLATFORM-`. **Next free ID: PLATFORM-014.** (Claim rang
 |---|---|---|
 | Method adoption (this installation) | 6 | P0 |
 | Delivery infrastructure follow-ups | 4 | P0/P1 |
-| Finance hardening (Epic A / CHUCK-7) | 1 | P0 |
+| Finance hardening (Epic A / CHUCK-7, CHUCK-8) | 2 | P0 |
 
 ## Parallelization Guide
 
@@ -41,6 +41,7 @@ After Phase 0 merges. Lane B touches test config only; Lane A touches Supabase/m
 
 | Task ID | Description | Completed | Commit |
 |---|---|---|---|
+| PLATFORM-014 | CHUCK-8: TDD `tests/integration/payment-links-anon.test.ts` (anon key leaks no payment_links rows — by dump or exact token — nor other sensitive tables; treasurer/guardian/service-client reads intact) + migration `20260711000001_close_anon_payment_links_read.sql` dropping the anon-readable SELECT policy and revoking the blanket anon table/sequence grants (current + default privileges); dev push only. (Commits reference PLATFORM-013 — renumbered on merge after a parallel-claim collision with CHUCK-20's PLATFORM-013.) | 2026-07-11 | 8b4bd6a |
 | PLATFORM-009 | CHUCK-20: split real-DB integration tests out of `npm test` — `vitest.integration.config.ts` (node env, `tests/integration/**` only) + `npm run test:integration`; default run excludes `tests/integration`, so `make test` is hermetic (64 files / 1,210 tests, ~4s, no `.env.local` needed) | 2026-07-11 | 263745c |
 | PLATFORM-013 | CHUCK-20: doc sync after the split — `docs/testing.md` layers/verbs/gaps, `ci.yml` stale comment (comment-only), task-status bookkeeping | 2026-07-11 | (docs commit, CHUCK-20 PR) |
 | PLATFORM-012 | CHUCK-17: remove the 8 unused `eslint-disable` directives (5 files) — `make lint` now 0 errors / 0 warnings; rest of CHUCK-17 (rename, signup-wizard fix, repo secrets) already delivered via CHUCK-7/PR #37 | 2026-07-11 | 3df2615 |
