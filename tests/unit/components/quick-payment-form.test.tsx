@@ -8,7 +8,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 // Mock the server action — we just assert it gets called with the right shape.
-const recordQuickPaymentMock = vi.fn(async () => ({ success: true, paymentId: 'pmt-1' }))
+const recordQuickPaymentMock = vi.fn(async (..._args: unknown[]) => ({ success: true, paymentId: 'pmt-1' }))
 vi.mock('@/app/actions/payments', () => ({
   recordQuickPayment: (...args: unknown[]) => recordQuickPaymentMock(...args),
 }))

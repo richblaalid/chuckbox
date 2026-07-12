@@ -32,6 +32,7 @@ import {
   getCurrentMembership,
   getCurrentProfile,
 } from '@/lib/data/cached-queries'
+import type { MemberRole } from '@/lib/roles'
 
 const mockedGetCurrentMembership = vi.mocked(getCurrentMembership)
 const mockedGetCurrentProfile = vi.mocked(getCurrentProfile)
@@ -61,7 +62,7 @@ function defaultChain() {
  * venmo_username via the supabase client. Tests can still override
  * mockSupabase.from for the profiles lookup if they want a different shape.
  */
-function setupUnitContext(role = 'leader', unitId = 'unit-1') {
+function setupUnitContext(role: MemberRole = 'leader', unitId = 'unit-1') {
   mockedGetCurrentMembership.mockResolvedValue({
     profile_id: 'profile-123',
     unit_id: unitId,
@@ -178,7 +179,7 @@ describe('Cost Sharing Actions', () => {
         unitId: 'unit-1',
         description: 'Campout food',
         totalAmount: 100,
-        result: { shares: [], totalScouts: 0, perScoutAmount: 0 },
+        result: { shares: [], totalScouts: 0, perScoutAmount: 0, organizerScoutCount: 0, organizerAmount: 0 },
       })
       expect(result.success).toBe(false)
       expect(result.error).toBe('Not a member of this unit')
@@ -191,7 +192,7 @@ describe('Cost Sharing Actions', () => {
         unitId: 'unit-1',
         description: 'Campout food',
         totalAmount: 100,
-        result: { shares: [], totalScouts: 0, perScoutAmount: 0 },
+        result: { shares: [], totalScouts: 0, perScoutAmount: 0, organizerScoutCount: 0, organizerAmount: 0 },
       })
       expect(result.success).toBe(false)
       expect(result.error).toBe('No shares to create')
@@ -218,9 +219,14 @@ describe('Cost Sharing Actions', () => {
         result: {
           totalScouts: 5,
           perScoutAmount: 20,
+          organizerScoutCount: 1,
+          organizerAmount: 20,
           shares: [
             {
               participantId: 'parent-1',
+              participantName: 'Parent One',
+              participantEmail: 'parent@test.com',
+              participantVenmo: '@parent',
               scoutCount: 2,
               shareAmount: 40,
             },

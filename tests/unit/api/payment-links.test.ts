@@ -30,13 +30,15 @@ describe('Payment Links API', () => {
     })
 
     it('should reject empty tokens', () => {
-      const token = ''
+      const token: string = ''
       expect(!token || token.length !== 64).toBe(true)
     })
 
     it('should reject null/undefined tokens', () => {
-      expect(!null || (null as unknown as string)?.length !== 64).toBe(true)
-      expect(!undefined || (undefined as unknown as string)?.length !== 64).toBe(true)
+      const missingTokens: Array<string | null | undefined> = [null, undefined]
+      for (const token of missingTokens) {
+        expect(!token || token.length !== 64).toBe(true)
+      }
     })
   })
 
@@ -47,17 +49,17 @@ describe('Payment Links API', () => {
     })
 
     it('should reject completed status', () => {
-      const link = mockCompletedPaymentLink
+      const link: { status: string } = mockCompletedPaymentLink
       expect(link.status !== 'pending').toBe(true)
     })
 
     it('should reject expired status', () => {
-      const link = { ...mockPaymentLink, status: 'expired' as const }
+      const link: { status: string } = { ...mockPaymentLink, status: 'expired' }
       expect(link.status !== 'pending').toBe(true)
     })
 
     it('should reject cancelled status', () => {
-      const link = { ...mockPaymentLink, status: 'cancelled' as const }
+      const link: { status: string } = { ...mockPaymentLink, status: 'cancelled' }
       expect(link.status !== 'pending').toBe(true)
     })
   })

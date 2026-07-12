@@ -46,6 +46,7 @@ import {
   getCurrentMembership,
   getCurrentProfile,
 } from '@/lib/data/cached-queries'
+import type { MemberRole } from '@/lib/roles'
 
 const mockedGetCurrentMembership = vi.mocked(getCurrentMembership)
 const mockedGetCurrentProfile = vi.mocked(getCurrentProfile)
@@ -64,7 +65,7 @@ const validExpenseData = {
  * stubbed; individual tests can override either as needed.
  */
 function setupAuthenticatedUser(
-  role: string,
+  role: MemberRole,
   overrides?: { profileId?: string; unitId?: string }
 ) {
   const profileId = overrides?.profileId ?? 'profile-123'

@@ -1555,8 +1555,8 @@ describe('Advancement Actions', () => {
       currentVersionYear: 2023,
       targetVersionYear: 2024,
       mappings: [
-        { sourceReqNumber: '1', targetReqId: 'new-req-1', confidence: 'high' as const },
-        { sourceReqNumber: '2', targetReqId: 'new-req-2', confidence: 'medium' as const },
+        { sourceReqNumber: '1', targetReqId: 'new-req-1', targetReqNumber: '1', confidence: 'exact' as const },
+        { sourceReqNumber: '2', targetReqId: 'new-req-2', targetReqNumber: '2', confidence: 'likely' as const },
       ],
     }
 
@@ -1768,7 +1768,7 @@ describe('Advancement Actions', () => {
       const paramsWithUnmapped = {
         ...switchParams,
         mappings: [
-          { sourceReqNumber: '1', targetReqId: null, confidence: 'none' as const },
+          { sourceReqNumber: '1', targetReqId: null, targetReqNumber: null, confidence: 'none' as const },
         ],
       }
 

@@ -6,6 +6,78 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { extractUnitFromCSV, activateProvisionedMemberships, checkEmailExists, provisionUnit, provisionUnitAuthenticated } from '@/app/actions/onboarding'
 import * as bsaRosterParser from '@/lib/import/bsa-roster-parser'
+import type { ParsedAdult, ParsedRoster, ParsedScout, UnitMetadata } from '@/lib/import/bsa-roster-parser'
+
+// Fixture factories — fill the parser types' required fields so tests only
+// spell out what each case is about.
+function makeAdult(overrides: Partial<ParsedAdult> = {}): ParsedAdult {
+  return {
+    firstName: 'Adult',
+    lastName: 'Test',
+    middleName: null,
+    email: null,
+    address: null,
+    city: null,
+    state: null,
+    zip: null,
+    phone: null,
+    phoneHome: null,
+    phoneMobile: null,
+    gender: 'prefer_not_to_say',
+    dateJoined: null,
+    bsaMemberId: null,
+    healthFormStatus: null,
+    healthFormExpires: null,
+    swimClassification: null,
+    swimClassDate: null,
+    positions: [],
+    trainings: [],
+    meritBadges: [],
+    ...overrides,
+  }
+}
+
+function makeScout(overrides: Partial<ParsedScout> = {}): ParsedScout {
+  return {
+    firstName: 'Scout',
+    lastName: 'Test',
+    middleName: null,
+    rank: null,
+    bsaMemberId: null,
+    dateOfBirth: null,
+    gender: 'prefer_not_to_say',
+    dateJoined: null,
+    healthFormStatus: null,
+    healthFormExpires: null,
+    swimClassification: null,
+    swimClassDate: null,
+    patrol: null,
+    positions: [],
+    guardians: [],
+    sectionIdentifier: null,
+    ...overrides,
+  }
+}
+
+function makeUnitMetadata(overrides: Partial<UnitMetadata> = {}): UnitMetadata {
+  return {
+    unitType: 'troop',
+    unitNumber: '100',
+    unitSuffix: null,
+    council: 'Test Council',
+    district: 'Test District',
+    ...overrides,
+  }
+}
+
+function makeRoster(overrides: Partial<ParsedRoster> = {}): ParsedRoster {
+  return {
+    adults: [],
+    scouts: [],
+    errors: [],
+    ...overrides,
+  }
+}
 
 // Mock the bsa-roster-parser module
 vi.mock('@/lib/import/bsa-roster-parser', () => ({
@@ -73,11 +145,7 @@ describe('onboarding actions', () => {
     })
 
     it('should return error when unit metadata is missing', async () => {
-      vi.mocked(bsaRosterParser.parseRosterWithMetadata).mockReturnValue({
-        adults: [],
-        scouts: [],
-        unitMetadata: null,
-      })
+      vi.mocked(bsaRosterParser.parseRosterWithMetadata).mockReturnValue(makeRoster())
 
       const result = await extractUnitFromCSV('some csv content')
 
@@ -86,16 +154,9 @@ describe('onboarding actions', () => {
     })
 
     it('should return error when unit type is missing', async () => {
-      vi.mocked(bsaRosterParser.parseRosterWithMetadata).mockReturnValue({
-        adults: [],
-        scouts: [],
-        unitMetadata: {
-          unitNumber: '123',
-          unitType: null as unknown as 'troop',
-          council: 'Test Council',
-          district: 'Test District',
-        },
-      })
+      vi.mocked(bsaRosterParser.parseRosterWithMetadata).mockReturnValue(
+        makeRoster({ unitMetadata: makeUnitMetadata({ unitNumber: '123', unitType: null }) })
+      )
 
       const result = await extractUnitFromCSV('some csv content')
 
@@ -106,16 +167,9 @@ describe('onboarding actions', () => {
     })
 
     it('should return error when unit number is missing', async () => {
-      vi.mocked(bsaRosterParser.parseRosterWithMetadata).mockReturnValue({
-        adults: [],
-        scouts: [],
-        unitMetadata: {
-          unitNumber: null as unknown as string,
-          unitType: 'troop',
-          council: 'Test Council',
-          district: 'Test District',
-        },
-      })
+      vi.mocked(bsaRosterParser.parseRosterWithMetadata).mockReturnValue(
+        makeRoster({ unitMetadata: makeUnitMetadata({ unitNumber: null }) })
+      )
 
       const result = await extractUnitFromCSV('some csv content')
 
@@ -126,58 +180,18 @@ describe('onboarding actions', () => {
     })
 
     it('should successfully extract unit data from valid CSV', async () => {
-      const mockRoster = {
+      const mockRoster = makeRoster({
         adults: [
-          {
-            firstName: 'John',
-            lastName: 'Leader',
-            bsaMemberId: 'adult-1',
-            positions: ['Scoutmaster'],
-          },
-          {
-            firstName: 'Jane',
-            lastName: 'Parent',
-            bsaMemberId: 'adult-2',
-            positions: [],
-          },
+          makeAdult({ firstName: 'John', lastName: 'Leader', bsaMemberId: 'adult-1', positions: ['Scoutmaster'] }),
+          makeAdult({ firstName: 'Jane', lastName: 'Parent', bsaMemberId: 'adult-2' }),
         ],
         scouts: [
-          {
-            firstName: 'Scout',
-            lastName: 'One',
-            bsaMemberId: 'scout-1',
-            patrol: 'Eagle Patrol',
-            rank: 'First Class',
-            positions: [],
-            guardians: [],
-          },
-          {
-            firstName: 'Scout',
-            lastName: 'Two',
-            bsaMemberId: 'scout-2',
-            patrol: 'Eagle Patrol',
-            rank: 'Tenderfoot',
-            positions: [],
-            guardians: [],
-          },
-          {
-            firstName: 'Scout',
-            lastName: 'Three',
-            bsaMemberId: 'scout-3',
-            patrol: 'Wolf Patrol',
-            rank: 'Scout',
-            positions: [],
-            guardians: [],
-          },
+          makeScout({ firstName: 'Scout', lastName: 'One', bsaMemberId: 'scout-1', patrol: 'Eagle Patrol', rank: 'First Class' }),
+          makeScout({ firstName: 'Scout', lastName: 'Two', bsaMemberId: 'scout-2', patrol: 'Eagle Patrol', rank: 'Tenderfoot' }),
+          makeScout({ firstName: 'Scout', lastName: 'Three', bsaMemberId: 'scout-3', patrol: 'Wolf Patrol', rank: 'Scout' }),
         ],
-        unitMetadata: {
-          unitNumber: '9297',
-          unitType: 'troop' as const,
-          council: 'Test Council',
-          district: 'Test District',
-          unitSuffix: null,
-        },
-      }
+        unitMetadata: makeUnitMetadata({ unitNumber: '9297' }),
+      })
 
       vi.mocked(bsaRosterParser.parseRosterWithMetadata).mockReturnValue(mockRoster)
 
@@ -194,23 +208,17 @@ describe('onboarding actions', () => {
     })
 
     it('should count unique patrols correctly', async () => {
-      const mockRoster = {
-        adults: [],
+      const mockRoster = makeRoster({
         scouts: [
-          { firstName: 'A', lastName: '1', patrol: 'Alpha', positions: [], guardians: [] },
-          { firstName: 'B', lastName: '2', patrol: 'Alpha', positions: [], guardians: [] },
-          { firstName: 'C', lastName: '3', patrol: 'Beta', positions: [], guardians: [] },
-          { firstName: 'D', lastName: '4', patrol: null, positions: [], guardians: [] }, // No patrol
+          makeScout({ firstName: 'A', lastName: '1', patrol: 'Alpha' }),
+          makeScout({ firstName: 'B', lastName: '2', patrol: 'Alpha' }),
+          makeScout({ firstName: 'C', lastName: '3', patrol: 'Beta' }),
+          makeScout({ firstName: 'D', lastName: '4', patrol: null }), // No patrol
         ],
-        unitMetadata: {
-          unitNumber: '100',
-          unitType: 'troop' as const,
-          council: 'Test',
-          district: 'Test',
-        },
-      }
+        unitMetadata: makeUnitMetadata({ council: 'Test', district: 'Test' }),
+      })
 
-      vi.mocked(bsaRosterParser.parseRosterWithMetadata).mockReturnValue(mockRoster as bsaRosterParser.ParsedRoster)
+      vi.mocked(bsaRosterParser.parseRosterWithMetadata).mockReturnValue(mockRoster)
 
       const result = await extractUnitFromCSV('valid csv')
 
@@ -219,16 +227,9 @@ describe('onboarding actions', () => {
     })
 
     it('should handle empty roster with valid metadata', async () => {
-      const mockRoster = {
-        adults: [],
-        scouts: [],
-        unitMetadata: {
-          unitNumber: '100',
-          unitType: 'pack' as const,
-          council: 'Test Council',
-          district: 'Test District',
-        },
-      }
+      const mockRoster = makeRoster({
+        unitMetadata: makeUnitMetadata({ unitType: 'pack' }),
+      })
 
       vi.mocked(bsaRosterParser.parseRosterWithMetadata).mockReturnValue(mockRoster)
 
@@ -243,17 +244,9 @@ describe('onboarding actions', () => {
     })
 
     it('should include unit suffix in metadata when present', async () => {
-      const mockRoster = {
-        adults: [],
-        scouts: [],
-        unitMetadata: {
-          unitNumber: '9297',
-          unitType: 'troop' as const,
-          unitSuffix: 'B',
-          council: 'Test Council',
-          district: 'Test District',
-        },
-      }
+      const mockRoster = makeRoster({
+        unitMetadata: makeUnitMetadata({ unitNumber: '9297', unitSuffix: 'B' }),
+      })
 
       vi.mocked(bsaRosterParser.parseRosterWithMetadata).mockReturnValue(mockRoster)
 
@@ -472,12 +465,7 @@ describe('onboarding actions', () => {
 
   describe('provisionUnit - existing user detection', () => {
     const validInput = {
-      unitMetadata: {
-        unitNumber: '100',
-        unitType: 'troop' as const,
-        council: 'Test Council',
-        district: 'Test District',
-      },
+      unitMetadata: makeUnitMetadata(),
       admin: {
         firstName: 'John',
         lastName: 'Doe',
@@ -545,12 +533,7 @@ describe('onboarding actions', () => {
 
   describe('provisionUnitAuthenticated', () => {
     const validInput = {
-      unitMetadata: {
-        unitNumber: '200',
-        unitType: 'troop' as const,
-        council: 'Test Council',
-        district: 'Test District',
-      },
+      unitMetadata: makeUnitMetadata({ unitNumber: '200' }),
       parsedAdults: [],
       parsedScouts: [],
       signupPath: 'csv' as const,
@@ -667,16 +650,9 @@ describe('onboarding actions', () => {
       const unitTypes = ['troop', 'pack', 'crew'] as const
 
       for (const unitType of unitTypes) {
-        const mockRoster = {
-          adults: [],
-          scouts: [],
-          unitMetadata: {
-            unitNumber: '100',
-            unitType,
-            council: 'Test',
-            district: 'Test',
-          },
-        }
+        const mockRoster = makeRoster({
+          unitMetadata: makeUnitMetadata({ unitType, council: 'Test', district: 'Test' }),
+        })
 
         vi.mocked(bsaRosterParser.parseRosterWithMetadata).mockReturnValue(mockRoster)
 
@@ -688,33 +664,13 @@ describe('onboarding actions', () => {
     })
 
     it('should handle special characters in CSV content', async () => {
-      const mockRoster = {
-        adults: [
-          {
-            firstName: "O'Connor",
-            lastName: 'Smith-Jones',
-            bsaMemberId: 'adult-1',
-            positions: [],
-          },
-        ],
-        scouts: [
-          {
-            firstName: 'José',
-            lastName: 'García',
-            patrol: 'Águila',
-            positions: [],
-            guardians: [],
-          },
-        ],
-        unitMetadata: {
-          unitNumber: '123',
-          unitType: 'troop' as const,
-          council: 'Tidewater',
-          district: "Smith's District",
-        },
-      }
+      const mockRoster = makeRoster({
+        adults: [makeAdult({ firstName: "O'Connor", lastName: 'Smith-Jones', bsaMemberId: 'adult-1' })],
+        scouts: [makeScout({ firstName: 'José', lastName: 'García', patrol: 'Águila' })],
+        unitMetadata: makeUnitMetadata({ unitNumber: '123', council: 'Tidewater', district: "Smith's District" }),
+      })
 
-      vi.mocked(bsaRosterParser.parseRosterWithMetadata).mockReturnValue(mockRoster as bsaRosterParser.ParsedRoster)
+      vi.mocked(bsaRosterParser.parseRosterWithMetadata).mockReturnValue(mockRoster)
 
       const result = await extractUnitFromCSV('csv with special chars')
 
