@@ -73,12 +73,14 @@ Migration-bearing tasks (022, 023, 025) push to **dev only** (`feownmcpkfugkcivd
 
 ## Verification Plan (AC → observable check)
 
-| # | Acceptance criterion (from ticket "Done-when") | How it's verified |
-|---|---|---|
-| 1 | Constraint active in dev: no transaction can commit an unbalanced journal entry | Integration test: single-transaction unbalanced `journal_lines` insert via service client → rejected with the balance error; balanced insert → commits |
-| 2 | Both (all three) writers produce balanced entries per charge/fee mode | Unit tests: reconcile scout + not-scout modes assert 3-line balanced insert; square-payments route failure path. Integration tests: `process_payment_link_payment` fees-passed and fees-absorbed both yield Σdebit=Σcredit; import contra-line shape balances. (Reconcile is a cookie-authed server action — its line math is unit-verified; the constraint enforces it at runtime.) |
-| 3 | Repair run; before/after trial balance documented | Trial-balance script output committed alongside this plan: before = units out by −15,372.20 / −767.90; after = both units tie out (Σdebit = Σcredit) |
-| 4 | Balance-sheet report ties out | Browser as **treasurer** on `http://localhost:3021/finances/reports`: Assets = Liabilities + Equity + Net Income; screenshot evidence |
+| # | Acceptance criterion (from ticket "Done-when") | How it's verified | Result (2026-07-12) |
+|---|---|---|---|
+| 1 | Constraint active in dev: no transaction can commit an unbalanced journal entry | Integration test: single-transaction unbalanced `journal_lines` insert via service client → rejected with the balance error; balanced insert → commits | **PASS** — `tests/integration/journal-balance.test.ts` 6/6; unbalanced insert and partial line delete rejected with `Journal entry … is unbalanced`; live smoke test on dev confirmed the same |
+| 2 | Both (all three) writers produce balanced entries per charge/fee mode | Unit tests: reconcile scout + not-scout modes assert 3-line balanced insert; square-payments route failure path. Integration tests: `process_payment_link_payment` fees-passed and fees-absorbed both yield Σdebit=Σcredit; import contra-line shape balances | **PASS** — reconcile 12/12 unit tests (both charge modes + zero-fee + missing-5600 guard); RPC balanced in both fee modes with the surcharge credit asserted; import shape (billing+funds+OBE contra) commits against the live constraint; route failure path 2/2 |
+| 3 | Repair run; before/after trial balance documented | Trial-balance script output committed alongside this plan | **PASS** — `CHUCK-9-trial-balance.md`: before −15,372.20 / −767.90; after both units tie out exactly; 0 of 202 entries unbalanced |
+| 4 | Balance-sheet report ties out | Browser as **treasurer** on `http://localhost:3021/finances/reports` + authenticated API check: Assets = Liabilities + Equity + Net Income | **PASS** — API: Assets 1,673.35 = Liab 767.90 + Equity −767.90 + NetIncome 1,673.35 (diff 0.0000); page shows "Balance sheet is balanced" — screenshot `CHUCK-9-screenshots/balance-sheet-ties-out.png` |
+
+Full gate: `make build` clean; `make test` 67 files / 1,232 tests green (baseline 65/1,217 — all new tests are this ticket's, zero regressions); full integration suite 5 files / 49 tests green with the constraint active.
 
 ## Screenshot Plan
 
