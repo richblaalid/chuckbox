@@ -1,6 +1,6 @@
 # Chuckbox — Testing Strategy & Snapshot
 
-**Status:** honest snapshot as of 2026-07-11. Fresh verified baseline: `npx tsc --noEmit` exit 0, `npm run build` exit 0, hermetic unit run 64 files / 1,210 tests all passing (~4s); real-DB integration suite (3 files / 36 tests) runs separately via `npm run test:integration`.
+**Status:** honest snapshot as of 2026-07-12. Fresh verified baseline: `npx tsc --noEmit` exit 0 (app) and `npx tsc --noEmit -p tsconfig.test.json` exit 0 (tests — CHUCK-21), `npm run build` exit 0, hermetic unit run 64 files / 1,210 tests all passing (~5s with coverage); real-DB integration suite (3 files / 36 tests) runs separately via `npm run test:integration`. Coverage baseline: 60.78% stmts / 53.99% branch / 58.45% funcs / 61.1% lines, enforced at a 58/51/55/58 ratchet floor.
 
 ## Layers
 
@@ -13,7 +13,7 @@
 
 ## Make verbs (what green means)
 
-`make build` → Next production build (type gate). `make lint` → ESLint 9 flat config incl. custom `no-single-on-unit-memberships` rule. `make test` → `npx vitest run` (hermetic — no DB, no `.env.local` needed). CI, the pre-push hook, and local runs all execute the same verbs. The real-DB suite is a deliberate extra step: `npm run test:integration` (dev credentials required; never run from CI).
+`make build` → Next production build (type gate for `src/`). `make lint` → ESLint 9 flat config incl. custom `no-single-on-unit-memberships` rule. `make test` → `npx tsc --noEmit -p tsconfig.test.json` (type gate for `tests/**`) then `npx vitest run --coverage` (hermetic — no DB, no `.env.local` needed; coverage thresholds in `vitest.config.ts` fail the verb when breached). CI, the pre-push hook, and local runs all execute the same verbs. The real-DB suite is a deliberate extra step: `npm run test:integration` (dev credentials required; never run from CI).
 
 ## Acceptance criteria conventions
 
@@ -28,6 +28,5 @@ Rounding (round-to-cent, fee ceil, net+fee==gross), allocation (FIFO, partial, z
 ## Known gaps (test-debt queue)
 
 1. Finance integration tests per approved spec (highest priority — encodes the ledger invariants)
-2. Test code excluded from typecheck (`tsconfig.json` excludes `tests/**`)
-3. 2 of 47 API routes have tests; e2e has no user flows; no multi-unit e2e (runbook phases D/E/F/H manual)
-4. Coverage report stale (Feb 2026), no thresholds
+2. 2 of 47 API routes have tests; e2e has no user flows; no multi-unit e2e (runbook phases D/E/F/H manual)
+3. Coverage floor is a ratchet (58/51/55/58), well below the 80% the archived plans aimed for — raise as suites grow

@@ -23,7 +23,7 @@ export default defineConfig(({ mode }) => {
       env,
       coverage: {
         provider: 'v8',
-        reporter: ['text', 'json', 'html'],
+        reporter: ['text', 'json', 'json-summary', 'html'],
         exclude: [
           'node_modules/',
           'tests/setup.ts',
@@ -31,6 +31,15 @@ export default defineConfig(({ mode }) => {
           '**/*.config.*',
           '**/types/**',
         ],
+        // Ratchet floor (CHUCK-21): ~2–3 pts below the 2026-07-12 baseline
+        // (60.78 / 53.99 / 58.45 / 61.1). Blocks regressions; raise these as
+        // coverage grows — never lower them to get a build green.
+        thresholds: {
+          statements: 58,
+          branches: 51,
+          functions: 55,
+          lines: 58,
+        },
       },
     },
     resolve: {

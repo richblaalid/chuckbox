@@ -33,7 +33,9 @@ lint:
 
 # Run mode explicitly: `npm test` is bare `vitest`, which watches in a TTY.
 # Typecheck the test suite first — tests/** is excluded from the app tsconfig,
-# so `make build` never sees it (PLATFORM-014).
+# so `make build` never sees it (PLATFORM-014). Coverage runs on every pass so
+# the thresholds in vitest.config.ts gate CI and the pre-push hook too — a
+# breach fails this verb (PLATFORM-015).
 test:
 	npx tsc --noEmit -p tsconfig.test.json
-	npx vitest run
+	npx vitest run --coverage
