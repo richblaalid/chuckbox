@@ -1,6 +1,6 @@
 # Platform Foundation — Tasks
 
-Task IDs use the prefix `PLATFORM-`. **Next free ID: PLATFORM-014.** (Claim ranges explicitly and update this note — see `docs/process.md` Task ID discipline.)
+Task IDs use the prefix `PLATFORM-`. **Next free ID: PLATFORM-016.** (Claim ranges explicitly and update this note — see `docs/process.md` Task ID discipline.)
 
 ## Summary
 
@@ -35,12 +35,14 @@ After Phase 0 merges. Lane B touches test config only; Lane A touches Supabase/m
 |---|---|---|---|---|---|
 | PLATFORM-007 | Reconcile prod schema with migration ledger: diff prod against `supabase/migrations/` chain; commit or delete the three untracked `supabase/scripts/*.sql`; document the single push path in docs/tech.md | no | none | Not Started | Schema diff clean; scripts resolved; **requires explicit user approval for any prod touch** |
 | PLATFORM-008 | Add Sentry error tracking (app + server actions); route the `console.error` hot paths through `src/lib/logger.ts` | no | none | Not Started | Error visible in Sentry from a forced dev exception; build green |
-| PLATFORM-010 | Bring `tests/**` into typecheck (tsconfig.test.json or include) and add coverage `json-summary` + thresholds | no | PLATFORM-009 | Not Started | `npx tsc --noEmit` covers tests; fresh coverage report |
 
 ## Completed Tasks
 
 | Task ID | Description | Completed | Commit |
 |---|---|---|---|
+| PLATFORM-015 | CHUCK-21: coverage enforcement — `json-summary` reporter + ratchet-floor thresholds (58/51/55/58) in `vitest.config.ts`; `make test` runs `vitest run --coverage`; ESLint ignores `coverage/`; `docs/testing.md` synced; breach demonstrably fails the verb | 2026-07-12 | 229800e |
+| PLATFORM-014 | CHUCK-21: `make test` runs `npx tsc --noEmit -p tsconfig.test.json` before vitest — test type drift fails the same verb CI and the pre-push hook run | 2026-07-12 | b65ba53 |
+| PLATFORM-010 | CHUCK-21: `tsconfig.test.json` (extends root; `tests/**` + both vitest configs; vitest/jest-dom/node types) + fixed all 49 pre-existing test-file type errors; suite unchanged (64 files / 1,210 tests) | 2026-07-12 | 4040aa5 |
 | PLATFORM-009 | CHUCK-20: split real-DB integration tests out of `npm test` — `vitest.integration.config.ts` (node env, `tests/integration/**` only) + `npm run test:integration`; default run excludes `tests/integration`, so `make test` is hermetic (64 files / 1,210 tests, ~4s, no `.env.local` needed) | 2026-07-11 | 263745c |
 | PLATFORM-013 | CHUCK-20: doc sync after the split — `docs/testing.md` layers/verbs/gaps, `ci.yml` stale comment (comment-only), task-status bookkeeping | 2026-07-11 | (docs commit, CHUCK-20 PR) |
 | PLATFORM-012 | CHUCK-17: remove the 8 unused `eslint-disable` directives (5 files) — `make lint` now 0 errors / 0 warnings; rest of CHUCK-17 (rename, signup-wizard fix, repo secrets) already delivered via CHUCK-7/PR #37 | 2026-07-11 | 3df2615 |
