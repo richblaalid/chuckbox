@@ -44,14 +44,14 @@ The other 33 sites are PROPAGATED (error response returned) — they still migra
 
 ## Analysis Against Existing Docs
 
-- **Relevant requirements/architecture:** `docs/features/platform-foundation/` capability 5 ("error monitoring … tracked here until done"); PLATFORM-008 in that feature's tasks.md is this exact work — this plan **decomposes PLATFORM-008 into PLATFORM-013…016**.
+- **Relevant requirements/architecture:** `docs/features/platform-foundation/` capability 5 ("error monitoring … tracked here until done"); PLATFORM-008 in that feature's tasks.md is this exact work — this plan **decomposes PLATFORM-008 into PLATFORM-015…018**. (Originally claimed as 013…016; on merging `main`, 013/014 collided with parallel claims by CHUCK-20/CHUCK-8, so the Sentry-install task became 017 and the boundaries task 018 — commits and older comments reference the original IDs. The logger task 015 and migration task 016 kept their IDs.)
 - **Active DRs that apply:** DR-2026-07-09-custom-double-entry-ledger-v1 — its hardening obligations motivate alerting on the money-moving swallows; nothing in this ticket touches ledger semantics.
 - **Conflicts detected:** none. One scope note: the ticket cites "352 console statements repo-wide" as context, but its build scope is the *finance-path* sites only — this plan does not touch the other ~305 statements.
 - **Decision-record needed?** No. Vendor choice (Sentry) was made in the roadmap/audit; everything else is mechanical integration. `docs/tech.md` stack list gets a direct-edit line for Sentry (uncontroversial factual update).
 
 ## Task List
 
-Added to `docs/features/platform-foundation/tasks.md` (next free ID was PLATFORM-013; PLATFORM-008 marked as decomposed into these):
+Added to `docs/features/platform-foundation/tasks.md` (next free ID was PLATFORM-013 at plan time; PLATFORM-008 marked as decomposed into these). **Post-merge IDs:** PLATFORM-013→017, PLATFORM-014→018 (collision renumber); 015/016 unchanged:
 
 | Task ID | Description | TDD? | Dependencies | Verification |
 |---|---|---|---|---|

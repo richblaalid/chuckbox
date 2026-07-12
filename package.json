@@ -12,6 +12,7 @@
     "test:watch": "vitest --watch",
     "test:coverage": "vitest --coverage",
     "test:ui": "vitest --ui",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "db:reset": "npx tsx scripts/db.ts reset",
     "db:seed:base": "npx tsx scripts/db.ts seed:base",
     "db:seed:test": "npx tsx scripts/db.ts seed:test",
