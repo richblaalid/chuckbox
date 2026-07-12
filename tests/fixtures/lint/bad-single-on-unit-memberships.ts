@@ -5,13 +5,14 @@
 // at `tests/unit/lint/no-single-on-unit-memberships.test.ts`, which uses
 // the ESLint API directly to assert the rule fires.
 
+interface FixtureFilterChain {
+  eq(col: string, val: unknown): FixtureFilterChain
+  single(): Promise<unknown>
+}
+
 declare const supabase: {
   from(table: string): {
-    select(columns: string): {
-      eq(col: string, val: unknown): {
-        single(): Promise<unknown>
-      }
-    }
+    select(columns: string): FixtureFilterChain
   }
 }
 

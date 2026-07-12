@@ -1,0 +1,25 @@
+=== CHUCK-21 AC evidence — 2026-07-12 12:59 CDT ===
+
+--- AC1: tests/** inside the typecheck gate ---
+$ npx tsc --noEmit -p tsconfig.test.json; echo exit: $?
+exit: 0
+
+$ echo "const chuck21TypeProbe: number = 'x'" >> tests/unit/utils.test.ts && make test
+tests/unit/utils.test.ts(65,7): error TS2322: Type 'string' is not assignable to type 'number'.
+make test exit: 2
+(probe reverted)
+
+--- AC3: fresh coverage report with json-summary ---
+-rw-r--r--@ 1 richblaalid  staff  28693 Jul 12 12:58 coverage/coverage-summary.json
+totals: {'statements': 60.78, 'branches': 53.99, 'functions': 58.45, 'lines': 61.1}
+
+--- AC4: threshold breach fails the build (statements floor 58 -> 90) ---
+ERROR: Coverage for statements (60.78%) does not meet global threshold (90%)
+make test exit: 2
+(threshold reverted to 58)
+
+--- AC5: full gate green at the ratchet floor ---
+ Test Files  64 passed (64)
+      Tests  1210 passed (1210)
+All files          |   60.78 |    53.99 |   58.45 |    61.1 |                   
+make test exit: 0

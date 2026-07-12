@@ -59,7 +59,7 @@ const noSingleOnUnitMemberships = {
 const eslintConfig = [
   ...nextConfig,
   {
-    ignores: [".next/*", "node_modules/*", "tests/fixtures/lint/*"],
+    ignores: [".next/*", "node_modules/*", "tests/fixtures/lint/*", "coverage/*"],
   },
   {
     plugins: {

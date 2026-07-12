@@ -143,7 +143,8 @@ export async function seedScout(
     first_name: data.first_name,
     last_name: data.last_name,
     rank: data.rank,
-    is_active: data.is_active,
+    // Column is nullable in the generated types, but we always insert a value.
+    is_active: data.is_active ?? isActive,
   }
 }
 

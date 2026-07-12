@@ -154,7 +154,7 @@ describe('Members Actions', () => {
           profile_id: 'admin_123',
           role: 'admin',
         }
-        const newRole = 'leader'
+        const newRole: string = 'leader'
         const otherAdmins: { id: string }[] = []
 
         const isSelfDemotion = targetMember.profile_id === currentUserId &&
@@ -172,7 +172,7 @@ describe('Members Actions', () => {
           profile_id: 'admin_123',
           role: 'admin',
         }
-        const newRole = 'leader'
+        const newRole: string = 'leader'
         const otherAdmins = [{ id: 'admin_456' }]
 
         const isSelfDemotion = targetMember.profile_id === currentUserId &&
@@ -225,7 +225,7 @@ describe('Members Actions', () => {
       })
 
       it('should deactivate (not delete) active members', () => {
-        const status = 'active'
+        const status: string = 'active'
         const action = status === 'invited' ? 'delete' : 'deactivate'
         expect(action).toBe('deactivate')
       })
@@ -271,13 +271,13 @@ describe('Members Actions', () => {
       })
 
       it('should not resend for active status', () => {
-        const status = 'active'
+        const status: string = 'active'
         const canResend = status === 'invited'
         expect(canResend).toBe(false)
       })
 
       it('should not resend for inactive status', () => {
-        const status = 'inactive'
+        const status: string = 'inactive'
         const canResend = status === 'invited'
         expect(canResend).toBe(false)
       })
