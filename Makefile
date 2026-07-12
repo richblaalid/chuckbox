@@ -32,5 +32,8 @@ lint:
 	npm run lint
 
 # Run mode explicitly: `npm test` is bare `vitest`, which watches in a TTY.
+# Typecheck the test suite first — tests/** is excluded from the app tsconfig,
+# so `make build` never sees it (PLATFORM-014).
 test:
+	npx tsc --noEmit -p tsconfig.test.json
 	npx vitest run
