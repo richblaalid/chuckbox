@@ -33,13 +33,13 @@ Bring `tests/**` into the TypeScript gate (it is explicitly excluded in `tsconfi
 
 ## Task List
 
-Tasks in `docs/features/platform-foundation/tasks.md` (PLATFORM-010 existed; 014–015 claimed; next free ID now PLATFORM-016).
+Tasks in `docs/features/platform-foundation/tasks.md`. *(Planned as PLATFORM-014/015; renumbered to PLATFORM-019/020 when merging main — CHUCK-8 and CHUCK-19 landed first and claimed 014/015 in a parallel-claim collision. Commits b65ba53/229800e reference the original IDs.)*
 
 | Task ID | Description | TDD? | Dependencies | Verification |
 |---|---|---|---|---|
 | PLATFORM-010 | Add `tsconfig.test.json` (extends root; includes `tests/**` + both vitest configs; vitest/jest-dom/node types) and fix the 49 pre-existing type errors in test files | no | none (PLATFORM-009 done) | `npx tsc -p tsconfig.test.json --noEmit` exit 0; `make test` still 1,210 green |
-| PLATFORM-014 | Wire the test typecheck into the gate: `make test` runs `npx tsc -p tsconfig.test.json --noEmit` before vitest | no | PLATFORM-010 | `make test` green; injected type error in a test file fails the verb |
-| PLATFORM-015 | Coverage enforcement: add `json-summary` reporter + thresholds (stmts 58 / branch 51 / funcs 55 / lines 58) to `vitest.config.ts`; run coverage in `make test` (`vitest run --coverage`); regenerate report; sync `docs/testing.md` (snapshot + gaps #2/#4) | no | PLATFORM-014 | Fresh `coverage/coverage-summary.json`; threshold breach fails `make test`; docs updated |
+| PLATFORM-019 | Wire the test typecheck into the gate: `make test` runs `npx tsc -p tsconfig.test.json --noEmit` before vitest | no | PLATFORM-010 | `make test` green; injected type error in a test file fails the verb |
+| PLATFORM-020 | Coverage enforcement: add `json-summary` reporter + thresholds (stmts 58 / branch 51 / funcs 55 / lines 58) to `vitest.config.ts`; run coverage in `make test` (`vitest run --coverage`); regenerate report; sync `docs/testing.md` (snapshot + gaps #2/#4) | no | PLATFORM-019 | Fresh `coverage/coverage-summary.json`; threshold breach fails `make test`; docs updated |
 
 ## Verification Plan (AC → observable check)
 

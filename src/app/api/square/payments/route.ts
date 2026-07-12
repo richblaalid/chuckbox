@@ -4,6 +4,7 @@ import { getCurrentMembership, getRequestedUnitId } from '@/lib/auth'
 import { getSquareClientForUnit, getDefaultLocationId } from '@/lib/square/client'
 import { createHash } from 'crypto'
 import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 // Zod schema for payment request validation
 const createPaymentSchema = z.object({
@@ -214,7 +215,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (journalError || !journalEntry) {
-      console.error('Failed to create journal entry:', journalError)
+      logger.square.error('Failed to create journal entry', journalError)
       // Payment succeeded in Square but failed to record - this needs attention
       return NextResponse.json(
         {
@@ -238,7 +239,7 @@ export async function POST(request: NextRequest) {
     const feeAccount = accounts.find((a) => a.code === '5600')
 
     if (!bankAccount || !receivableAccount) {
-      console.error('Required accounts not found')
+      logger.square.error('Required accounts not found')
       return NextResponse.json(
         {
           error: 'Payment processed but accounts not configured. Please contact support.',
@@ -290,7 +291,7 @@ export async function POST(request: NextRequest) {
       .insert(journalLines)
 
     if (linesError) {
-      console.error('Failed to create journal lines:', linesError)
+      logger.square.error('Failed to create journal lines', linesError)
     }
 
     // Create payment record
@@ -313,7 +314,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (paymentError) {
-      console.error('Failed to create payment record:', paymentError)
+      logger.square.error('Failed to create payment record', paymentError)
     }
 
     // If there's a billing charge, mark it as paid
@@ -338,7 +339,7 @@ export async function POST(request: NextRequest) {
         .insert(allocationRows)
 
       if (allocError) {
-        console.error('Failed to create payment allocations:', allocError)
+        logger.square.error('Failed to create payment allocations', allocError)
       }
 
       for (const alloc of allocations) {
@@ -396,7 +397,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     // Log full error for debugging but return sanitized message to client
-    console.error('Square payment error:', error)
+    logger.square.error('Square payment error', error)
 
     const userMessage = sanitizeSquareError(error)
     return NextResponse.json({ error: userMessage }, { status: 400 })

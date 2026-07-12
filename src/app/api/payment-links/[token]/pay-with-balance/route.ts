@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { allocatePayment, type OutstandingCharge } from '@/lib/payment-allocation'
+import { logger } from '@/lib/logger'
 
 interface RouteParams {
   params: Promise<{ token: string }>
@@ -189,7 +190,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     })
 
     if (transferError) {
-      console.error('Failed to transfer funds:', transferError)
+      logger.payment.error('Failed to transfer funds', transferError)
       return NextResponse.json(
         { error: transferError.message || 'Failed to transfer Scout Funds' },
         { status: 500 }
@@ -213,7 +214,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .single()
 
     if (paymentError) {
-      console.error('Failed to create payment record:', paymentError)
+      logger.payment.error('Failed to create payment record', paymentError)
       // Transfer succeeded but payment record failed - log but don't fail
     }
 
@@ -262,7 +263,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       remainingBalance: result.new_billing_balance < 0 ? Math.abs(result.new_billing_balance) : 0,
     })
   } catch (error) {
-    console.error('Pay with balance error:', error)
+    logger.payment.error('Pay with balance error', error)
     return NextResponse.json(
       { error: 'Failed to process balance payment' },
       { status: 500 }

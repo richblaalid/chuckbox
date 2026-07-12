@@ -1,5 +1,22 @@
+import { withSentryConfig } from '@sentry/nextjs'
+import { execFileSync } from 'node:child_process'
+
+// Release identifier for Sentry events: Vercel provides the commit SHA in
+// deployed environments; fall back to the local git HEAD for dev servers.
+function resolveRelease() {
+  if (process.env.VERCEL_GIT_COMMIT_SHA) return process.env.VERCEL_GIT_COMMIT_SHA
+  try {
+    return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim()
+  } catch {
+    return undefined
+  }
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  env: {
+    NEXT_PUBLIC_SENTRY_RELEASE: resolveRelease(),
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: '10mb',
@@ -70,4 +87,9 @@ const nextConfig = {
   },
 }
 
-export default nextConfig
+export default withSentryConfig(nextConfig, {
+  // Source-map upload is deferred until SENTRY_AUTH_TOKEN/org/project are
+  // configured in the Vercel environment — builds stay green without them.
+  silent: true,
+  disableLogger: true,
+})

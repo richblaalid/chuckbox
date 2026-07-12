@@ -19,6 +19,9 @@ import type {
   ExpenseReimbursementWithSubmitter,
   ExpenseFilters,
 } from '@/lib/expenses/types'
+import { createLogger } from '@/lib/logger'
+
+const expenseLog = createLogger('Expenses')
 
 interface ActionResult {
   success: boolean
@@ -109,7 +112,7 @@ export async function createExpenseReimbursement(
     .single()
 
   if (error) {
-    console.error('Create expense error:', error)
+    expenseLog.error('Create expense error', error)
     return { success: false, error: 'Failed to create expense' }
   }
 
@@ -199,7 +202,7 @@ export async function updateExpenseReimbursement(
     .eq('id', expenseId)
 
   if (updateError) {
-    console.error('Update expense error:', updateError)
+    expenseLog.error('Update expense error', updateError)
     return { success: false, error: 'Failed to update expense' }
   }
 
@@ -252,7 +255,7 @@ export async function submitExpenseReimbursement(
     .eq('id', expenseId)
 
   if (updateError) {
-    console.error('Submit expense error:', updateError)
+    expenseLog.error('Submit expense error', updateError)
     return { success: false, error: 'Failed to submit expense' }
   }
 
@@ -305,7 +308,7 @@ export async function deleteExpenseReimbursement(
     .eq('id', expenseId)
 
   if (deleteError) {
-    console.error('Delete expense error:', deleteError)
+    expenseLog.error('Delete expense error', deleteError)
     return { success: false, error: 'Failed to delete expense' }
   }
 
@@ -382,7 +385,7 @@ export async function getExpenseReimbursements(
   const { data: expenses, error, count } = await query
 
   if (error) {
-    console.error('Get expenses error:', error)
+    expenseLog.error('Get expenses error', error)
     return { success: false, error: 'Failed to fetch expenses' }
   }
 
@@ -506,7 +509,7 @@ export async function approveExpenseReimbursement(
     .eq('id', validData.expense_id)
 
   if (updateError) {
-    console.error('Approve expense error:', updateError)
+    expenseLog.error('Approve expense error', updateError)
     return { success: false, error: 'Failed to approve expense' }
   }
 
@@ -517,12 +520,12 @@ export async function approveExpenseReimbursement(
   )
 
   if (journalError) {
-    console.error('Create journal entry error:', journalError)
+    expenseLog.error('Create journal entry error', journalError)
     // Don't fail the approval, just log the error - can be fixed manually
   } else {
     const result = journalResult as { success: boolean; error?: string }
     if (!result.success) {
-      console.error('Journal entry creation failed:', result.error)
+      expenseLog.error('Journal entry creation failed', result.error)
     }
   }
 
@@ -619,7 +622,7 @@ export async function rejectExpenseReimbursement(
     .eq('id', validData.expense_id)
 
   if (updateError) {
-    console.error('Reject expense error:', updateError)
+    expenseLog.error('Reject expense error', updateError)
     return { success: false, error: 'Failed to reject expense' }
   }
 
@@ -710,7 +713,7 @@ export async function markExpensePaid(
     .eq('id', validData.expense_id)
 
   if (updateError) {
-    console.error('Mark expense paid error:', updateError)
+    expenseLog.error('Mark expense paid error', updateError)
     return { success: false, error: 'Failed to mark expense as paid' }
   }
 

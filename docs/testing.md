@@ -1,6 +1,6 @@
 # Chuckbox — Testing Strategy & Snapshot
 
-**Status:** honest snapshot as of 2026-07-12. Fresh verified baseline: `npx tsc --noEmit` exit 0 (app) and `npx tsc --noEmit -p tsconfig.test.json` exit 0 (tests — CHUCK-21), `npm run build` exit 0, hermetic unit run 64 files / 1,210 tests all passing (~5s with coverage); real-DB integration suite (3 files / 36 tests) runs separately via `npm run test:integration`. Coverage baseline: 60.78% stmts / 53.99% branch / 58.45% funcs / 61.1% lines, enforced at a 58/51/55/58 ratchet floor.
+**Status:** honest snapshot as of 2026-07-12 (post CHUCK-19/CHUCK-8/CHUCK-21 merge). Fresh verified baseline: `npx tsc --noEmit` exit 0 (app) and `npx tsc --noEmit -p tsconfig.test.json` exit 0 (tests — CHUCK-21), `npm run build` exit 0, hermetic unit run 65 files / 1,217 tests all passing (~5s with coverage); real-DB integration suite (4 files / 43 tests) runs separately via `npm run test:integration`. Coverage baseline: 60.88% stmts / 54.13% branch / 58.6% funcs / 61.21% lines, enforced at a 58/51/55/58 ratchet floor.
 
 ## Layers
 

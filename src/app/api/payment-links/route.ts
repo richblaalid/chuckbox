@@ -8,6 +8,7 @@ import {
 } from '@/lib/email/templates/payment-request'
 import { randomBytes } from 'crypto'
 import { z } from 'zod'
+import { logger } from '@/lib/logger'
 
 // Zod schema for payment link request validation
 const createPaymentLinkSchema = z.object({
@@ -214,7 +215,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (linkError || !paymentLink) {
-      console.error('Failed to create payment link:', linkError)
+      logger.payment.error('Failed to create payment link', linkError)
       return NextResponse.json(
         { error: 'Failed to create payment link' },
         { status: 500 }
@@ -254,7 +255,7 @@ export async function POST(request: NextRequest) {
         text,
       })
     } catch (emailError) {
-      console.error('Failed to send email:', emailError)
+      logger.payment.error('Failed to send email', emailError)
       // Don't fail the whole operation if email fails - the link is still valid
     }
 
@@ -272,7 +273,7 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Create payment link error:', error)
+    logger.payment.error('Create payment link error', error)
     return NextResponse.json(
       { error: 'Failed to create payment link' },
       { status: 500 }

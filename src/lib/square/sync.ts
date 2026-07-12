@@ -1,6 +1,7 @@
 import { getSquareClientForUnit, getDefaultLocationId } from './client'
 import { createClient } from '../supabase/server'
 import type { Database } from '@/types/database'
+import { logger } from '@/lib/logger'
 
 type SquareTransaction = Database['public']['Tables']['square_transactions']['Insert']
 type OrderLineItem = { name: string; quantity: number; amount: number }
@@ -102,7 +103,7 @@ export async function syncSquareTransactions(
         }
       } catch (orderError) {
         // Log but don't fail sync if order fetch fails
-        console.error('Failed to fetch orders:', orderError)
+        logger.square.error('Failed to fetch orders', orderError)
       }
     }
 
@@ -137,7 +138,7 @@ export async function syncSquareTransactions(
         }
       } catch (customerError) {
         // Log but don't fail sync if customer fetch fails
-        console.error('Failed to fetch customers:', customerError)
+        logger.square.error('Failed to fetch customers', customerError)
       }
     }
 

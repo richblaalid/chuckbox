@@ -7,7 +7,7 @@
 - **Next.js 16** (App Router, React 19), TypeScript strict, Tailwind 4 + shadcn/ui
 - **Supabase** (PostgreSQL + RLS, Auth via magic links, generated types in `src/types/database.ts`)
 - **Vitest 4** + React Testing Library; Playwright e2e (smoke)
-- **Integrations:** Square (payments, OAuth per unit), Plaid (gated), Resend (email), Anthropic SDK (receipt OCR + Scoutbook roster parsing), PostHog (partial)
+- **Integrations:** Square (payments, OAuth per unit), Plaid (gated), Resend (email), Anthropic SDK (receipt OCR + Scoutbook roster parsing), PostHog (partial), Sentry (`@sentry/nextjs` — client/server/edge error monitoring; no-op without `SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN`; `src/lib/logger.ts` `.error()` forwards to it)
 - **Hosting:** Vercel (app) + Supabase (backend)
 
 ## Environments — CRITICAL

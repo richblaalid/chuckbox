@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { logger } from '@/lib/logger'
 
 interface ReconcileToScoutParams {
   type: 'scout'
@@ -215,7 +216,7 @@ export async function reconcileSquareTransaction(params: ReconcileParams): Promi
 
     return { success: true, paymentId: payment.id }
   } catch (err) {
-    console.error('reconcileSquareTransaction error:', err)
+    logger.square.error('reconcileSquareTransaction error', err)
     return { success: false, error: 'An unexpected error occurred' }
   }
 }

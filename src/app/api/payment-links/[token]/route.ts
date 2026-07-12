@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
 
 interface RouteParams {
   params: Promise<{ token: string }>
@@ -175,7 +176,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       squareLocationId: squareCredentials?.location_id || null,
     })
   } catch (error) {
-    console.error('Get payment link error:', error)
+    logger.payment.error('Get payment link error', error)
     return NextResponse.json(
       { error: 'Failed to fetch payment link' },
       { status: 500 }
