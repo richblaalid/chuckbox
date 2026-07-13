@@ -10,7 +10,6 @@ Single sequential lane — ADV-001→004 are the /decide pipeline for CHUCK-26 a
 
 | Task ID | Description | Status | TDD? | Dependencies |
 |---|---|---|---|---|
-| ADV-005 | Server-side flag enforcement on CSV-import mutations (`troop-advancement-import.ts`) — native mutations verified already gated | In Progress | yes | ADV-001 |
 
 ## Completed Tasks
 
@@ -20,3 +19,4 @@ Single sequential lane — ADV-001→004 are the /decide pipeline for CHUCK-26 a
 | ADV-002 | Impact-analysis report (`DR-2026-07-13-advancement-launch-impact-v1.md`) | 2026-07-13 |
 | ADV-003 | Downstream doc updates: prd.md index + decision queue, tech.md DR index, advancement/requirements.md | 2026-07-13 |
 | ADV-004 | Re-prioritized Epic D in Linear (CHUCK-27→Urgent; 29/30→High; comments on CHUCK-4 + siblings) | 2026-07-13 |
+| ADV-005 | Flag enforcement on CSV-import mutations (stage/import/processInternal) — TDD; native mutations verified already gated | 2026-07-13 |

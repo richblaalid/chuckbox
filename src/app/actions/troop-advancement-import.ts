@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
+import { isFeatureEnabled, FeatureFlag } from '@/lib/feature-flags'
 import {
   parseTroopAdvancementCSV,
   validateParsedData,
@@ -189,6 +190,10 @@ export async function stageTroopAdvancement(
   unitId: string,
   csvContent: string
 ): Promise<ActionResult<StagedTroopAdvancement>> {
+  if (!isFeatureEnabled(FeatureFlag.ADVANCEMENT_TRACKING)) {
+    return { success: false, error: 'Advancement tracking feature is not enabled' }
+  }
+
   const auth = await verifyLeaderRole(unitId)
   if ('error' in auth) return { success: false, error: auth.error }
 
@@ -498,6 +503,10 @@ export async function importStagedAdvancement(
   selectedBsaMemberIds: string[],
   createUnmatchedScouts: boolean = true
 ): Promise<ActionResult<TroopAdvancementImportResult>> {
+  if (!isFeatureEnabled(FeatureFlag.ADVANCEMENT_TRACKING)) {
+    return { success: false, error: 'Advancement tracking feature is not enabled' }
+  }
+
   const auth = await verifyLeaderRole(unitId)
   if ('error' in auth) return { success: false, error: auth.error }
 
@@ -1480,6 +1489,11 @@ export async function processImportJobInternal(
   profileId: string,
   onProgress?: ProgressCallback
 ): Promise<TroopAdvancementImportResult> {
+  if (!isFeatureEnabled(FeatureFlag.ADVANCEMENT_TRACKING)) {
+    // Callers run this inside a job try/catch — a throw marks the job failed
+    throw new Error('Advancement tracking feature is not enabled')
+  }
+
   const adminSupabase = createAdminClient()
 
   // Signal that we're loading reference data
