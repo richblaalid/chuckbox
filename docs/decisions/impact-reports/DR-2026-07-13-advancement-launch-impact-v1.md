@@ -24,7 +24,7 @@
 - None — no `docs/features/advancement/tests.md` exists yet.
 
 ## New ACs Recommended (record in requirements.md; migrate to tests.md when the hardening tickets land)
-- **Server-side kill-switch (ADV-005):** with `ADVANCEMENT_TRACKING` disabled, every advancement mutation action returns an error and performs no writes — observable as the action failing even when invoked directly, not just hidden UI.
+- **Server-side kill-switch (ADV-005):** with `ADVANCEMENT_TRACKING` disabled, every advancement mutation — including the CSV-import actions (`stageTroopAdvancement`, `importStagedAdvancement`, `processImportJobInternal`) — fails and performs no writes, even when invoked directly. (Correction 2026-07-13: native mutations were already gated 38/38; the import path was the gap.)
 - **Unit scoping (CHUCK-27):** a leader of unit A cannot mutate advancement progress rows belonging to unit B, even with valid IDs of unit-B rows.
 - **Import auth (CHUCK-28):** `processImportJob` rejects callers without leader/admin membership in the job's unit; a stalled import surfaces as failed, not stuck `processing` forever.
 - **Data pipeline (CHUCK-30):** seeding from canonical data yields exactly 141 badges and validated requirement counts; seeder fails loudly on count drift.
@@ -42,7 +42,7 @@
 ## Linear Re-prioritization (executed as ADV-004)
 | Issue | From | To | Why |
 |---|---|---|---|
-| CHUCK-27 | High | Urgent | IDOR surface reachable in prod today (flag never gated server actions); mandatory flag-flip gate |
+| CHUCK-27 | High | Urgent | Mandatory flag-flip gate on the ratified launch's critical path. (Corrected: native mutations are flag-gated, so the IDOR is dark-mode-safe except via the import path, which ADV-005 gates) |
 | CHUCK-28 | High | High (confirmed launch-prep) | CSV import is the launch data feed |
 | CHUCK-29 | Medium | High | N+1 bulk paths are launch-prep, not maintenance |
 | CHUCK-30 | Medium | High | Yearly BSA data pipeline is a launch operating obligation |

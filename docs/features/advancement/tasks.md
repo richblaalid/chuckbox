@@ -10,7 +10,7 @@ Single sequential lane — ADV-001→004 are the /decide pipeline for CHUCK-26 a
 
 | Task ID | Description | Status | TDD? | Dependencies |
 |---|---|---|---|---|
-| ADV-005 | Server-side flag enforcement: `checkFeatureEnabled()` in all advancement mutation actions (gate-approved) | Not Started | yes | ADV-001 |
+| ADV-005 | Server-side flag enforcement on CSV-import mutations (`troop-advancement-import.ts`) — native mutations verified already gated | In Progress | yes | ADV-001 |
 
 ## Completed Tasks
 

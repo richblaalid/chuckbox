@@ -12,7 +12,7 @@ Ratify the native advancement tracker as product scope: **harden it and launch i
 `ADVANCEMENT_TRACKING` stays **off in prod until the launch gates clear**:
 
 1. **CHUCK-27** — unit-scope every advancement mutation (cross-unit IDOR). Mandatory before any flag flip; upgraded to *exploitable-today* urgency because the flag never gated server actions (see Context).
-2. **ADV-005 (this ticket)** — server-side kill-switch: every advancement mutation action enforces `checkFeatureEnabled()`, so "dark" actually means unreachable until launch.
+2. **ADV-005 (this ticket)** — extend the server-side kill-switch to the CSV-import mutations. Native advancement mutations already enforce `checkFeatureEnabled()` (verified 38/38, one transitively); the troop-advancement CSV-import actions (`stageTroopAdvancement`, `importStagedAdvancement`, `processImportJobInternal`) did not, so advancement data could be written while the feature is "dark."
 3. **CHUCK-28** — auth on `processImportJob` + stale-job watchdog (the CSV import is the launch-day data feed).
 4. **CHUCK-29 / CHUCK-30** — N+1 batching and the BSA canonical-data yearly-update pipeline become launch-prep, not maintenance.
 
@@ -27,7 +27,7 @@ Alternatives considered:
 - **(b) Freeze** — keep dark, stop investing, focus on sync. Rejected: abandons ~26k lines of working capability the pilot can use, and the sync-only path still lacks its down-sync build (extension is roster-only v1.0.1).
 - **(c) Partial read-only launch** — views fed by the existing Scoutbook troop-advancement CSV import, native sign-off kept dark. Rejected as the *end state* (it under-uses the module and needs UI surgery to hide mutation affordances across ~62 components), but its insight is kept: the CSV import is the launch data feed.
 
-Security context that shaped the gates: `ADVANCEMENT_TRACKING=false` gates only two page renders. `checkFeatureEnabled()` (`src/app/actions/advancement/utils.ts`) is called by **zero** of the 59 advancement server actions, and Next.js server actions are live POST endpoints regardless of UI gating — so the CHUCK-27 IDOR surface is plausibly reachable in prod today. Hence ADV-005 lands immediately with this DR, ahead of the full unit-scoping fix.
+Security context that shaped the gates (corrected during implementation): the native advancement mutations **do** enforce `checkFeatureEnabled()` server-side (verified 38/38; an initial "0/59" finding was a grep artifact — call sites use `checkFeatureEnabled<T>()`). The residual dark-mode exposure is the troop-advancement **CSV-import path**: its two staged-import actions carry leader auth but no flag check, and `processImportJobInternal` is an exported server action using the admin client with **no auth and no flag check** (adjacent to CHUCK-28). ADV-005 closes the flag gap on that path immediately; CHUCK-27/28 remain the substantive authorization fixes.
 
 ## Consequences
 
