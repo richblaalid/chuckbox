@@ -10,7 +10,6 @@ Single sequential lane — ADV-001→004 are the /decide pipeline for CHUCK-26 a
 
 | Task ID | Description | Status | TDD? | Dependencies |
 |---|---|---|---|---|
-| ADV-003 | Execute downstream doc updates (prd.md index + decision queue, tech.md DR index, advancement/requirements.md) | Not Started | no | ADV-002 |
 | ADV-004 | Re-prioritize Epic D siblings in Linear per decision; rationale comments on CHUCK-4 + siblings | Not Started | no | ADV-003 |
 | ADV-005 | Server-side flag enforcement: `checkFeatureEnabled()` in all advancement mutation actions (gate-approved) | Not Started | yes | ADV-001 |
 
@@ -20,3 +19,4 @@ Single sequential lane — ADV-001→004 are the /decide pipeline for CHUCK-26 a
 |---|---|---|
 | ADV-001 | Draft DR: advancement harden + launch (`DR-2026-07-13-advancement-launch-v1.md`) — option (a) per CHUCK-26 gate | 2026-07-13 |
 | ADV-002 | Impact-analysis report (`DR-2026-07-13-advancement-launch-impact-v1.md`) | 2026-07-13 |
+| ADV-003 | Downstream doc updates: prd.md index + decision queue, tech.md DR index, advancement/requirements.md | 2026-07-13 |
