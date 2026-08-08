@@ -292,6 +292,17 @@ export async function POST(request: NextRequest) {
 
     if (linesError) {
       logger.square.error('Failed to create journal lines', linesError)
+      // Money was captured in Square but the ledger write failed. Continuing
+      // would leave a zero-line journal entry, so remove it and surface the
+      // failure instead of silently recording nothing.
+      await supabase.from('journal_entries').delete().eq('id', journalEntry.id)
+      return NextResponse.json(
+        {
+          error: 'Payment processed but failed to record. Please contact support.',
+          squarePaymentId: squarePayment.id,
+        },
+        { status: 500 }
+      )
     }
 
     // Create payment record

@@ -1,6 +1,6 @@
 # Platform Foundation — Tasks
 
-Task IDs use the prefix `PLATFORM-`. **Next free ID: PLATFORM-021.** (Claim ranges explicitly and update this note — see `docs/process.md` Task ID discipline. PLATFORM-015–018 claimed by CHUCK-19, 2026-07-11, two renumbered from 013/014 on merge; PLATFORM-019–020 claimed by CHUCK-21, 2026-07-12, renumbered from 014/015 on merge after the same parallel-claim collision.)
+Task IDs use the prefix `PLATFORM-`. **Next free ID: PLATFORM-027.** (Claim ranges explicitly and update this note — see `docs/process.md` Task ID discipline. PLATFORM-015–018 claimed by CHUCK-19, 2026-07-11, two renumbered from 013/014 on merge; PLATFORM-019–020 claimed by CHUCK-21, 2026-07-12, renumbered from 014/015 on merge after the same parallel-claim collision; PLATFORM-021–026 claimed by CHUCK-9, 2026-07-12.)
 
 ## Summary
 
@@ -8,7 +8,7 @@ Task IDs use the prefix `PLATFORM-`. **Next free ID: PLATFORM-021.** (Claim rang
 |---|---|---|
 | Method adoption (this installation) | 6 | P0 |
 | Delivery infrastructure follow-ups | 4 | P0/P1 |
-| Finance hardening (Epic A / CHUCK-7, CHUCK-8) | 2 | P0 |
+| Finance hardening (Epic A / CHUCK-7, CHUCK-8, CHUCK-9) | 8 | P0 |
 
 ## Parallelization Guide
 
@@ -40,6 +40,12 @@ After Phase 0 merges. Lane B touches test config only; Lane A touches Supabase/m
 
 | Task ID | Description | Completed | Commit |
 |---|---|---|---|
+| PLATFORM-026 | CHUCK-9: `tests/integration/journal-balance.test.ts` (6 tests) — constraint rejects unbalanced insert + partial line delete, accepts balanced insert + full-entry delete; `process_payment_link_payment` balanced in both fee modes (surcharge credit asserted); balance-import shape w/ OBE contra accepted; full integration suite 5 files / 49 tests green with constraint active | 2026-07-12 | (this commit) |
+| PLATFORM-025 | CHUCK-9: migration `20260712000003_journal_balance_repair_and_constraint.sql` (dev push) — repaired all 64 unbalanced entries (58 imports→3000 contra, 5 reconciles→5600 debit, 1 fees-passed link→5600 credit), fail-loud guard, then deferred SECURITY DEFINER constraint trigger on `journal_lines`; after: 0 unbalanced / both units tie out; smoke-tested live (unbalanced insert + partial delete rejected). Before/after: `docs/grounding/tickets/CHUCK-9-trial-balance.md` | 2026-07-12 | bfec566 |
+| PLATFORM-024 | CHUCK-9: `/api/square/payments` — `journal_lines` insert failure now deletes the orphan journal entry and returns 500 with `squarePaymentId` (was: log-and-continue leaving a zero-line entry while money was captured); TDD via new handler-level `tests/unit/api/square-payments-route.test.ts` | 2026-07-12 | 967e819 |
+| PLATFORM-023 | CHUCK-9: migration `20260712000002_fix_payment_link_fee_balance.sql` (dev push) — `process_payment_link_payment` fees-passed branch now credits 5600 for the payer surcharge (net + fee = base + surcharge); RAISEs if 5600 missing while a fee/surcharge line is due; overpayment sweep intentionally preserved for CHUCK-12 | 2026-07-12 | ef31ad3 |
+| PLATFORM-022 | CHUCK-9: migration `20260712000001_opening_balance_equity_account.sql` (3000 OBE system account, default chart + backfill, dev push); `/api/import/balances` now builds lines via new `src/lib/import/balance-import-lines.ts` with an OBE contra so every import entry balances (undo mirrors originals, so reversals balance automatically); TDD 9 tests | 2026-07-12 | (this commit) |
+| PLATFORM-021 | CHUCK-9: fix `reconcileSquareTransaction` — 5600 fee-expense debit line added so net + fee debits balance the gross credit; clear error (entry rolled back) if 5600 missing while fee > 0; TDD via `tests/unit/actions/reconcile.test.ts` (12 tests) | 2026-07-12 | 278d002 |
 | PLATFORM-020 | CHUCK-21: coverage enforcement — `json-summary` reporter + ratchet-floor thresholds (58/51/55/58) in `vitest.config.ts`; `make test` runs `vitest run --coverage`; ESLint ignores `coverage/`; `docs/testing.md` synced; breach demonstrably fails the verb. (Commits reference PLATFORM-015 — renumbered on merge after a parallel-claim collision with CHUCK-19's PLATFORM-015.) | 2026-07-12 | 229800e |
 | PLATFORM-019 | CHUCK-21: `make test` runs `npx tsc --noEmit -p tsconfig.test.json` before vitest — test type drift fails the same verb CI and the pre-push hook run. (Commits reference PLATFORM-014 — renumbered on merge after a parallel-claim collision with CHUCK-8's PLATFORM-014.) | 2026-07-12 | b65ba53 |
 | PLATFORM-010 | CHUCK-21: `tsconfig.test.json` (extends root; `tests/**` + both vitest configs; vitest/jest-dom/node types) + fixed all 49 pre-existing test-file type errors; suite unchanged (64 files / 1,210 tests) | 2026-07-12 | 4040aa5 |

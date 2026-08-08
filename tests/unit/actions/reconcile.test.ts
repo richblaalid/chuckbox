@@ -209,7 +209,17 @@ describe('reconcileSquareTransaction', () => {
 
   // --- Scout Reconciliation Tests ---
 
-  it('should reconcile Square transaction to scout account', async () => {
+  interface JournalLine {
+    account_id: string
+    debit: number
+    credit: number
+  }
+
+  function happyPathMocks(options: {
+    accounts: Array<{ id: string; code: string }>
+    linesInsert: ReturnType<typeof vi.fn>
+    paymentId?: string
+  }) {
     mockSupabase.auth.getUser.mockResolvedValue({
       data: { user: { id: 'user-123' } },
     })
@@ -249,6 +259,9 @@ describe('reconcileSquareTransaction', () => {
       if (table === 'journal_entries') {
         return {
           insert: vi.fn().mockReturnThis(),
+          delete: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ error: null }),
+          }),
           select: vi.fn().mockReturnThis(),
           single: vi.fn().mockResolvedValue({
             data: { id: 'journal-1' },
@@ -261,17 +274,14 @@ describe('reconcileSquareTransaction', () => {
           select: vi.fn().mockReturnThis(),
           eq: vi.fn().mockReturnThis(),
           in: vi.fn().mockResolvedValue({
-            data: [
-              { id: 'bank-1', code: '1000' },
-              { id: 'recv-1', code: '1200' },
-            ],
+            data: options.accounts,
             error: null,
           }),
         }
       }
       if (table === 'journal_lines') {
         return {
-          insert: vi.fn().mockResolvedValue({ error: null }),
+          insert: options.linesInsert,
         }
       }
       if (table === 'payments') {
@@ -279,7 +289,7 @@ describe('reconcileSquareTransaction', () => {
           insert: vi.fn().mockReturnThis(),
           select: vi.fn().mockReturnThis(),
           single: vi.fn().mockResolvedValue({
-            data: { id: 'payment-1' },
+            data: { id: options.paymentId || 'payment-1' },
             error: null,
           }),
         }
@@ -296,10 +306,115 @@ describe('reconcileSquareTransaction', () => {
       }
       return defaultChain()
     })
+  }
+
+  it('should reconcile Square transaction to scout account', async () => {
+    const linesInsert = vi.fn().mockResolvedValue({ error: null })
+    happyPathMocks({
+      accounts: [
+        { id: 'bank-1', code: '1000' },
+        { id: 'recv-1', code: '1200' },
+        { id: 'fee-1', code: '5600' },
+      ],
+      linesInsert,
+    })
 
     const result = await reconcileSquareTransaction(scoutParams)
     expect(result.success).toBe(true)
     expect(result.paymentId).toBe('payment-1')
+  })
+
+  it('should write a balanced journal entry with a fee expense line (scout)', async () => {
+    const linesInsert = vi.fn().mockResolvedValue({ error: null })
+    happyPathMocks({
+      accounts: [
+        { id: 'bank-1', code: '1000' },
+        { id: 'recv-1', code: '1200' },
+        { id: 'fee-1', code: '5600' },
+      ],
+      linesInsert,
+    })
+
+    const result = await reconcileSquareTransaction(scoutParams)
+    expect(result.success).toBe(true)
+
+    const lines = linesInsert.mock.calls[0][0] as JournalLine[]
+    expect(lines).toHaveLength(3)
+
+    const feeLine = lines.find((l) => l.account_id === 'fee-1')
+    expect(feeLine).toMatchObject({ debit: 1.5, credit: 0 })
+
+    const totalDebits = lines.reduce((sum, l) => sum + l.debit, 0)
+    const totalCredits = lines.reduce((sum, l) => sum + l.credit, 0)
+    expect(totalDebits).toBeCloseTo(totalCredits, 2)
+    expect(totalCredits).toBeCloseTo(50, 2)
+  })
+
+  it('should write a balanced journal entry with a fee expense line (not scout)', async () => {
+    const linesInsert = vi.fn().mockResolvedValue({ error: null })
+    happyPathMocks({
+      accounts: [
+        { id: 'bank-1', code: '1000' },
+        { id: 'income-1', code: '4900' },
+        { id: 'fee-1', code: '5600' },
+      ],
+      linesInsert,
+      paymentId: 'payment-2',
+    })
+
+    const result = await reconcileSquareTransaction(notScoutParams)
+    expect(result.success).toBe(true)
+
+    const lines = linesInsert.mock.calls[0][0] as JournalLine[]
+    expect(lines).toHaveLength(3)
+
+    const feeLine = lines.find((l) => l.account_id === 'fee-1')
+    expect(feeLine).toMatchObject({ debit: 1.5, credit: 0 })
+
+    const totalDebits = lines.reduce((sum, l) => sum + l.debit, 0)
+    const totalCredits = lines.reduce((sum, l) => sum + l.credit, 0)
+    expect(totalDebits).toBeCloseTo(totalCredits, 2)
+  })
+
+  it('should omit the fee line when feeAmount is zero', async () => {
+    const linesInsert = vi.fn().mockResolvedValue({ error: null })
+    happyPathMocks({
+      accounts: [
+        { id: 'bank-1', code: '1000' },
+        { id: 'recv-1', code: '1200' },
+      ],
+      linesInsert,
+    })
+
+    const result = await reconcileSquareTransaction({
+      ...scoutParams,
+      feeAmount: 0,
+      netAmount: 50,
+    })
+    expect(result.success).toBe(true)
+
+    const lines = linesInsert.mock.calls[0][0] as JournalLine[]
+    expect(lines).toHaveLength(2)
+
+    const totalDebits = lines.reduce((sum, l) => sum + l.debit, 0)
+    const totalCredits = lines.reduce((sum, l) => sum + l.credit, 0)
+    expect(totalDebits).toBeCloseTo(totalCredits, 2)
+  })
+
+  it('should return error when fee account is missing and fee > 0', async () => {
+    const linesInsert = vi.fn().mockResolvedValue({ error: null })
+    happyPathMocks({
+      accounts: [
+        { id: 'bank-1', code: '1000' },
+        { id: 'recv-1', code: '1200' },
+      ],
+      linesInsert,
+    })
+
+    const result = await reconcileSquareTransaction(scoutParams)
+    expect(result.success).toBe(false)
+    expect(result.error).toBe('Required accounts not found (1000, 1200, 5600)')
+    expect(linesInsert).not.toHaveBeenCalled()
   })
 
   it('should return error when required accounts not found', async () => {
@@ -363,7 +478,7 @@ describe('reconcileSquareTransaction', () => {
 
     const result = await reconcileSquareTransaction(scoutParams)
     expect(result.success).toBe(false)
-    expect(result.error).toBe('Required accounts not found (1000, 1200)')
+    expect(result.error).toBe('Required accounts not found (1000, 1200, 5600)')
   })
 
   // --- Not-Scout Reconciliation Tests ---
@@ -423,6 +538,7 @@ describe('reconcileSquareTransaction', () => {
             data: [
               { id: 'bank-1', code: '1000' },
               { id: 'income-1', code: '4900' },
+              { id: 'fee-1', code: '5600' },
             ],
             error: null,
           }),
