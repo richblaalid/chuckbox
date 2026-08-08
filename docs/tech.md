@@ -51,5 +51,6 @@ DRs live in `docs/decisions/` (see `docs/CLAUDE.md` for template/supersession ru
 | DR | Topic |
 |---|---|
 | [DR-2026-07-09-custom-double-entry-ledger-v1](decisions/DR-2026-07-09-custom-double-entry-ledger-v1.md) | Postgres-native ledger (not Medici); binds 4 hardening obligations on all money-moving code |
+| [DR-2026-07-13-advancement-launch-v1](decisions/DR-2026-07-13-advancement-launch-v1.md) | Native advancement tracker ratified: harden + launch as pilot; flag stays off until launch gates (CHUCK-27 mandatory, server-side kill-switch, import auth) clear |
 
 Further retroactive-DR candidates: dual-balance model, extension AI-parsing.

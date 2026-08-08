@@ -23,7 +23,7 @@ Five per-unit roles: **admin** (Key 3), **treasurer** (full financial), **leader
 | Transactional email | **Live** | Resend; 5 templates; collection reminders |
 | CSV imports | **Live** | Roster, charges, balances |
 | Scoutbook sync (roster) | **Live (v1.0.1)** | Chrome extension, roster down-sync only; AI-parsed server-side |
-| Advancement tracking (native) | **Built, dark** | Largest module; `ADVANCEMENT_TRACKING=false` in prod; launch-or-freeze decision pending; cross-unit authz hardening required before flag flip |
+| Advancement tracking (native) | **Launch-prep (gated)** | Ratified as pilot scope ([DR-2026-07-13](decisions/DR-2026-07-13-advancement-launch-v1.md)); `ADVANCEMENT_TRACKING=false` until launch gates clear (CHUCK-27 IDOR fix mandatory); Scoutbook stays record of record |
 | Multi-unit | **Built, gated** | Data layer done; `MULTI_UNIT_CREATION=false` |
 | Plaid bank view | **Built, gated** | `BANK_INTEGRATION=false` |
 | Calendar/RSVP | **Ghost schema** | `events`/`event_rsvps` tables exist, zero app code — build-or-drop decision pending |
@@ -31,9 +31,9 @@ Five per-unit roles: **admin** (Key 3), **treasurer** (full financial), **leader
 
 ## Known product debt (decision queue)
 
-1. Roadmap v3 — ratify actual scope, re-sequence Phase 1 (owner: product)
-2. Advancement: launch or freeze (blocks: authz hardening)
-3. Extension strategy: advancement down-sync in extension? canary infra + CSV fallback
+1. Roadmap v3 — ratify actual scope, re-sequence Phase 1 (owner: product); must incorporate the ratified advancement expansion
+2. ~~Advancement: launch or freeze~~ — **resolved 2026-07-13**: harden + launch as pilot ([DR-2026-07-13](decisions/DR-2026-07-13-advancement-launch-v1.md)); Epic D is launch-prep
+3. Extension strategy: advancement down-sync in extension? canary infra + CSV fallback — **now highest-leverage open decision** (closes the double-entry loop the advancement launch accepts)
 4. Calendar/RSVP: build or drop ghost schema
 5. Fundraising inventory tracker: ratify the cut or schedule it
 6. Parked specs: void/delete billing UX, email branding alignment, billing line-items↔total
