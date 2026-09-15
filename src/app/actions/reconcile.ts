@@ -106,24 +106,30 @@ export async function reconcileSquareTransaction(params: ReconcileParams): Promi
       return { success: false, error: 'Failed to create journal entry' }
     }
 
-    // Get accounts
+    // Get accounts — the fee expense account is required whenever a fee was
+    // charged, or the entry would be unbalanced by the fee
+    const needsFeeLine = params.feeAmount > 0
+    const requiredCodes = needsFeeLine
+      ? ['1000', creditAccountCode, '5600']
+      : ['1000', creditAccountCode]
     const { data: accounts } = await supabase
       .from('accounts')
       .select('id, code')
       .eq('unit_id', params.unitId)
-      .in('code', ['1000', creditAccountCode])
+      .in('code', requiredCodes)
 
     const bankAccount = accounts?.find(a => a.code === '1000')
     const creditAccount = accounts?.find(a => a.code === creditAccountCode)
+    const feeAccount = accounts?.find(a => a.code === '5600')
 
-    if (!bankAccount || !creditAccount) {
+    if (!bankAccount || !creditAccount || (needsFeeLine && !feeAccount)) {
       await supabase.from('journal_entries').delete().eq('id', journalEntry.id)
-      return { success: false, error: `Required accounts not found (1000, ${creditAccountCode})` }
+      return { success: false, error: `Required accounts not found (${requiredCodes.join(', ')})` }
     }
 
-    // Create journal lines (double-entry)
+    // Create journal lines (double-entry: net + fee debits balance the gross credit)
     const scoutAccountId = isScout ? (params as ReconcileToScoutParams).scoutAccountId : null
-    const { error: linesError } = await supabase.from('journal_lines').insert([
+    const journalLines = [
       {
         journal_entry_id: journalEntry.id,
         account_id: bankAccount.id,
@@ -140,7 +146,18 @@ export async function reconcileSquareTransaction(params: ReconcileParams): Promi
         credit: params.amount,
         memo: isScout ? 'Payment received' : (params.notes || 'Non-scout card payment'),
       },
-    ])
+    ]
+    if (needsFeeLine && feeAccount) {
+      journalLines.push({
+        journal_entry_id: journalEntry.id,
+        account_id: feeAccount.id,
+        scout_account_id: null,
+        debit: params.feeAmount,
+        credit: 0,
+        memo: 'Square processing fee',
+      })
+    }
+    const { error: linesError } = await supabase.from('journal_lines').insert(journalLines)
 
     if (linesError) {
       await supabase.from('journal_entries').delete().eq('id', journalEntry.id)

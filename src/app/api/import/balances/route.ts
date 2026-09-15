@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentMembership, getRequestedUnitId } from '@/lib/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { buildBalanceImportLines } from '@/lib/import/balance-import-lines'
 
 interface BalanceImportRow {
   scoutId?: string // If matched
@@ -156,12 +157,13 @@ export async function POST(
     .from('accounts')
     .select('id, code')
     .eq('unit_id', unitId)
-    .in('code', ['1100', '2100']) // Receivables and Scout Funds Liability
+    .in('code', ['1100', '2100', '3000']) // Receivables, Scout Funds Liability, Opening Balance Equity
 
   const receivablesAccount = accounts?.find((a) => a.code === '1100')
   const fundsLiabilityAccount = accounts?.find((a) => a.code === '2100')
+  const openingBalanceAccount = accounts?.find((a) => a.code === '3000')
 
-  if (!receivablesAccount || !fundsLiabilityAccount) {
+  if (!receivablesAccount || !fundsLiabilityAccount || !openingBalanceAccount) {
     return NextResponse.json(
       {
         success: false,
@@ -280,72 +282,18 @@ export async function POST(
           continue
         }
 
-        // Create journal lines
-        const journalLines: Array<{
-          journal_entry_id: string
-          account_id: string
-          scout_account_id: string
-          debit: number
-          credit: number
-          memo: string
-          target_balance: string
-        }> = []
-
-        if (billingDiff !== 0) {
-          // Billing balance change
-          // If billing goes more negative (more owed), debit receivables
-          // If billing goes less negative (less owed), credit receivables
-          if (billingDiff < 0) {
-            // More owed = debit receivables
-            journalLines.push({
-              journal_entry_id: journalEntry.id,
-              account_id: receivablesAccount.id,
-              scout_account_id: scoutAccountId,
-              debit: Math.abs(billingDiff),
-              credit: 0,
-              memo: `Billing balance: ${currentBilling} → ${newBilling}`,
-              target_balance: 'billing',
-            })
-          } else {
-            // Less owed = credit receivables
-            journalLines.push({
-              journal_entry_id: journalEntry.id,
-              account_id: receivablesAccount.id,
-              scout_account_id: scoutAccountId,
-              debit: 0,
-              credit: billingDiff,
-              memo: `Billing balance: ${currentBilling} → ${newBilling}`,
-              target_balance: 'billing',
-            })
-          }
-        }
-
-        if (fundsDiff !== 0) {
-          // Funds balance change
-          // If funds increase, credit liability (unit owes scout more)
-          // If funds decrease, debit liability (unit owes scout less)
-          if (fundsDiff > 0) {
-            journalLines.push({
-              journal_entry_id: journalEntry.id,
-              account_id: fundsLiabilityAccount.id,
-              scout_account_id: scoutAccountId,
-              debit: 0,
-              credit: fundsDiff,
-              memo: `Funds balance: ${currentFunds} → ${newFunds}`,
-              target_balance: 'funds',
-            })
-          } else {
-            journalLines.push({
-              journal_entry_id: journalEntry.id,
-              account_id: fundsLiabilityAccount.id,
-              scout_account_id: scoutAccountId,
-              debit: Math.abs(fundsDiff),
-              credit: 0,
-              memo: `Funds balance: ${currentFunds} → ${newFunds}`,
-              target_balance: 'funds',
-            })
-          }
-        }
+        // Create journal lines, balanced against Opening Balance Equity
+        const journalLines = buildBalanceImportLines({
+          journalEntryId: journalEntry.id,
+          receivablesAccountId: receivablesAccount.id,
+          fundsLiabilityAccountId: fundsLiabilityAccount.id,
+          openingBalanceAccountId: openingBalanceAccount.id,
+          scoutAccountId,
+          currentBilling,
+          newBilling,
+          currentFunds,
+          newFunds,
+        })
 
         if (journalLines.length > 0) {
           const { error: linesError } = await adminSupabase
